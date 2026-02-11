@@ -1,0 +1,19 @@
+[project]
+name = "academic-agentai"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "langchain>=1.2.10",
+    "langchain-openai>=1.1.9",
+    "langgraph>=1.0.8",
+    "openai>=2.20.0",
+    "python-dotenv>=1.2.1",
+]
+
+[dependency-groups]
+dev = [
+    "ipykernel>=7.2.0",
+    "langgraph-cli[inmem]>=0.4.12",
+]
