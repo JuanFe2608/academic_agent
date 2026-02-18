@@ -2,7 +2,8 @@
 {
     "dependencies": ["."],
     "graphs": {
-        "academic_agent": "./src/agents/academic_agent.py:agent"
+        "academic_agent": "./src/agents/academic_agent.py:agent",
+        "support": "./src/agents/support/agent.py:agent"
     },
     "env": ".env"
 }
