@@ -1,6 +1,13 @@
 from agents.support.state import StudentState
 
 
+def _courses_summary(state: StudentState) -> str:
+    if not state.current_courses:
+        return "Sin materias registradas."
+    names = [course.course_name for course in state.current_courses if course.course_name]
+    return ", ".join(names) if names else "Sin materias registradas."
+
+
 def build_system_prompt(state: StudentState) -> str:
     return (
         "Eres un asistente virtual educativo disenado para apoyar a estudiantes "
@@ -21,13 +28,15 @@ def build_system_prompt(state: StudentState) -> str:
         "Restricciones: no hagas tareas completas sin explicar, no fomentes trampas "
         "academicas, no uses lenguaje ofensivo, no des informacion peligrosa, "
         "mantente educativo.\n"
-        "Formato: usa titulos cortos, viñetas cuando sea util, da ejemplos y "
+        "Formato: usa titulos cortos, vinetas cuando sea util, da ejemplos y "
         "finaliza con una pregunta abierta.\n"
         "Contexto del estudiante:\n"
         f"- Nombre: {state.full_name}\n"
+        f"- Nombre preferido: {state.preferred_name}\n"
         f"- Programa: {state.program}\n"
-        f"- Semestre: {state.semester}\n"
+        f"- Promedio: {state.gpa}\n"
         f"- Edad: {state.age}\n"
-        f"- Temas faciles: {state.strengths_topics}\n"
-        f"- Temas a reforzar: {state.difficulty_topics}\n"
+        f"- Codigo: {state.student_code}\n"
+        f"- Materias actuales: {_courses_summary(state)}\n"
+        f"- Materia mas exigente: {state.most_challenging_course}\n"
     )
