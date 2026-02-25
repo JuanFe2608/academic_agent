@@ -1,8 +1,0 @@
-import os
-import re
-
-DEFAULT_DEPLOYMENT = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
-DEFAULT_API_VERSION = os.getenv("OPENAI_API_VERSION")
-DEFAULT_AZURE_ENDPOINT = os.getenv("AZURE_OPENAI_ENDPOINT")
-DEFAULT_AZURE_API_KEY = os.getenv("AZURE_OPENAI_API_KEY")
-EMAIL_PATTERN = re.compile(r"^[^@\s]+@ucatolica\.edu\.co$")
