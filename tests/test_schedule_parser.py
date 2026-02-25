@@ -31,11 +31,11 @@ def test_parse_work_schedule_text(text, expected_days, start, end):
     events = parse_work_schedule_text(text)
 
     assert len(events) == len(expected_days)
-    assert [event["dia"] for event in events] == expected_days
-    assert all(event["inicio"] == start for event in events)
-    assert all(event["fin"] == end for event in events)
-    assert all(event["categoria"] == "laboral" for event in events)
-    assert all(event["titulo"] == "Trabajo" for event in events)
+    assert [event.dia for event in events] == expected_days
+    assert all(event.inicio == start for event in events)
+    assert all(event.fin == end for event in events)
+    assert all(event.categoria == "laboral" for event in events)
+    assert all(event.titulo == "Trabajo" for event in events)
 
 
 def test_parse_invalid_text():

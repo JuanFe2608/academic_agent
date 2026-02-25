@@ -33,6 +33,21 @@ _TIME_RANGE_PATTERN = re.compile(
     r"(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)\s*(?:-|a|hasta)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)"
 )
 
+_ACADEMIC_DAYS_PATTERN = re.compile(
+    r"(?P<days>(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM)(?:\s*,\s*(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM))*)"
+    r"\s+(?P<start>\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(?P<end>\d{1,2}:\d{2}(?::\d{2})?)",
+    re.IGNORECASE,
+)
+
+_DATE_LINE = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
+
+_DAY_LINE_PATTERN = re.compile(
+    r"(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
+    r"\s+(?P<start>\d{1,2}(?::\d{2})?)\s*(?:-|a|hasta)\s*(?P<end>\d{1,2}(?::\d{2})?)"
+    r"(?:\s+(?P<title>.+))?",
+    re.IGNORECASE,
+)
+
 
 def parse_work_schedule_text(
     text: str, timezone: str = "America/Bogota"
@@ -48,25 +63,128 @@ def parse_work_schedule_text(
 
     normalized = _strip_accents(str(text).lower())
     start_raw, end_raw = _extract_time_range(normalized)
-    start = normalize_time(start_raw)
-    end = normalize_time(end_raw)
+    start, end = _normalize_time_range(start_raw, end_raw, normalized)
     days = _extract_days(normalized)
 
     events: list[Event] = []
     for day in days:
         events.append(
-            {
-                "id": new_event_id(),
-                "dia": day,
-                "inicio": start,
-                "fin": end,
-                "titulo": "Trabajo",
-                "tipo": "confirmado",
-                "categoria": "laboral",
-                "origen": "user_text",
-                "timezone": timezone,
-            }
+            Event(
+                id=new_event_id(),
+                dia=day,
+                inicio=start,
+                fin=end,
+                titulo="Trabajo",
+                tipo="confirmado",
+                categoria="laboral",
+                origen="user_text",
+                timezone=timezone,
+            )
         )
+    return events
+
+
+def _normalize_time_range(start_raw: str, end_raw: str, context: str = "") -> tuple[str, str]:
+    start = normalize_time(start_raw)
+    end = normalize_time(end_raw)
+
+    # Si no hay AM/PM ni formato 24h y el fin es menor, asumimos PM en la hora final.
+    if _has_meridiem(start_raw) or _has_meridiem(end_raw):
+        return start, end
+    if _looks_24h(start_raw) or _looks_24h(end_raw):
+        return start, end
+
+    start_h, start_m = _extract_hour_minute(start_raw)
+    end_h, end_m = _extract_hour_minute(end_raw)
+
+    if _has_afternoon_marker(context):
+        if start_h < 12 and end_h < 12 and end_h >= start_h:
+            start = f"{start_h + 12:02d}:{start_m:02d}"
+            end = f"{end_h + 12:02d}:{end_m:02d}"
+            return start, end
+
+    if _has_morning_marker(context):
+        return start, end
+
+    if start_h <= 5 and end_h <= 7:
+        start = f"{min(start_h + 12, 23):02d}:{start_m:02d}"
+        end = f"{min(end_h + 12, 23):02d}:{end_m:02d}"
+        return start, end
+
+    if end_h < start_h:
+        end_h = min(end_h + 12, 23)
+        end = f"{end_h:02d}:{end_m:02d}"
+    return start, end
+
+
+def parse_academic_schedule_text(
+    text: str, timezone: str = "America/Bogota"
+) -> list[Event]:
+    """Parsea texto del correo institucional de horario academico."""
+    if text is None or not str(text).strip():
+        return []
+
+    lines = _normalize_lines(text)
+    current_subject = ""
+    events: list[Event] = []
+    seen: set[tuple[str, str, str, str]] = set()
+
+    for line in lines:
+        day_match = _DAY_LINE_PATTERN.search(line)
+        if day_match:
+            day_token = day_match.group("day")
+            days = [_normalize_day_token(day_token)]
+            start_raw = day_match.group("start")
+            end_raw = day_match.group("end")
+            start, end = _normalize_time_range(start_raw, end_raw, line)
+            title = (day_match.group("title") or "").strip() or current_subject or "Clase"
+            for day in days:
+                key = (day, start, end, title)
+                if key in seen:
+                    continue
+                seen.add(key)
+                events.append(
+                    Event(
+                        id=new_event_id(),
+                        dia=day,
+                        inicio=start,
+                        fin=end,
+                        titulo=title,
+                        tipo="confirmado",
+                        categoria="academico",
+                        origen="user_text",
+                        timezone=timezone,
+                    )
+                )
+            continue
+
+        if _is_subject_line(line):
+            current_subject = line.strip()
+            continue
+
+        for match in _ACADEMIC_DAYS_PATTERN.finditer(line):
+            days = _split_days(match.group("days"))
+            start = normalize_time(_strip_seconds(match.group("start")))
+            end = normalize_time(_strip_seconds(match.group("end")))
+            title = current_subject or "Clase"
+            for day in days:
+                key = (day, start, end, title)
+                if key in seen:
+                    continue
+                seen.add(key)
+                events.append(
+                    Event(
+                        id=new_event_id(),
+                        dia=day,
+                        inicio=start,
+                        fin=end,
+                        titulo=title,
+                        tipo="confirmado",
+                        categoria="academico",
+                        origen="user_text",
+                        timezone=timezone,
+                    )
+                )
     return events
 
 
@@ -79,12 +197,97 @@ def _strip_accents(value: str) -> str:
     )
 
 
+def _normalize_lines(text: str) -> list[str]:
+    lines = [line.strip() for line in str(text).splitlines()]
+    return [line for line in lines if line]
+
+
+def _is_subject_line(line: str) -> bool:
+    normalized = _strip_accents(line.lower())
+    if _DAY_LINE_PATTERN.search(line):
+        return False
+    if _DATE_LINE.search(normalized):
+        return False
+    if "codigo asignatura" in normalized:
+        return False
+    if "creditos" in normalized or "créditos" in normalized:
+        return False
+    if "grupo" in normalized:
+        return False
+    if "bogota" in normalized or "bloque" in normalized or "salon" in normalized or "sala" in normalized:
+        return False
+    if _ACADEMIC_DAYS_PATTERN.search(line):
+        return False
+    if len(normalized) < 3:
+        return False
+    letters = sum(1 for ch in normalized if ch.isalpha())
+    return letters >= 3
+
+
+def _split_days(days_raw: str) -> list[str]:
+    tokens = [token.strip() for token in days_raw.split(",") if token.strip()]
+    days: list[str] = []
+    for token in tokens:
+        normalized = _strip_accents(token.lower())
+        normalized = normalized[:3]
+        if normalized == "lun":
+            days.append("Lunes")
+        elif normalized == "mar":
+            days.append("Martes")
+        elif normalized == "mie":
+            days.append("Miercoles")
+        elif normalized == "jue":
+            days.append("Jueves")
+        elif normalized == "vie":
+            days.append("Viernes")
+        elif normalized == "sab":
+            days.append("Sabado")
+        elif normalized == "dom":
+            days.append("Domingo")
+    return days
+
+
 def _extract_time_range(text: str) -> tuple[str, str]:
     """Extrae el rango de horas desde el texto normalizado."""
     match = _TIME_RANGE_PATTERN.search(text)
     if not match:
         raise ValueError("no time range found")
     return match.group(1), match.group(2)
+
+
+def _extract_hour_minute(value: str) -> tuple[int, int]:
+    raw = str(value).strip().lower()
+    match = re.match(r"^(\d{1,2})(?::(\d{2}))?", raw)
+    if not match:
+        return 0, 0
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    return hour, minute
+
+
+def _has_meridiem(value: str) -> bool:
+    return bool(re.search(r"\b([ap]m)\b", str(value).lower()))
+
+
+def _has_afternoon_marker(context: str) -> bool:
+    normalized = _strip_accents(context.lower())
+    return "tarde" in normalized or "noche" in normalized
+
+
+def _has_morning_marker(context: str) -> bool:
+    normalized = _strip_accents(context.lower())
+    return "manana" in normalized or "mañana" in normalized
+
+
+def _looks_24h(value: str) -> bool:
+    hour, _ = _extract_hour_minute(value)
+    return hour >= 13
+
+
+def _strip_seconds(value: str) -> str:
+    raw = str(value).strip()
+    match = re.match(r"^(\d{1,2}:\d{2})(?::\d{2})?$", raw)
+    return match.group(1) if match else raw
 
 
 def _extract_days(text: str) -> list[str]:
