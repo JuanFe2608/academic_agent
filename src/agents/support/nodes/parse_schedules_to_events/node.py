@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from agents.support.nodes.utils import append_message
 from agents.support.state import AgentState, Event, validate_event
+from agents.support.tools.llm import llm_normalize_schedule
 from agents.support.tools.schedule_parser import (
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
-from agents.support.tools.llm import llm_normalize_schedule
 
 from .prompt import PROMPT_ERROR
 
@@ -24,7 +24,9 @@ def parse_schedules_to_events(state: AgentState) -> dict:
     laboral_text = raw_inputs.get("horario_laboral_text")
     if laboral_text:
         try:
-            parsed = parse_work_schedule_text(laboral_text, state.get("timezone", "America/Bogota"))
+            parsed = parse_work_schedule_text(
+                laboral_text, state.get("timezone", "America/Bogota")
+            )
         except ValueError as exc:
             errors.append(f"Horario laboral invalido: {exc}")
             return {
