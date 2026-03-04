@@ -71,7 +71,7 @@ def confirm_profile(state: AgentState) -> dict:
                 "messages": append_message(messages, "assistant", PROMPT_FIELD),
             }
         profile[field] = None
-        prompt = PROMPTS_BY_FIELD.get(field, "¿Cuál es el dato correcto?")
+        prompt = _prompt_for_field(field, is_edit=True)
         return {
             "student_profile": profile,
             "profile_edit_target": None,
@@ -97,7 +97,7 @@ def confirm_profile(state: AgentState) -> dict:
         field = _extract_field(normalized)
         if field:
             profile[field] = None
-            prompt = PROMPTS_BY_FIELD.get(field, "¿Cuál es el dato correcto?")
+            prompt = _prompt_for_field(field, is_edit=True)
             return {
                 "student_profile": profile,
                 "profile_edit_target": None,
@@ -186,3 +186,12 @@ def _display_value(value: object) -> str:
         combined = " ".join(part for part in parts if part)
         return combined if combined else "Pendiente"
     return str(value)
+
+
+def _prompt_for_field(field: str, is_edit: bool = False) -> str:
+    prompt = PROMPTS_BY_FIELD.get(field, "¿Cuál es el dato correcto?")
+    if not is_edit:
+        return prompt
+    if field == "nombre":
+        return prompt.replace("Empecemos. ", "").replace("Empecemos ", "")
+    return prompt

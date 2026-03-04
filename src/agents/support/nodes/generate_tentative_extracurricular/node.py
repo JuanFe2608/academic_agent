@@ -7,6 +7,8 @@ import re
 from agents.support.nodes.utils import normalize_text
 from agents.support.state import DAY_ORDER, AgentState, Event, ExtracurricularItem, validate_event
 from agents.support.state import new_event_id, normalize_day, normalize_time
+from agents.support.tools.llm import llm_normalize_schedule
+from agents.support.tools.schedule_parser import parse_academic_schedule_text
 
 _DAY_TOKEN_PATTERN = (
     r"(?:"
@@ -22,6 +24,18 @@ _DAY_TOKEN_PATTERN = (
 _RANGE_PATTERN = re.compile(
     rf"\b({_DAY_TOKEN_PATTERN})\b\s*(?:-|a|hasta)\s*\b({_DAY_TOKEN_PATTERN})\b"
 )
+_DAY_TOKEN_STRICT_PATTERN = (
+    r"(?:"
+    r"lunes|lun|"
+    r"martes|mar|"
+    r"miercoles|mier|mie|x|"
+    r"jueves|jue|"
+    r"viernes|vie|"
+    r"sabado|sab|"
+    r"domingo|dom"
+    r")"
+)
+_ALL_DAY_PATTERN = re.compile(rf"\b({_DAY_TOKEN_STRICT_PATTERN})\b")
 _SINGLE_DAY_PATTERN = re.compile(rf"\b({_DAY_TOKEN_PATTERN})\b")
 _TIME_RANGE_PATTERN = re.compile(
     r"(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)\s*(?:-|a|hasta)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)"
@@ -30,7 +44,7 @@ _COUNT_PATTERN = re.compile(r"(\d+)\s*veces")
 
 
 def generate_tentative_extracurricular(state: AgentState) -> dict:
-    """Genera eventos tentativos para actividades variables."""
+    """Genera eventos para actividades variables y fijas."""
     timezone = state.get("timezone", "America/Bogota")
     events: list[Event] = list(state.get("events", []))
     errors = list(state.get("errors", []))
@@ -39,15 +53,20 @@ def generate_tentative_extracurricular(state: AgentState) -> dict:
     for item in state.get("extracurricular", []):
         updated_item = _ensure_extracurricular_item(item)
         tentativos: list[Event] = []
-        if item.get("es_variable"):
-            tentativos = build_tentative_events(item, timezone)
-            for event in tentativos:
-                try:
-                    validate_event(event)
-                except ValueError as exc:
-                    errors.append(f"Tentativo extracurricular invalido: {exc}")
-                    continue
-                events.append(event)
+        generated_events = (
+            build_tentative_events(updated_item, timezone)
+            if updated_item.get("es_variable")
+            else build_fixed_events(updated_item, timezone)
+        )
+        for event in generated_events:
+            try:
+                validate_event(event)
+            except ValueError as exc:
+                errors.append(f"Evento extracurricular invalido: {exc}")
+                continue
+            events.append(event)
+            if event.get("tipo") == "tentativo":
+                tentativos.append(event)
         updated_item.tentativo = tentativos
         extracurricular_updated.append(updated_item)
 
@@ -91,6 +110,57 @@ def build_tentative_events(item: ExtracurricularItem, timezone: str) -> list[Eve
     return events
 
 
+def build_fixed_events(item: ExtracurricularItem, timezone: str) -> list[Event]:
+    """Crea eventos confirmados a partir del horario fijo de la actividad."""
+    detail = str(item.get("detalle", "")).strip()
+    if not detail:
+        return []
+
+    heuristic_events = _build_fixed_events_heuristic(item, timezone)
+    parsed = _parse_fixed_schedule_with_ai(detail, timezone)
+    if parsed and len(parsed) >= len(heuristic_events):
+        return [
+            Event(
+                id=new_event_id(),
+                dia=event.get("dia"),
+                inicio=event.get("inicio"),
+                fin=event.get("fin"),
+                titulo=item.get("nombre", "Extracurricular"),
+                tipo="confirmado",
+                categoria="extracurricular",
+                origen="user_text",
+                timezone=timezone,
+            )
+            for event in parsed
+        ]
+
+    return heuristic_events
+
+
+def _build_fixed_events_heuristic(item: ExtracurricularItem, timezone: str) -> list[Event]:
+    detail = str(item.get("detalle", "")).strip()
+    day_candidates = _extract_days(detail)
+    if not day_candidates:
+        return []
+    start_time, end_time = _extract_start_end_time(detail)
+    if not start_time or not end_time:
+        return []
+    return [
+        Event(
+            id=new_event_id(),
+            dia=day,
+            inicio=start_time,
+            fin=end_time,
+            titulo=item.get("nombre", "Extracurricular"),
+            tipo="confirmado",
+            categoria="extracurricular",
+            origen="user_text",
+            timezone=timezone,
+        )
+        for day in day_candidates
+    ]
+
+
 def _ensure_extracurricular_item(item: ExtracurricularItem | dict) -> ExtracurricularItem:
     if isinstance(item, ExtracurricularItem):
         return item
@@ -105,10 +175,21 @@ def _extract_days(text: str) -> list[str]:
         end_day = _normalize_day_token(range_match.group(2))
         return _expand_day_range(start_day, end_day)
 
-    single_match = _SINGLE_DAY_PATTERN.search(normalized)
-    if single_match:
-        return [_normalize_day_token(single_match.group(1))]
-    return []
+    matches = _ALL_DAY_PATTERN.findall(normalized)
+    if not matches:
+        single_match = _SINGLE_DAY_PATTERN.search(normalized)
+        if single_match:
+            matches = [single_match.group(1)]
+
+    days: list[str] = []
+    for token in matches:
+        try:
+            day = _normalize_day_token(token)
+        except ValueError:
+            continue
+        if day not in days:
+            days.append(day)
+    return days
 
 
 def _normalize_day_token(token: str) -> str:
@@ -143,6 +224,15 @@ def _extract_start_time(text: str) -> str:
     return "18:00"
 
 
+def _extract_start_end_time(text: str) -> tuple[str | None, str | None]:
+    match = _TIME_RANGE_PATTERN.search(normalize_text(text))
+    if not match:
+        return None, None
+    start = normalize_time(match.group(1))
+    end = normalize_time(match.group(2))
+    return start, end
+
+
 def _add_minutes(time_str: str, minutes: int) -> str:
     base = normalize_time(time_str)
     hours = int(base[:2])
@@ -161,3 +251,21 @@ def _pick_days(days: list[str], count: int) -> list[str]:
         selected.append(days[index % len(days)])
         index += 1
     return selected
+
+
+def _parse_fixed_schedule_with_ai(detail: str, timezone: str) -> list[Event]:
+    normalized = llm_normalize_schedule(detail, "academico")
+    candidates = [candidate for candidate in [normalized, detail] if candidate]
+    seen: set[str] = set()
+    for candidate in candidates:
+        text = str(candidate).strip()
+        if not text or text in seen:
+            continue
+        seen.add(text)
+        try:
+            parsed = parse_academic_schedule_text(text, timezone)
+        except ValueError:
+            parsed = []
+        if parsed:
+            return parsed
+    return []

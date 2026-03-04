@@ -41,3 +41,16 @@ def test_parse_work_schedule_text(text, expected_days, start, end):
 def test_parse_invalid_text():
     with pytest.raises(ValueError):
         parse_work_schedule_text("No tengo horario fijo")
+
+
+def test_parse_work_schedule_multiline_day_entries():
+    text = "Lunes 07:00-16:00 Trabajo\nMiercoles 08:00-12:00 Trabajo"
+    events = parse_work_schedule_text(text)
+
+    assert len(events) == 2
+    assert events[0].dia == "Lunes"
+    assert events[0].inicio == "07:00"
+    assert events[0].fin == "16:00"
+    assert events[1].dia == "Miercoles"
+    assert events[1].inicio == "08:00"
+    assert events[1].fin == "12:00"

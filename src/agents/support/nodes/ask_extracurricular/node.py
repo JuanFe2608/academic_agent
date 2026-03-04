@@ -9,7 +9,7 @@ from agents.support.nodes.utils import (
 )
 from agents.support.state import AgentState
 
-from .prompt import PROMPT
+from .prompt import PROMPT, PROMPT_TYPE
 
 
 def ask_extracurricular(state: AgentState) -> dict:
@@ -26,7 +26,8 @@ def ask_extracurricular(state: AgentState) -> dict:
     if answer is True:
         return {
             "extras_has_any": True,
-            "extras_collect_stage": "awaiting_details",
+            "extras_collect_stage": "awaiting_type",
+            "extras_pending_is_variable": None,
             "phase": "extras",
             "user_message_count": current_count,
             "last_user_text": last_text,
@@ -34,7 +35,7 @@ def ask_extracurricular(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                "Cuentame la actividad: nombre, si es fija o variable y el detalle.",
+                PROMPT_TYPE,
             ),
         }
 
@@ -42,6 +43,7 @@ def ask_extracurricular(state: AgentState) -> dict:
         return {
             "extras_has_any": False,
             "extras_collect_stage": "done",
+            "extras_pending_is_variable": None,
             "phase": "draft",
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
             "last_user_text": last_text if has_new_input else state.get("last_user_text"),

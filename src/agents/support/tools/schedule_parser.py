@@ -33,6 +33,12 @@ _TIME_RANGE_PATTERN = re.compile(
     r"(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)\s*(?:-|a|hasta)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)"
 )
 
+_WORK_DAY_LINE_PATTERN = re.compile(
+    r"(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
+    r"\s+(?P<start>\d{1,2}(?::\d{2})?)\s*(?:-|a|hasta)\s*(?P<end>\d{1,2}(?::\d{2})?)",
+    re.IGNORECASE,
+)
+
 _ACADEMIC_DAYS_PATTERN = re.compile(
     r"(?P<days>(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM)(?:\s*,\s*(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM))*)"
     r"\s+(?P<start>\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(?P<end>\d{1,2}:\d{2}(?::\d{2})?)",
@@ -61,6 +67,10 @@ def parse_work_schedule_text(
     if text is None or not str(text).strip():
         return []
 
+    line_events = _parse_work_day_lines(str(text), timezone)
+    if line_events:
+        return line_events
+
     normalized = _strip_accents(str(text).lower())
     start_raw, end_raw = _extract_time_range(normalized)
     start, end = _normalize_time_range(start_raw, end_raw, normalized)
@@ -68,6 +78,41 @@ def parse_work_schedule_text(
 
     events: list[Event] = []
     for day in days:
+        events.append(
+            Event(
+                id=new_event_id(),
+                dia=day,
+                inicio=start,
+                fin=end,
+                titulo="Trabajo",
+                tipo="confirmado",
+                categoria="laboral",
+                origen="user_text",
+                timezone=timezone,
+            )
+        )
+    return events
+
+
+def _parse_work_day_lines(text: str, timezone: str) -> list[Event]:
+    lines = _normalize_lines(text)
+    events: list[Event] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    for line in lines:
+        match = _WORK_DAY_LINE_PATTERN.search(line)
+        if not match:
+            continue
+        day = _normalize_day_token(match.group("day"))
+        start, end = _normalize_time_range(
+            match.group("start"),
+            match.group("end"),
+            line,
+        )
+        key = (day, start, end)
+        if key in seen:
+            continue
+        seen.add(key)
         events.append(
             Event(
                 id=new_event_id(),

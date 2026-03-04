@@ -26,11 +26,13 @@ from agents.support.state import AgentState
 
 def _should_wait(state: AgentState) -> bool:
     messages = state.get("messages", [])
+    last_images = state.get("last_user_images", []) if state.get("phase") == "schedules" else None
     has_new_input, _, _ = detect_new_input(
         messages,
         state.get("user_message_count", 0),
         state.get("awaiting_user_input", False),
         state.get("last_user_text"),
+        last_images,
     )
     return bool(state.get("awaiting_user_input") and not has_new_input)
 
@@ -107,14 +109,28 @@ def _route_request_schedules(state: AgentState) -> str:
 
     if ocupacion == "ninguna":
         return "end"
-    if ocupacion in ("solo_trabajo", "ambos") and not raw_inputs.get(
-        "horario_laboral_text"
-    ):
-        return "request_schedules"
-    if ocupacion in ("solo_estudio", "ambos") and not raw_inputs.get(
-        "horario_academico_text"
-    ):
-        return "request_schedules"
+
+    if ocupacion == "solo_estudio":
+        if not raw_inputs.get("horario_academico_text"):
+            return "request_schedules"
+        return "parse_schedules_to_events"
+
+    if ocupacion == "solo_trabajo":
+        if not raw_inputs.get("horario_laboral_tipo"):
+            return "request_schedules"
+        if not raw_inputs.get("horario_laboral_text"):
+            return "request_schedules"
+        return "parse_schedules_to_events"
+
+    if ocupacion == "ambos":
+        if not raw_inputs.get("horario_academico_text"):
+            return "request_schedules"
+        if not raw_inputs.get("horario_laboral_tipo"):
+            return "request_schedules"
+        if not raw_inputs.get("horario_laboral_text"):
+            return "request_schedules"
+        return "parse_schedules_to_events"
+
     return "parse_schedules_to_events"
 
 

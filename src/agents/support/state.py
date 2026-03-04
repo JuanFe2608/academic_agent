@@ -37,7 +37,7 @@ EventCategory = Literal["academico", "laboral", "extracurricular", "estudio"]
 CalendarProvider = Literal["outlook", "google"]
 Ocupacion = Literal["solo_estudio", "solo_trabajo", "ambos", "ninguna"]
 Prioridad = Literal["alta", "media", "baja"]
-ExtrasCollectStage = Literal["awaiting_details", "awaiting_more", "done"]
+ExtrasCollectStage = Literal["awaiting_type", "awaiting_details", "awaiting_more", "done"]
 
 
 class BaseStateModel(BaseModel):
@@ -183,6 +183,7 @@ class AgentState(BaseStateModel):
     timezone: str = "America/Bogota"
     welcome_sent: bool = False
     last_user_text: Optional[str] = None
+    last_user_images: list[str] = Field(default_factory=list)
     profile_edit_target: Optional[str] = None
     user_message_count: int = 0
     awaiting_user_input: bool = False
@@ -191,6 +192,7 @@ class AgentState(BaseStateModel):
     raw_inputs: RawInputs = Field(default_factory=RawInputs)
     extras_has_any: Optional[bool] = None
     extras_collect_stage: Optional[ExtrasCollectStage] = None
+    extras_pending_is_variable: Optional[bool] = None
     extracurricular: list[ExtracurricularItem] = Field(default_factory=list)
     events: list[Event] = Field(default_factory=list)
     events_validated: bool = False

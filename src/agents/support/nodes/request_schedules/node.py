@@ -5,7 +5,6 @@ from __future__ import annotations
 from agents.support.nodes.utils import (
     append_message,
     detect_new_input,
-    get_last_user_images,
     has_time_range,
     normalize_text,
 )
@@ -29,7 +28,6 @@ def request_schedules(state: AgentState) -> dict:
         state.get("awaiting_user_input", False),
         state.get("last_user_text"),
     )
-    images = get_last_user_images(messages) if has_new_input else []
     raw_inputs = dict(state.get("raw_inputs", {}))
     ocupacion = state.get("student_profile", {}).get("ocupacion")
 
@@ -39,38 +37,8 @@ def request_schedules(state: AgentState) -> dict:
             "messages": append_message(messages, "assistant", PROMPT_NINGUNA),
         }
 
-    if _needs_work_type(ocupacion, raw_inputs):
-        if has_new_input and last_text:
-            work_type = _parse_work_type(last_text)
-            if work_type:
-                raw_inputs["horario_laboral_tipo"] = work_type
-            else:
-                return {
-                    "raw_inputs": raw_inputs,
-                    "phase": "schedules",
-                    "user_message_count": current_count
-                    if has_new_input
-                    else state.get("user_message_count", 0),
-                    "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-                    "awaiting_user_input": True,
-                    "messages": append_message(messages, "assistant", PROMPT_LABORAL_TIPO),
-                }
-        if _needs_work_type(ocupacion, raw_inputs):
-            return {
-                "raw_inputs": raw_inputs,
-                "phase": "schedules",
-                "user_message_count": current_count
-                if has_new_input
-                else state.get("user_message_count", 0),
-                "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-                "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", PROMPT_LABORAL_TIPO),
-            }
-
     if has_new_input and last_text:
-        raw_inputs = _apply_schedule_text(raw_inputs, last_text, ocupacion)
-    if has_new_input and images:
-        raw_inputs = _apply_schedule_image(raw_inputs, images, ocupacion, last_text)
+        raw_inputs = _consume_schedule_text_by_stage(raw_inputs, last_text, ocupacion)
 
     missing = _missing_schedule_inputs(raw_inputs, ocupacion)
     if missing:
@@ -99,36 +67,39 @@ def request_schedules(state: AgentState) -> dict:
     }
 
 
-def _apply_schedule_text(raw_inputs: RawInputs, text: str, ocupacion: str | None) -> RawInputs:
-    """Guarda el texto recibido en el campo adecuado."""
+def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion: str | None) -> RawInputs:
+    """Consume texto segun el paso pendiente del flujo de horarios."""
     updated = dict(raw_inputs)
-    normalized = normalize_text(text)
+    clean_text = str(text or "").strip()
+    if not clean_text:
+        return updated
 
     if ocupacion == "solo_trabajo":
-        if not updated.get("horario_laboral_text") and has_time_range(text):
-            updated["horario_laboral_text"] = text.strip()
+        if not updated.get("horario_laboral_tipo"):
+            work_type = _parse_work_type(clean_text)
+            if work_type:
+                updated["horario_laboral_tipo"] = work_type
+            return updated
+        if not updated.get("horario_laboral_text") and has_time_range(clean_text):
+            updated["horario_laboral_text"] = clean_text
         return updated
 
     if ocupacion == "solo_estudio":
         if not updated.get("horario_academico_text"):
-            updated["horario_academico_text"] = text.strip()
+            updated["horario_academico_text"] = clean_text
         return updated
 
     if ocupacion == "ambos":
-        if _looks_like_academic_schedule(normalized):
-            if not updated.get("horario_academico_text"):
-                updated["horario_academico_text"] = text.strip()
-        elif "trabajo" in normalized or "laboral" in normalized:
-            if not updated.get("horario_laboral_text") and has_time_range(text):
-                updated["horario_laboral_text"] = text.strip()
-        elif "academico" in normalized or "clase" in normalized:
-            if not updated.get("horario_academico_text"):
-                updated["horario_academico_text"] = text.strip()
-        elif has_time_range(text):
-            if not updated.get("horario_laboral_text"):
-                updated["horario_laboral_text"] = text.strip()
-            elif not updated.get("horario_academico_text"):
-                updated["horario_academico_text"] = text.strip()
+        if not updated.get("horario_academico_text"):
+            updated["horario_academico_text"] = clean_text
+            return updated
+        if not updated.get("horario_laboral_tipo"):
+            work_type = _parse_work_type(clean_text)
+            if work_type:
+                updated["horario_laboral_tipo"] = work_type
+            return updated
+        if not updated.get("horario_laboral_text") and has_time_range(clean_text):
+            updated["horario_laboral_text"] = clean_text
         return updated
 
     return updated
@@ -136,20 +107,39 @@ def _apply_schedule_text(raw_inputs: RawInputs, text: str, ocupacion: str | None
 
 def _missing_schedule_inputs(raw_inputs: RawInputs, ocupacion: str | None) -> list[str]:
     missing: list[str] = []
-    if ocupacion in ("solo_trabajo", "ambos"):
-        if not raw_inputs.get("horario_laboral_text") and not raw_inputs.get(
-            "horario_laboral_img"
-        ):
+    if ocupacion == "solo_trabajo":
+        if not raw_inputs.get("horario_laboral_tipo"):
+            missing.append("horario_laboral_tipo")
+        elif not raw_inputs.get("horario_laboral_text"):
             missing.append("horario_laboral_text")
-    if ocupacion in ("solo_estudio", "ambos"):
-        if not raw_inputs.get("horario_academico_text") and not raw_inputs.get(
-            "horario_academico_img"
-        ):
+        return missing
+
+    if ocupacion == "solo_estudio":
+        if not raw_inputs.get("horario_academico_text"):
             missing.append("horario_academico_text")
+        return missing
+
+    if ocupacion == "ambos":
+        if not raw_inputs.get("horario_academico_text"):
+            missing.append("horario_academico_text")
+        elif not raw_inputs.get("horario_laboral_tipo"):
+            missing.append("horario_laboral_tipo")
+        elif not raw_inputs.get("horario_laboral_text"):
+            missing.append("horario_laboral_text")
     return missing
 
 
 def _build_prompt_for_missing(missing: list[str], ocupacion: str | None) -> str:
+    if not missing:
+        return "Comparte tus horarios en texto."
+    first = missing[0]
+    if first == "horario_academico_text":
+        return PROMPT_ACADEMICO
+    if first == "horario_laboral_tipo":
+        return PROMPT_LABORAL_TIPO
+    if first == "horario_laboral_text":
+        return PROMPT_LABORAL
+
     if ocupacion == "solo_trabajo":
         return PROMPT_LABORAL
     if ocupacion == "solo_estudio":
@@ -157,59 +147,6 @@ def _build_prompt_for_missing(missing: list[str], ocupacion: str | None) -> str:
     if ocupacion == "ambos":
         return PROMPT_AMBOS
     return "Comparte tus horarios."
-
-
-def _apply_schedule_image(
-    raw_inputs: RawInputs, images: list[str], ocupacion: str | None, text: str
-) -> RawInputs:
-    updated = dict(raw_inputs)
-    if not images:
-        return updated
-    normalized = normalize_text(text or "")
-
-    image_ref = images[0]
-    if ocupacion == "solo_trabajo":
-        if not updated.get("horario_laboral_img"):
-            updated["horario_laboral_img"] = image_ref
-        return updated
-
-    if ocupacion == "solo_estudio":
-        if not updated.get("horario_academico_img"):
-            updated["horario_academico_img"] = image_ref
-        return updated
-
-    if ocupacion == "ambos":
-        if "trabajo" in normalized or "laboral" in normalized:
-            if not updated.get("horario_laboral_img"):
-                updated["horario_laboral_img"] = image_ref
-        elif "academico" in normalized or "clase" in normalized:
-            if not updated.get("horario_academico_img"):
-                updated["horario_academico_img"] = image_ref
-        else:
-            if not updated.get("horario_academico_img"):
-                updated["horario_academico_img"] = image_ref
-            elif not updated.get("horario_laboral_img"):
-                updated["horario_laboral_img"] = image_ref
-        return updated
-
-    return updated
-
-
-def _looks_like_academic_schedule(text: str) -> bool:
-    markers = (
-        "codigo asignatura",
-        "periodo academico",
-        "asignatura",
-        "creditos",
-        "grupo",
-    )
-    return any(marker in text for marker in markers)
-
-
-def _needs_work_type(ocupacion: str | None, raw_inputs: RawInputs) -> bool:
-    if ocupacion not in ("solo_trabajo", "ambos"):
-        return False
-    return not raw_inputs.get("horario_laboral_tipo")
 
 
 def _parse_work_type(text: str) -> str | None:
