@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from agents.support.nodes.render_schedule_preview.node import render_schedule_preview
+import agents.support.nodes.render_schedule_preview.node as preview_node
 from agents.support.state import AgentState, Event, new_event_id
 
 
@@ -12,7 +15,7 @@ def test_render_schedule_preview_lists_all_days_and_mentions_full_day(monkeypatc
 
     monkeypatch.setattr(
         "agents.support.nodes.render_schedule_preview.node.render_week_schedule",
-        lambda _events: str(image_path),
+        lambda _events, **_kwargs: str(image_path),
     )
     monkeypatch.setattr(
         "agents.support.nodes.render_schedule_preview.node._encode_image",
@@ -46,18 +49,32 @@ def test_render_schedule_preview_lists_all_days_and_mentions_full_day(monkeypatc
         ]
     )
 
+    preview_text = preview_node._build_text_preview(
+        state.get("events", []),
+        "America/Bogota",
+        datetime(2026, 3, 10, 9, 0),
+    )
+    monkeypatch.setattr(
+        "agents.support.nodes.render_schedule_preview.node._build_text_preview",
+        lambda _events, _timezone_name: preview_text,
+    )
+
     update = render_schedule_preview(state)
 
     preview_text = update["schedule_preview"]["text"]
     assert update["schedule_preview"]["image_path"] == str(image_path)
-    assert "Lunes: 05:00-06:00 Gym (extracurricular, confirmado)" in preview_text
-    assert "Martes: Sin eventos" in preview_text
-    assert "Viernes: 17:00-18:00 Trabajo (laboral, confirmado)" in preview_text
-    assert "Domingo: Sin eventos" in preview_text
+    assert "Semana del 9 al 15 de Marzo de 2026" in preview_text
+    assert "| Dia" in preview_text
+    assert "| Lunes 09/03/2026" in preview_text
+    assert "| Gym" in preview_text
+    assert "| 05:00-06:00" in preview_text
+    assert "| Martes 10/03/2026" in preview_text
+    assert "| Sin eventos" in preview_text
+    assert "| Trabajo laboral" in preview_text
 
     message = update["messages"][0].content
     assert message[0]["type"] == "text"
     assert "00:00 a 23:59" in message[0]["text"]
-    assert "Martes: Sin eventos" in message[0]["text"]
+    assert "| Martes 10/03/2026" in message[0]["text"]
     assert message[1]["type"] == "image_url"
     assert message[1]["image_url"]["url"] == "data:image/png;base64,abc"

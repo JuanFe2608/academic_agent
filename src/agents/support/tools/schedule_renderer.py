@@ -7,10 +7,19 @@ visual. Aqui se crea una imagen PNG con una tabla de dias y bloques de hora.
 from __future__ import annotations
 
 import os
+from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageFont
 
-from agents.support.state import DAY_ORDER, Event, normalize_time, sort_events
+from agents.support.state import Event, normalize_time, sort_events
+from agents.support.tools.calendar_logic import (
+    ScheduledOccurrence,
+    WeekDaySlot,
+    format_day_header,
+    format_week_title,
+    resolve_weekly_events_to_current_week,
+)
+from agents.support.tools.event_labels import normalize_activity_label
 
 COLOR_BY_CATEGORY = {
     "laboral": ((244, 124, 94), (255, 232, 223)),
@@ -34,6 +43,8 @@ def render_week_schedule(
     filename: str = "schedule.png",
     start_hour: int = 0,
     end_hour: int = 24,
+    timezone_name: str = "America/Bogota",
+    reference: datetime | None = None,
 ) -> str:
     """Genera una tabla semanal con eventos y retorna el PNG generado.
 
@@ -45,15 +56,19 @@ def render_week_schedule(
     if end_hour <= start_hour:
         raise ValueError("end_hour must be greater than start_hour")
     ordered = sort_events(events)
-
-    days = list(DAY_ORDER)
+    slots, occurrences = resolve_weekly_events_to_current_week(
+        ordered,
+        timezone_name,
+        reference,
+    )
+    days = [slot.day_name for slot in slots]
     hour_count = end_hour - start_hour
 
     width = 1200
     height = 828
     left_margin = 92
     right_margin = 24
-    top_margin = 22
+    top_margin = 62
     bottom_margin = 26
     header_height = 58
     row_height = int((height - top_margin - bottom_margin - header_height) / hour_count)
@@ -67,7 +82,7 @@ def render_week_schedule(
 
     _draw_grid(
         draw,
-        days,
+        slots,
         width,
         height,
         left_margin,
@@ -78,12 +93,13 @@ def render_week_schedule(
         row_height,
         start_hour,
         fonts,
+        format_week_title(slots),
     )
 
-    for event in ordered:
+    for occurrence in occurrences:
         _draw_event(
             draw,
-            event,
+            occurrence,
             days,
             left_margin,
             top_margin,
@@ -102,7 +118,7 @@ def render_week_schedule(
 
 def _draw_grid(
     draw: ImageDraw.ImageDraw,
-    days: list[str],
+    slots: list[WeekDaySlot],
     width: int,
     height: int,
     left_margin: int,
@@ -113,6 +129,7 @@ def _draw_grid(
     row_height: int,
     start_hour: int,
     fonts: dict[str, ImageFont.ImageFont],
+    title: str,
 ) -> None:
     """Dibuja la tabla base con cabeceras y lineas de hora."""
     panel = [12, 12, width - 12, height - 12]
@@ -129,18 +146,30 @@ def _draw_grid(
         fill=HEADER_FILL,
     )
 
-    for idx, day in enumerate(days):
-        x0 = left_margin + idx * int((grid_right - grid_left) / len(days))
-        x1 = left_margin + (idx + 1) * int((grid_right - grid_left) / len(days))
+    if title:
+        draw.text((left_margin, 22), title, fill=TEXT_COLOR, font=fonts["subtitle"])
+
+    for idx, slot in enumerate(slots):
+        x0 = left_margin + idx * int((grid_right - grid_left) / len(slots))
+        x1 = left_margin + (idx + 1) * int((grid_right - grid_left) / len(slots))
         if idx > 0:
             draw.line([x0, grid_top, x0, grid_bottom], fill=GRID_COLOR, width=1)
-        text_bbox = draw.textbbox((0, 0), day, font=fonts["day"])
+        first_line, second_line = format_day_header(slot)
+        text_bbox = draw.textbbox((0, 0), first_line, font=fonts["day"])
         text_width = text_bbox[2] - text_bbox[0]
         draw.text(
-            (x0 + ((x1 - x0) - text_width) / 2, grid_top + 17),
-            day,
+            (x0 + ((x1 - x0) - text_width) / 2, grid_top + 10),
+            first_line,
             fill=HEADER_TEXT,
             font=fonts["day"],
+        )
+        second_bbox = draw.textbbox((0, 0), second_line, font=fonts["date"])
+        second_width = second_bbox[2] - second_bbox[0]
+        draw.text(
+            (x0 + ((x1 - x0) - second_width) / 2, grid_top + 31),
+            second_line,
+            fill=(204, 213, 225),
+            font=fonts["date"],
         )
 
     hour_count = int((grid_bottom - grid_top - header_height) / row_height)
@@ -167,7 +196,7 @@ def _draw_background(draw: ImageDraw.ImageDraw, width: int, height: int) -> None
 
 def _draw_event(
     draw: ImageDraw.ImageDraw,
-    event: Event,
+    occurrence: ScheduledOccurrence,
     days: list[str],
     left_margin: int,
     top_margin: int,
@@ -179,6 +208,7 @@ def _draw_event(
     fonts: dict[str, ImageFont.ImageFont],
 ) -> None:
     """Dibuja un bloque de evento dentro de la tabla semanal."""
+    event = occurrence.event
     day = event.get("dia")
     if day not in days:
         return
@@ -219,21 +249,26 @@ def _draw_event(
         fill=accent,
     )
 
-    title = str(event.get("titulo", "")).strip() or "Sin titulo"
-    content_x = block[0] + 16
-    content_y = block[1] + 9
-    max_width = int(block[2] - content_x - 10)
-    max_height = int(block[3] - content_y - 8)
+    title = normalize_activity_label(
+        str(event.get("titulo", "")).strip() or "Sin titulo",
+        str(event.get("categoria", "")).strip(),
+    )
+    content_padding_x = 14
+    content_padding_y = 8
+    content_x = block[0] + content_padding_x
+    max_width = int(block[2] - block[0] - (content_padding_x * 2))
+    max_height = int(block[3] - block[1] - (content_padding_y * 2))
 
-    title_y = content_y
     wrapped_title = _wrap_text(draw, title, fonts["title"], max_width)
     wrapped_title = _fit_wrapped_lines(draw, wrapped_title, fonts["title"], max_width, max_height)
-    draw.multiline_text(
-        (content_x, title_y),
-        "\n".join(wrapped_title),
-        fill=TEXT_COLOR,
-        font=fonts["title"],
-        spacing=2,
+    _draw_centered_multiline_text(
+        draw,
+        wrapped_title,
+        block,
+        fonts["title"],
+        TEXT_COLOR,
+        padding_x=content_padding_x,
+        padding_y=content_padding_y,
     )
 
 
@@ -245,6 +280,8 @@ def _load_fonts() -> dict[str, ImageFont.ImageFont]:
             "hour": ImageFont.truetype("DejaVuSans.ttf", 13),
             "time": ImageFont.truetype("DejaVuSans-Bold.ttf", 13),
             "title": ImageFont.truetype("DejaVuSans.ttf", 14),
+            "date": ImageFont.truetype("DejaVuSans.ttf", 12),
+            "subtitle": ImageFont.truetype("DejaVuSans-Bold.ttf", 20),
         }
     except OSError:
         fallback = ImageFont.load_default()
@@ -253,6 +290,8 @@ def _load_fonts() -> dict[str, ImageFont.ImageFont]:
             "hour": fallback,
             "time": fallback,
             "title": fallback,
+            "date": fallback,
+            "subtitle": fallback,
         }
 
 
@@ -312,3 +351,35 @@ def _fit_wrapped_lines(
         last_line = last_line[:-1].rstrip()
     visible[-1] = "..."
     return visible
+
+
+def _draw_centered_multiline_text(
+    draw: ImageDraw.ImageDraw,
+    lines: list[str],
+    block: list[int],
+    font: ImageFont.ImageFont,
+    fill: tuple[int, int, int],
+    padding_x: int,
+    padding_y: int,
+) -> None:
+    """Dibuja lineas centradas dentro del bloque respetando padding interno."""
+    if not lines:
+        return
+
+    sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
+    line_height = max(12, sample_bbox[3] - sample_bbox[1] + 2)
+    spacing = 2
+    text_height = len(lines) * line_height + max(0, len(lines) - 1) * spacing
+
+    usable_top = block[1] + padding_y
+    usable_bottom = block[3] - padding_y
+    usable_left = block[0] + padding_x
+    usable_right = block[2] - padding_x
+
+    start_y = usable_top + max(0, int(((usable_bottom - usable_top) - text_height) / 2))
+    for index, line in enumerate(lines):
+        line_bbox = draw.textbbox((0, 0), line, font=font)
+        line_width = line_bbox[2] - line_bbox[0]
+        x = usable_left + max(0, int(((usable_right - usable_left) - line_width) / 2))
+        y = start_y + index * (line_height + spacing)
+        draw.text((x, y), line, fill=fill, font=font)

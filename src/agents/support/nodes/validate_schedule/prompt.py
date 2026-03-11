@@ -1,11 +1,17 @@
 """Prompts base para validar el horario."""
 
 PROMPT_CONFIRM = (
-    "Confirma si la interpretacion de dias, horas y actividades es correcta. "
-    "Responde si o no. Si algo no coincide, indica exactamente el texto correcto "
-    "(por ejemplo: Gym todos los dias de 5 am a 6 am)."
+    "Revisa la tabla y la imagen del horario. Elige una opcion:\n"
+    "1) Modificar horario o actividad\n"
+    "2) Anadir alguna actividad\n"
+    "3) Eliminar una actividad\n"
+    "4) Confirmar que todo esta bien\n"
+    "Tambien puedes escribir directamente el cambio en lenguaje natural."
 )
 PROMPT_MODIFY = (
-    "Que deseas modificar? 1) info personal 2) horario 3) extracurricular. "
-    "Tambien puedes escribir directamente el cambio con sus dias y horas."
+    "Que deseas hacer ahora?\n"
+    "1) Modificar horario o actividad\n"
+    "2) Anadir alguna actividad\n"
+    "3) Eliminar una actividad\n"
+    "Tambien puedes escribir el cambio completo con dias y horas."
 )
