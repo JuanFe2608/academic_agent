@@ -14,7 +14,6 @@ from .prompt import (
     PROMPT_ACADEMICO,
     PROMPT_AMBOS,
     PROMPT_LABORAL,
-    PROMPT_LABORAL_TIPO,
     PROMPT_NINGUNA,
 )
 
@@ -75,13 +74,9 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion:
         return updated
 
     if ocupacion == "solo_trabajo":
-        if not updated.get("horario_laboral_tipo"):
-            work_type = _parse_work_type(clean_text)
-            if work_type:
-                updated["horario_laboral_tipo"] = work_type
-            return updated
         if not updated.get("horario_laboral_text") and has_time_range(clean_text):
             updated["horario_laboral_text"] = clean_text
+            updated["horario_laboral_tipo"] = _parse_work_type(clean_text) or "fijo"
         return updated
 
     if ocupacion == "solo_estudio":
@@ -93,13 +88,9 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion:
         if not updated.get("horario_academico_text"):
             updated["horario_academico_text"] = clean_text
             return updated
-        if not updated.get("horario_laboral_tipo"):
-            work_type = _parse_work_type(clean_text)
-            if work_type:
-                updated["horario_laboral_tipo"] = work_type
-            return updated
         if not updated.get("horario_laboral_text") and has_time_range(clean_text):
             updated["horario_laboral_text"] = clean_text
+            updated["horario_laboral_tipo"] = _parse_work_type(clean_text) or "fijo"
         return updated
 
     return updated
@@ -108,9 +99,7 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion:
 def _missing_schedule_inputs(raw_inputs: RawInputs, ocupacion: str | None) -> list[str]:
     missing: list[str] = []
     if ocupacion == "solo_trabajo":
-        if not raw_inputs.get("horario_laboral_tipo"):
-            missing.append("horario_laboral_tipo")
-        elif not raw_inputs.get("horario_laboral_text"):
+        if not raw_inputs.get("horario_laboral_text"):
             missing.append("horario_laboral_text")
         return missing
 
@@ -122,8 +111,6 @@ def _missing_schedule_inputs(raw_inputs: RawInputs, ocupacion: str | None) -> li
     if ocupacion == "ambos":
         if not raw_inputs.get("horario_academico_text"):
             missing.append("horario_academico_text")
-        elif not raw_inputs.get("horario_laboral_tipo"):
-            missing.append("horario_laboral_tipo")
         elif not raw_inputs.get("horario_laboral_text"):
             missing.append("horario_laboral_text")
     return missing
@@ -135,8 +122,6 @@ def _build_prompt_for_missing(missing: list[str], ocupacion: str | None) -> str:
     first = missing[0]
     if first == "horario_academico_text":
         return PROMPT_ACADEMICO
-    if first == "horario_laboral_tipo":
-        return PROMPT_LABORAL_TIPO
     if first == "horario_laboral_text":
         return PROMPT_LABORAL
 

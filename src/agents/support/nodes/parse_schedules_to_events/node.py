@@ -21,11 +21,16 @@ def parse_schedules_to_events(state: AgentState) -> dict:
     """Convierte horarios en eventos y avanza a extras."""
     raw_inputs = dict(state.get("raw_inputs", {}))
     messages = state.get("messages", [])
-    events: list[Event] = list(state.get("events", []))
+    events: list[Event] = [
+        event
+        for event in list(state.get("events", []))
+        if event.get("categoria") not in {"laboral", "academico"}
+    ]
     initial_count = len(events)
     errors = list(state.get("errors", []))
     laboral_text = str(raw_inputs.get("horario_laboral_text") or "").strip()
     academico_text = str(raw_inputs.get("horario_academico_text") or "").strip()
+    invalid_messages: list[str] = []
 
     if raw_inputs.get("horario_laboral_img") and not laboral_text:
         return {
@@ -36,7 +41,7 @@ def parse_schedules_to_events(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                "Por ahora solo acepto horario laboral en texto. Comparte el horario por escrito.",
+                "Necesito tu horario laboral por escrito para poder interpretarlo.",
             ),
         }
 
@@ -49,40 +54,29 @@ def parse_schedules_to_events(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                "Por ahora solo acepto horario academico en texto. Comparte el horario por escrito.",
+                "Necesito tu horario academico por escrito para poder interpretarlo.",
             ),
         }
 
     if laboral_text:
         if has_ambiguous_time_range(laboral_text):
-            return {
-                "errors": errors,
-                "raw_inputs": raw_inputs,
-                "phase": "schedules",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    messages,
-                    "assistant",
-                    "Tu horario laboral tiene horas ambiguas (ej: 9-10). "
-                    "Por favor aclara AM o PM en cada rango.",
+            invalid_messages.append(
+                "Tu horario laboral tiene horas ambiguas (ej: 9-10). "
+                "Por favor aclara AM o PM en cada rango."
+            )
+            laboral_parsed = []
+            laboral_error = None
+        else:
+            laboral_parsed, laboral_error = _parse_first_valid(
+                _build_schedule_candidates(laboral_text, "laboral"),
+                lambda candidate: parse_work_schedule_text(
+                    candidate, state.get("timezone", "America/Bogota")
                 ),
-            }
-        laboral_parsed, laboral_error = _parse_first_valid(
-            _build_schedule_candidates(laboral_text, "laboral"),
-            lambda candidate: parse_work_schedule_text(
-                candidate, state.get("timezone", "America/Bogota")
-            ),
-        )
-        if not laboral_parsed:
+            )
+        if not laboral_parsed and laboral_error:
             if laboral_error:
                 errors.append(f"Horario laboral invalido: {laboral_error}")
-            return {
-                "errors": errors,
-                "raw_inputs": raw_inputs,
-                "phase": "schedules",
-                "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", PROMPT_ERROR),
-            }
+                invalid_messages.append(PROMPT_ERROR)
 
         for event in laboral_parsed:
             try:
@@ -94,26 +88,25 @@ def parse_schedules_to_events(state: AgentState) -> dict:
 
     if academico_text:
         if has_ambiguous_time_range(academico_text):
-            return {
-                "errors": errors,
-                "raw_inputs": raw_inputs,
-                "phase": "schedules",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    messages,
-                    "assistant",
-                    "Tu horario academico tiene horas ambiguas (ej: 9-10). "
-                    "Por favor aclara AM o PM en cada rango.",
+            invalid_messages.append(
+                "Tu horario academico tiene horas ambiguas (ej: 9-10). "
+                "Por favor aclara AM o PM en cada rango."
+            )
+            academico_parsed = []
+            academico_error = None
+        else:
+            academico_parsed, academico_error = _parse_first_valid(
+                _build_schedule_candidates(academico_text, "academico"),
+                lambda candidate: parse_academic_schedule_text(
+                    candidate, state.get("timezone", "America/Bogota")
                 ),
-            }
-        academico_parsed, academico_error = _parse_first_valid(
-            _build_schedule_candidates(academico_text, "academico"),
-            lambda candidate: parse_academic_schedule_text(
-                candidate, state.get("timezone", "America/Bogota")
-            ),
-        )
+            )
         if not academico_parsed and academico_error:
             errors.append(f"Horario academico invalido: {academico_error}")
+            invalid_messages.append(
+                "Tu horario academico no se pudo interpretar. "
+                "Comparte el texto con dias y horas (ej: Lunes 08:00-10:00 Algebra)."
+            )
 
         for event in academico_parsed:
             try:
@@ -127,6 +120,15 @@ def parse_schedules_to_events(state: AgentState) -> dict:
         laboral_text
         or academico_text
     )
+    if invalid_messages:
+        return {
+            "events": events,
+            "errors": errors,
+            "raw_inputs": raw_inputs,
+            "phase": "schedules",
+            "awaiting_user_input": True,
+            "messages": append_message(messages, "assistant", "\n".join(invalid_messages)),
+        }
     if len(events) == initial_count and has_schedule_inputs:
         return {
             "errors": errors,

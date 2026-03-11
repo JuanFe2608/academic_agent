@@ -24,7 +24,18 @@ _DAY_TOKEN_PATTERN = (
     r"domingo|dom|do|d"
     r")"
 )
-_TIME_TOKEN_PATTERN = r"\d{1,2}(?::\d{2})?(?::\d{2})?\s*(?:[ap]m?)?"
+_DAY_TOKEN_STRICT_PATTERN = (
+    r"(?:"
+    r"lunes|lun|"
+    r"martes|mar|"
+    r"miercoles|mier|mie|x|"
+    r"jueves|jue|"
+    r"viernes|vie|"
+    r"sabados|sabado|sab|"
+    r"domingo|dom"
+    r")"
+)
+_TIME_TOKEN_PATTERN = r"\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?"
 _ALL_DAYS_PATTERN = re.compile(
     r"\b(?:todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
 )
@@ -33,8 +44,9 @@ _RANGE_PATTERN = re.compile(
     rf"\b({_DAY_TOKEN_PATTERN})\b\s*(?:-|a|hasta)\s*\b({_DAY_TOKEN_PATTERN})\b"
 )
 _SINGLE_DAY_PATTERN = re.compile(rf"\b({_DAY_TOKEN_PATTERN})\b")
+_STRICT_DAY_PATTERN = re.compile(rf"\b({_DAY_TOKEN_STRICT_PATTERN})\b")
 _TIME_RANGE_PATTERN = re.compile(
-    rf"({_TIME_TOKEN_PATTERN})\s*(?:-|a|hasta)\s*({_TIME_TOKEN_PATTERN})"
+    rf"(?:de|desde)?\s*(?:las\s+)?({_TIME_TOKEN_PATTERN})\s*(?:-|a|hasta)\s*(?:las\s+)?({_TIME_TOKEN_PATTERN})"
 )
 
 _WORK_DAY_LINE_PATTERN = re.compile(
@@ -76,26 +88,64 @@ def parse_work_schedule_text(
         return line_events
 
     normalized = _strip_accents(str(text).lower())
-    start_raw, end_raw = _extract_time_range(normalized)
-    start, end = _normalize_time_range(start_raw, end_raw, normalized)
-    days = _extract_days(normalized)
+    schedule = extract_natural_schedule_components(normalized)
+    start = str(schedule["start"])
+    end = str(schedule["end"])
+    days = list(schedule["days"])
+    overnight = bool(schedule["overnight"])
 
     events: list[Event] = []
     for day in days:
-        events.append(
-            Event(
-                id=new_event_id(),
-                dia=day,
-                inicio=start,
-                fin=end,
-                titulo="Trabajo",
-                tipo="confirmado",
-                categoria="laboral",
-                origen="user_text",
+        events.extend(
+            _build_day_events(
+                day=day,
+                start=start,
+                end=end,
+                overnight=overnight,
+                title="Trabajo",
+                category="laboral",
                 timezone=timezone,
             )
         )
     return events
+
+
+def extract_natural_schedule_components(text: str) -> dict[str, object]:
+    """Extrae dias y horas desde lenguaje natural sin inventar AM/PM."""
+    if text is None or not str(text).strip():
+        raise ValueError("schedule text is required")
+
+    normalized = _strip_accents(str(text).lower())
+    start_raw, end_raw = _extract_time_range(normalized)
+    start, end, overnight = _normalize_time_range_info(start_raw, end_raw, normalized)
+    days, is_all_days = _extract_days_with_meta(normalized)
+    return {
+        "days": days,
+        "start": start,
+        "end": end,
+        "is_all_days": is_all_days,
+        "overnight": overnight,
+    }
+
+
+def is_ambiguous_time_range(text: str) -> bool:
+    """Indica si el rango horario requiere aclaracion adicional."""
+    if text is None or not str(text).strip():
+        return False
+    normalized = _strip_accents(str(text).lower())
+    if any(marker in normalized for marker in ("manana", "mañana", "tarde", "noche")):
+        return False
+
+    try:
+        start_raw, end_raw = _extract_time_range(normalized)
+    except ValueError:
+        return False
+
+    try:
+        _normalize_time_range_info(start_raw, end_raw, normalized)
+    except ValueError as exc:
+        return "ambiguous time range" in str(exc).lower()
+    return False
 
 
 def _parse_work_day_lines(text: str, timezone: str) -> list[Event]:
@@ -108,49 +158,79 @@ def _parse_work_day_lines(text: str, timezone: str) -> list[Event]:
         if not match:
             continue
         day = _normalize_day_token(match.group("day"))
-        start, end = _normalize_time_range(
+        start, end, overnight = _normalize_time_range_info(
             match.group("start"),
             match.group("end"),
             line,
         )
-        key = (day, start, end)
-        if key in seen:
-            continue
-        seen.add(key)
-        events.append(
-            Event(
-                id=new_event_id(),
-                dia=day,
-                inicio=start,
-                fin=end,
-                titulo="Trabajo",
-                tipo="confirmado",
-                categoria="laboral",
-                origen="user_text",
-                timezone=timezone,
-            )
-        )
+        for event in _build_day_events(
+            day=day,
+            start=start,
+            end=end,
+            overnight=overnight,
+            title="Trabajo",
+            category="laboral",
+            timezone=timezone,
+        ):
+            key = (event.dia, event.inicio, event.fin)
+            if key in seen:
+                continue
+            seen.add(key)
+            events.append(event)
     return events
 
 
 def _normalize_time_range(start_raw: str, end_raw: str, context: str = "") -> tuple[str, str]:
-    start = normalize_time(_strip_seconds(start_raw))
-    end = normalize_time(_strip_seconds(end_raw))
+    start, end, _overnight = _normalize_time_range_info(start_raw, end_raw, context)
+    return start, end
+
+
+def _normalize_time_range_info(
+    start_raw: str,
+    end_raw: str,
+    context: str = "",
+) -> tuple[str, str, bool]:
+    start, start_ambiguous, start_has_meridiem = _parse_time_token(start_raw)
+    end, end_ambiguous, end_has_meridiem = _parse_time_token(end_raw)
+    propagated_meridiem = False
+
+    if start_ambiguous and end_ambiguous:
+        raise ValueError(
+            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
+        )
+
+    if start_ambiguous and end_has_meridiem:
+        start = _apply_meridiem(start_raw, _extract_meridiem(end_raw))
+        start_ambiguous = False
+        propagated_meridiem = True
+    elif end_ambiguous and start_has_meridiem:
+        end = _apply_meridiem(end_raw, _extract_meridiem(start_raw))
+        end_ambiguous = False
+        propagated_meridiem = True
+
+    if start_ambiguous or end_ambiguous:
+        raise ValueError(
+            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
+        )
 
     start_minutes = int(start[:2]) * 60 + int(start[3:])
     end_minutes = int(end[:2]) * 60 + int(end[3:])
     if end_minutes <= start_minutes:
+        if propagated_meridiem:
+            raise ValueError(
+                "ambiguous time range; specify AM o PM o usa formato de 24 horas"
+            )
         if (
-            _has_meridiem(start_raw)
-            or _has_meridiem(end_raw)
+            start_has_meridiem
+            or end_has_meridiem
             or _looks_24h(start_raw)
             or _looks_24h(end_raw)
         ):
-            raise ValueError(f"invalid time range: {context or f'{start_raw}-{end_raw}'}")
+            return start, end, True
         raise ValueError(
             "ambiguous time range; specify AM o PM o usa formato de 24 horas"
         )
-    return start, end
+    return start, end, False
 
 
 def parse_academic_schedule_text(
@@ -172,26 +252,23 @@ def parse_academic_schedule_text(
             days = [_normalize_day_token(day_token)]
             start_raw = day_match.group("start")
             end_raw = day_match.group("end")
-            start, end = _normalize_time_range(start_raw, end_raw, line)
+            start, end, overnight = _normalize_time_range_info(start_raw, end_raw, line)
             title = (day_match.group("title") or "").strip() or current_subject or "Clase"
             for day in days:
-                key = (day, start, end, title)
-                if key in seen:
-                    continue
-                seen.add(key)
-                events.append(
-                    Event(
-                        id=new_event_id(),
-                        dia=day,
-                        inicio=start,
-                        fin=end,
-                        titulo=title,
-                        tipo="confirmado",
-                        categoria="academico",
-                        origen="user_text",
-                        timezone=timezone,
-                    )
-                )
+                for event in _build_day_events(
+                    day=day,
+                    start=start,
+                    end=end,
+                    overnight=overnight,
+                    title=title,
+                    category="academico",
+                    timezone=timezone,
+                ):
+                    key = (event.dia, event.inicio, event.fin, event.titulo)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    events.append(event)
             continue
 
         if _is_subject_line(line):
@@ -200,30 +277,27 @@ def parse_academic_schedule_text(
 
         for match in _ACADEMIC_DAYS_PATTERN.finditer(line):
             days = _split_days(match.group("days"))
-            start, end = _normalize_time_range(
+            start, end, overnight = _normalize_time_range_info(
                 match.group("start"),
                 match.group("end"),
                 line,
             )
             title = current_subject or "Clase"
             for day in days:
-                key = (day, start, end, title)
-                if key in seen:
-                    continue
-                seen.add(key)
-                events.append(
-                    Event(
-                        id=new_event_id(),
-                        dia=day,
-                        inicio=start,
-                        fin=end,
-                        titulo=title,
-                        tipo="confirmado",
-                        categoria="academico",
-                        origen="user_text",
-                        timezone=timezone,
-                    )
-                )
+                for event in _build_day_events(
+                    day=day,
+                    start=start,
+                    end=end,
+                    overnight=overnight,
+                    title=title,
+                    category="academico",
+                    timezone=timezone,
+                ):
+                    key = (event.dia, event.inicio, event.fin, event.titulo)
+                    if key in seen:
+                        continue
+                    seen.add(key)
+                    events.append(event)
     return events
 
 
@@ -295,14 +369,14 @@ def _extract_time_range(text: str) -> tuple[str, str]:
 
 
 def _has_meridiem(value: str) -> bool:
-    return bool(re.search(r"\b([ap]m)\b", str(value).lower()))
+    return bool(_extract_meridiem(value))
 
 
 def _looks_24h(value: str) -> bool:
-    raw = str(value).strip().lower()
+    raw = _normalize_meridiem_token(value)
     match = re.match(r"^(\d{1,2})", raw)
     hour = int(match.group(1)) if match else 0
-    return hour >= 13
+    return hour >= 13 or ":" in raw
 
 
 def _strip_seconds(value: str) -> str:
@@ -312,21 +386,35 @@ def _strip_seconds(value: str) -> str:
 
 
 def _extract_days(text: str) -> list[str]:
+    days, _ = _extract_days_with_meta(text)
+    return days
+
+
+def _extract_days_with_meta(text: str) -> tuple[list[str], bool]:
     """Extrae dias desde un rango o un dia individual."""
     if _ALL_DAYS_PATTERN.search(text):
-        return list(DAY_ORDER)
+        return list(DAY_ORDER), True
 
     range_match = _RANGE_PATTERN.search(text)
     if range_match:
         start_token, end_token = range_match.group(1), range_match.group(2)
         start_day = _normalize_day_token(start_token)
         end_day = _normalize_day_token(end_token)
-        return _expand_day_range(start_day, end_day)
+        return _expand_day_range(start_day, end_day), False
+
+    matches = _STRICT_DAY_PATTERN.findall(text)
+    if matches:
+        days: list[str] = []
+        for token in matches:
+            day = _normalize_day_token(token)
+            if day not in days:
+                days.append(day)
+        return days, False
 
     single_match = _SINGLE_DAY_PATTERN.search(text)
     if not single_match:
         raise ValueError("no day found")
-    return [_normalize_day_token(single_match.group(1))]
+    return [_normalize_day_token(single_match.group(1))], False
 
 
 def _normalize_day_token(token: str) -> str:
@@ -347,3 +435,105 @@ def _expand_day_range(start_day: str, end_day: str) -> list[str]:
     if start_index <= end_index:
         return order[start_index : end_index + 1]
     return order[start_index:] + order[: end_index + 1]
+
+
+def _next_day(day: str) -> str:
+    order = list(DAY_ORDER)
+    return order[(order.index(day) + 1) % len(order)]
+
+
+def _build_day_events(
+    day: str,
+    start: str,
+    end: str,
+    overnight: bool,
+    title: str,
+    category: str,
+    timezone: str,
+) -> list[Event]:
+    if not overnight:
+        return [
+            Event(
+                id=new_event_id(),
+                dia=day,
+                inicio=start,
+                fin=end,
+                titulo=title,
+                tipo="confirmado",
+                categoria=category,
+                origen="user_text",
+                timezone=timezone,
+            )
+        ]
+
+    events = [
+        Event(
+            id=new_event_id(),
+            dia=day,
+            inicio=start,
+            fin="23:59",
+            titulo=title,
+            tipo="confirmado",
+            categoria=category,
+            origen="user_text",
+            timezone=timezone,
+        )
+    ]
+    if end != "00:00":
+        events.append(
+            Event(
+                id=new_event_id(),
+                dia=_next_day(day),
+                inicio="00:00",
+                fin=end,
+                titulo=title,
+                tipo="confirmado",
+                categoria=category,
+                origen="user_text",
+                timezone=timezone,
+            )
+        )
+    return events
+
+
+def _parse_time_token(value: str) -> tuple[str, bool, bool]:
+    raw = _normalize_meridiem_token(_strip_seconds(value))
+    match = re.match(r"^(\d{1,2})(?::(\d{2}))?([ap]m)?$", raw)
+    if not match:
+        raise ValueError(f"invalid time format: {value!r}")
+
+    hour = int(match.group(1))
+    minute = int(match.group(2) or 0)
+    meridiem = match.group(3)
+    has_colon = ":" in raw
+
+    if meridiem:
+        normalized = normalize_time(f"{hour}:{minute:02d}{meridiem}")
+        return normalized, False, True
+
+    normalized = normalize_time(f"{hour}:{minute:02d}")
+    is_ambiguous = not has_colon and hour <= 12
+    return normalized, is_ambiguous, False
+
+
+def _extract_meridiem(value: str) -> str:
+    raw = _normalize_meridiem_token(value)
+    match = re.search(r"([ap]m)$", raw)
+    return match.group(1) if match else ""
+
+
+def _apply_meridiem(value: str, meridiem: str) -> str:
+    if not meridiem:
+        raise ValueError("ambiguous time range; specify AM o PM o usa formato de 24 horas")
+    raw = _normalize_meridiem_token(_strip_seconds(value))
+    if _extract_meridiem(raw):
+        return normalize_time(raw)
+    return normalize_time(f"{raw}{meridiem}")
+
+
+def _normalize_meridiem_token(value: str) -> str:
+    raw = str(value).strip().lower()
+    raw = raw.replace(".", "")
+    raw = re.sub(r"\s+", "", raw)
+    raw = raw.replace("a m", "am").replace("p m", "pm")
+    return raw

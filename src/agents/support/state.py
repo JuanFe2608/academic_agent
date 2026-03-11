@@ -106,6 +106,10 @@ class ExtracurricularItem(BaseStateModel):
     nombre: str
     es_variable: bool
     detalle: str
+    dias: list[str] = Field(default_factory=list)
+    frecuencia: Optional[str] = None
+    hora_inicio: Optional[str] = None
+    hora_fin: Optional[str] = None
     tentativo: list[Event] = Field(default_factory=list)
 
 

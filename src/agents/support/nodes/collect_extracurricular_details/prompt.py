@@ -1,9 +1,9 @@
 """Prompts para recolectar actividades extracurriculares por pasos."""
 
-PROMPT_TYPE = (
-    "Tu actividad extracurricular es fija o flexible?\n"
-    "1) fija\n"
-    "2) flexible"
+PROMPT_DETAILS = (
+    "Describe la actividad extracurricular en texto libre. "
+    "Incluye nombre, dias y horario. "
+    "Ejemplo: Gym todos los dias de 5 am a 6 am o Futbol martes y jueves 18:00-19:00."
 )
 
 PROMPT_FIXED_DETAILS = (

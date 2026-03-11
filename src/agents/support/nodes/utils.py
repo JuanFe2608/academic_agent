@@ -7,6 +7,7 @@ import unicodedata
 from typing import Any, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from agents.support.tools.schedule_parser import is_ambiguous_time_range
 
 _YES_TOKENS = {
     "si",
@@ -272,20 +273,4 @@ def has_ambiguous_time_range(text: str) -> bool:
     """Detecta rangos ambiguos sin AM/PM (ej: 9-10)."""
     if not text:
         return False
-    normalized = normalize_text(text)
-    if any(marker in normalized for marker in ("manana", "mañana", "tarde", "noche")):
-        return False
-    for match in _AMBIGUOUS_TIME_RANGE_PATTERN.finditer(normalized):
-        start_meridiem = match.group(3)
-        end_meridiem = match.group(6)
-        if start_meridiem or end_meridiem:
-            continue
-        start_raw_hour = match.group(1)
-        end_raw_hour = match.group(4)
-        start_hour = int(match.group(1))
-        end_hour = int(match.group(4))
-        if start_hour <= 12 and end_hour <= 12 and (
-            len(start_raw_hour) == 1 or len(end_raw_hour) == 1
-        ):
-            return True
-    return False
+    return is_ambiguous_time_range(text)

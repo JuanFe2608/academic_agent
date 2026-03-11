@@ -9,7 +9,8 @@ from agents.support.nodes.utils import (
 )
 from agents.support.state import AgentState
 
-from .prompt import PROMPT, PROMPT_TYPE
+from .prompt import PROMPT
+from ..collect_extracurricular_details.prompt import PROMPT_DETAILS
 
 
 def ask_extracurricular(state: AgentState) -> dict:
@@ -26,7 +27,7 @@ def ask_extracurricular(state: AgentState) -> dict:
     if answer is True:
         return {
             "extras_has_any": True,
-            "extras_collect_stage": "awaiting_type",
+            "extras_collect_stage": "awaiting_details",
             "extras_pending_is_variable": None,
             "phase": "extras",
             "user_message_count": current_count,
@@ -35,7 +36,7 @@ def ask_extracurricular(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                PROMPT_TYPE,
+                PROMPT_DETAILS,
             ),
         }
 

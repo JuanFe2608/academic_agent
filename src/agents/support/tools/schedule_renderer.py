@@ -13,11 +13,19 @@ from PIL import Image, ImageDraw, ImageFont
 from agents.support.state import DAY_ORDER, Event, normalize_time, sort_events
 
 COLOR_BY_CATEGORY = {
-    "laboral": (255, 200, 200),
-    "academico": (200, 255, 200),
-    "extracurricular": (200, 220, 255),
-    "estudio": (255, 240, 200),
+    "laboral": ((244, 124, 94), (255, 232, 223)),
+    "academico": ((78, 152, 118), (225, 244, 232)),
+    "extracurricular": ((73, 117, 201), (228, 237, 255)),
+    "estudio": ((220, 168, 61), (255, 245, 215)),
 }
+BACKGROUND_COLOR = (245, 247, 250)
+PANEL_COLOR = (255, 255, 255)
+GRID_COLOR = (212, 218, 228)
+HEADER_FILL = (23, 37, 61)
+HEADER_TEXT = (248, 250, 252)
+TEXT_COLOR = (34, 43, 58)
+MUTED_TEXT = (97, 109, 126)
+HOUR_BAND = (238, 242, 247)
 
 
 def render_week_schedule(
@@ -42,15 +50,20 @@ def render_week_schedule(
     hour_count = end_hour - start_hour
 
     width = 1200
-    left_margin = 80
-    header_height = 40
-    row_height = 32
-    height = header_height + hour_count * row_height + 20
-    col_width = int((width - left_margin) / len(days))
+    height = 828
+    left_margin = 92
+    right_margin = 24
+    top_margin = 22
+    bottom_margin = 26
+    header_height = 58
+    row_height = int((height - top_margin - bottom_margin - header_height) / hour_count)
+    col_width = int((width - left_margin - right_margin) / len(days))
 
-    image = Image.new("RGB", (width, height), "white")
+    image = Image.new("RGB", (width, height), BACKGROUND_COLOR)
     draw = ImageDraw.Draw(image)
-    font = ImageFont.load_default()
+    fonts = _load_fonts()
+
+    _draw_background(draw, width, height)
 
     _draw_grid(
         draw,
@@ -58,10 +71,13 @@ def render_week_schedule(
         width,
         height,
         left_margin,
+        right_margin,
+        top_margin,
+        bottom_margin,
         header_height,
         row_height,
         start_hour,
-        font,
+        fonts,
     )
 
     for event in ordered:
@@ -70,12 +86,13 @@ def render_week_schedule(
             event,
             days,
             left_margin,
+            top_margin,
             header_height,
             col_width,
             row_height,
             start_hour,
             end_hour,
-            font,
+            fonts,
         )
 
     path = os.path.join(out_dir, filename)
@@ -89,27 +106,63 @@ def _draw_grid(
     width: int,
     height: int,
     left_margin: int,
+    right_margin: int,
+    top_margin: int,
+    bottom_margin: int,
     header_height: int,
     row_height: int,
     start_hour: int,
-    font: ImageFont.ImageFont,
+    fonts: dict[str, ImageFont.ImageFont],
 ) -> None:
     """Dibuja la tabla base con cabeceras y lineas de hora."""
-    draw.rectangle([0, 0, width - 1, height - 1], outline="black")
-    for idx, day in enumerate(days):
-        x0 = left_margin + idx * int((width - left_margin) / len(days))
-        x1 = left_margin + (idx + 1) * int((width - left_margin) / len(days))
-        draw.line([x0, 0, x0, height], fill="black")
-        draw.text((x0 + 4, 10), day, fill="black", font=font)
-        draw.line([x1, 0, x1, height], fill="black")
+    panel = [12, 12, width - 12, height - 12]
+    draw.rounded_rectangle(panel, radius=24, fill=PANEL_COLOR, outline=(224, 229, 236), width=2)
 
-    hour_count = int((height - header_height - 20) / row_height)
+    grid_left = left_margin
+    grid_top = top_margin
+    grid_right = width - right_margin
+    grid_bottom = height - bottom_margin
+
+    draw.rounded_rectangle(
+        [grid_left, grid_top, grid_right, grid_top + header_height],
+        radius=18,
+        fill=HEADER_FILL,
+    )
+
+    for idx, day in enumerate(days):
+        x0 = left_margin + idx * int((grid_right - grid_left) / len(days))
+        x1 = left_margin + (idx + 1) * int((grid_right - grid_left) / len(days))
+        if idx > 0:
+            draw.line([x0, grid_top, x0, grid_bottom], fill=GRID_COLOR, width=1)
+        text_bbox = draw.textbbox((0, 0), day, font=fonts["day"])
+        text_width = text_bbox[2] - text_bbox[0]
+        draw.text(
+            (x0 + ((x1 - x0) - text_width) / 2, grid_top + 17),
+            day,
+            fill=HEADER_TEXT,
+            font=fonts["day"],
+        )
+
+    hour_count = int((grid_bottom - grid_top - header_height) / row_height)
     for hour in range(hour_count + 1):
-        y = header_height + hour * row_height
-        draw.line([0, y, width, y], fill="black")
+        y = grid_top + header_height + hour * row_height
+        draw.line([grid_left, y, grid_right, y], fill=GRID_COLOR, width=1)
         if hour < hour_count:
             label = f"{start_hour + hour:02d}:00"
-            draw.text((5, y + 2), label, fill="black", font=font)
+            label_y = y + max(4, int((row_height - 12) / 2) - 2)
+            draw.rounded_rectangle(
+                [20, y + 4, left_margin - 14, y + row_height - 4],
+                radius=10,
+                fill=HOUR_BAND,
+            )
+            draw.text((30, label_y), label, fill=MUTED_TEXT, font=fonts["hour"])
+
+
+def _draw_background(draw: ImageDraw.ImageDraw, width: int, height: int) -> None:
+    """Agrega acentos suaves al fondo para evitar un lienzo plano."""
+    draw.ellipse([-120, -80, 260, 220], fill=(229, 237, 247))
+    draw.ellipse([width - 240, height - 220, width + 120, height + 80], fill=(237, 232, 223))
+    draw.rectangle([0, 0, width, height], outline=(230, 234, 240))
 
 
 def _draw_event(
@@ -117,12 +170,13 @@ def _draw_event(
     event: Event,
     days: list[str],
     left_margin: int,
+    top_margin: int,
     header_height: int,
     col_width: int,
     row_height: int,
     start_hour: int,
     end_hour: int,
-    font: ImageFont.ImageFont,
+    fonts: dict[str, ImageFont.ImageFont],
 ) -> None:
     """Dibuja un bloque de evento dentro de la tabla semanal."""
     day = event.get("dia")
@@ -145,14 +199,116 @@ def _draw_event(
     x0 = left_margin + day_index * col_width
     x1 = x0 + col_width
 
-    y0 = header_height + int(((start_minutes - visible_start) / 60) * row_height)
-    y1 = header_height + int(((end_minutes - visible_start) / 60) * row_height)
+    y0 = top_margin + header_height + int(((start_minutes - visible_start) / 60) * row_height)
+    y1 = top_margin + header_height + int(((end_minutes - visible_start) / 60) * row_height)
 
-    color = COLOR_BY_CATEGORY.get(event.get("categoria"), (200, 230, 255))
-    draw.rectangle(
-        [x0 + 1, y0 + 1, x1 - 1, y1 - 1],
-        fill=color,
-        outline="blue",
+    accent, fill = COLOR_BY_CATEGORY.get(event.get("categoria"), ((73, 117, 201), (228, 237, 255)))
+    block = [x0 + 8, y0 + 4, x1 - 8, y1 - 4]
+    if block[3] - block[1] < 20:
+        block[3] = block[1] + 20
+    draw.rounded_rectangle(
+        block,
+        radius=16,
+        fill=fill,
+        outline=accent,
+        width=2,
     )
-    title = str(event.get("titulo", ""))
-    draw.text((x0 + 4, y0 + 4), title, fill="black", font=font)
+    draw.rounded_rectangle(
+        [block[0], block[1], block[0] + 7, block[3]],
+        radius=16,
+        fill=accent,
+    )
+
+    title = str(event.get("titulo", "")).strip() or "Sin titulo"
+    content_x = block[0] + 16
+    content_y = block[1] + 9
+    max_width = int(block[2] - content_x - 10)
+    max_height = int(block[3] - content_y - 8)
+
+    title_y = content_y
+    wrapped_title = _wrap_text(draw, title, fonts["title"], max_width)
+    wrapped_title = _fit_wrapped_lines(draw, wrapped_title, fonts["title"], max_width, max_height)
+    draw.multiline_text(
+        (content_x, title_y),
+        "\n".join(wrapped_title),
+        fill=TEXT_COLOR,
+        font=fonts["title"],
+        spacing=2,
+    )
+
+
+def _load_fonts() -> dict[str, ImageFont.ImageFont]:
+    """Carga una familia legible; usa fallback si no hay TTF disponible."""
+    try:
+        return {
+            "day": ImageFont.truetype("DejaVuSans-Bold.ttf", 18),
+            "hour": ImageFont.truetype("DejaVuSans.ttf", 13),
+            "time": ImageFont.truetype("DejaVuSans-Bold.ttf", 13),
+            "title": ImageFont.truetype("DejaVuSans.ttf", 14),
+        }
+    except OSError:
+        fallback = ImageFont.load_default()
+        return {
+            "day": fallback,
+            "hour": fallback,
+            "time": fallback,
+            "title": fallback,
+        }
+
+
+def _wrap_text(
+    draw: ImageDraw.ImageDraw,
+    text: str,
+    font: ImageFont.ImageFont,
+    max_width: int,
+) -> list[str]:
+    """Divide texto en varias lineas para ajustarlo al ancho del bloque."""
+    if not text:
+        return [""]
+
+    words = text.split()
+    if not words:
+        return [text]
+
+    lines: list[str] = []
+    current = words[0]
+    for word in words[1:]:
+        candidate = f"{current} {word}"
+        width = draw.textbbox((0, 0), candidate, font=font)[2]
+        if width <= max_width:
+            current = candidate
+            continue
+        lines.append(current)
+        current = word
+    lines.append(current)
+    return lines
+
+
+def _fit_wrapped_lines(
+    draw: ImageDraw.ImageDraw,
+    lines: list[str],
+    font: ImageFont.ImageFont,
+    max_width: int,
+    max_height: int,
+) -> list[str]:
+    """Recorta lineas cuando el alto disponible no alcanza."""
+    if not lines:
+        return [""]
+
+    sample_bbox = draw.textbbox((0, 0), "Ag", font=font)
+    line_height = max(12, sample_bbox[3] - sample_bbox[1] + 2)
+    max_lines = max(1, max_height // line_height)
+    if len(lines) <= max_lines:
+        return lines
+
+    visible = lines[:max_lines]
+    last_line = visible[-1]
+    while last_line:
+        candidate = f"{last_line}..."
+        width = draw.textbbox((0, 0), candidate, font=font)[2]
+        if width <= max_width:
+            visible[-1] = candidate
+            return visible
+        last_line = last_line[:-1].rstrip()
+    visible[-1] = "..."
+    return visible

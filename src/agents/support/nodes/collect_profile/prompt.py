@@ -1,16 +1,15 @@
 """Prompts para recolectar perfil del estudiante paso a paso."""
 
 PROMPTS_BY_FIELD = {
-    "nombre": "Empecemos. ¿Cuál es tu nombre completo?",
-    "edad": "¿Cuántos años tienes?",
+    "nombre": "Empecemos. ¿Cuál es tu nombre completo? Usa solo letras y espacios.",
+    "edad": "¿Cuántos años tienes? Escribe solo números.",
     "correo": (
         "¿Cuál es tu correo institucional o personal? "
         "(Ej: usuario@ucatolica.edu.co, usuario@gmail.com, usuario@outlook.com)"
     ),
-    "codigo": "¿Cuál es tu código estudiantil?",
-    "programa": "¿Cuál es tu programa académico? (Ej: Sistemas)",
-    "semestre": "¿En qué semestre estás?",
-    "promedio": "¿Cuál es tu promedio actual? (1-100)",
+    "codigo": "¿Cuál es tu código estudiantil? Escribe solo números.",
+    "semestre": "¿En qué semestre estás? Escribe solo números.",
+    "promedio": "¿Cuál es tu promedio actual? Escribe solo números.",
     "ocupacion": (
         "¿Cuál es tu ocupación? Elige una opción:\n"
         "1) solo estudio\n"

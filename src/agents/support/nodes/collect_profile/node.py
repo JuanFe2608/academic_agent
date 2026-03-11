@@ -15,6 +15,7 @@ from agents.support.tools.llm import llm_extract_json
 from .prompt import FALLBACK_PROMPT, PROMPTS_BY_FIELD
 
 _EMAIL_PATTERN = re.compile(r"[\w.+-]+@[\w-]+\.[\w.-]+")
+_NAME_ALLOWED_PATTERN = re.compile(r"^[A-Za-zÀ-ÿ\s]+$")
 
 
 def collect_profile(state: AgentState) -> dict:
@@ -69,7 +70,11 @@ def _extract_profile_updates(text: str, profile: StudentProfile) -> tuple[dict, 
 
     nombre = _extract_value(normalized, r"nombre\s*[:\-]?\s*([a-z\s]+)")
     if nombre and not profile.get("nombre"):
-        updates["nombre"] = nombre.strip().title()
+        cleaned_name = _clean_name(nombre)
+        if cleaned_name:
+            updates["nombre"] = cleaned_name
+        else:
+            issues.append("nombre solo puede contener letras y espacios")
 
     correo = _extract_allowed_email(text)
     if correo and not profile.get("correo"):
@@ -87,16 +92,10 @@ def _extract_profile_updates(text: str, profile: StudentProfile) -> tuple[dict, 
 
     codigo = _extract_value(normalized, r"codigo\s*[:\-]?\s*([a-z0-9-]+)")
     if codigo and not profile.get("codigo"):
-        updates["codigo"] = codigo
-
-    programa_raw = _extract_value(
-        normalized, r"(programa|carrera)\s*[:\-]?\s*([a-z\s]+)", 2
-    )
-    programa = _normalize_programa(programa_raw or normalized)
-    if programa and not profile.get("programa"):
-        updates["programa"] = programa
-    elif programa_raw and not programa:
-        issues.append("programa debe ser Ingenieria de Sistemas y Computacion")
+        if codigo.isdigit():
+            updates["codigo"] = codigo
+        else:
+            issues.append("codigo debe ser numerico")
 
     semestre = _extract_value(normalized, r"semestre\s*[:\-]?\s*(\d+)")
     if semestre and not profile.get("semestre"):
@@ -126,9 +125,8 @@ def _extract_profile_updates(text: str, profile: StudentProfile) -> tuple[dict, 
 def _extract_profile_with_llm(text: str, profile: StudentProfile) -> tuple[dict, list[str]]:
     """Usa el LLM para extraer campos faltantes del perfil."""
     prompt = (
-        "Extrae un JSON con campos: nombre, edad, correo, codigo, programa, "
+        "Extrae un JSON con campos: nombre, edad, correo, codigo, "
         "semestre, promedio, ocupacion. Usa null si falta. "
-        "programa solo si es Ingenieria de Sistemas y Computacion; si no, null. "
         "ocupacion debe ser uno de: solo_estudio, solo_trabajo, ambos, ninguna, o null. "
         "promedio es numero entre 1 y 100. "
         "Devuelve solo JSON sin texto extra.\n"
@@ -143,7 +141,11 @@ def _extract_profile_with_llm(text: str, profile: StudentProfile) -> tuple[dict,
 
     nombre = data.get("nombre")
     if nombre and not profile.get("nombre"):
-        updates["nombre"] = str(nombre).strip().title()
+        cleaned_name = _clean_name(str(nombre))
+        if cleaned_name:
+            updates["nombre"] = cleaned_name
+        else:
+            issues.append("nombre solo puede contener letras y espacios")
 
     correo = data.get("correo")
     if correo and not profile.get("correo"):
@@ -166,15 +168,11 @@ def _extract_profile_with_llm(text: str, profile: StudentProfile) -> tuple[dict,
 
     codigo = data.get("codigo")
     if codigo and not profile.get("codigo"):
-        updates["codigo"] = str(codigo).strip()
-
-    programa_raw = data.get("programa")
-    if programa_raw and not profile.get("programa"):
-        programa = _normalize_programa(str(programa_raw))
-        if programa:
-            updates["programa"] = programa
+        code_match = re.fullmatch(r"\d+", str(codigo).strip())
+        if code_match:
+            updates["codigo"] = code_match.group(0)
         else:
-            issues.append("programa debe ser Ingenieria de Sistemas y Computacion")
+            issues.append("codigo debe ser numerico")
 
     semestre = data.get("semestre")
     if semestre and not profile.get("semestre"):
@@ -249,26 +247,12 @@ def _normalize_ocupacion(value: str) -> Ocupacion | None:
     return _parse_ocupacion(normalized)
 
 
-def _normalize_programa(text: str) -> str:
-    normalized = normalize_text(text)
-    if "sistemas" in normalized:
-        return "Ingenieria de Sistemas y Computacion"
-    if "sistemas" in normalized and "computacion" in normalized:
-        return "Ingenieria de Sistemas y Computacion"
-    if "ingenieria de sistemas" in normalized:
-        return "Ingenieria de Sistemas y Computacion"
-    if "ing sistemas" in normalized:
-        return "Ingenieria de Sistemas y Computacion"
-    return ""
-
-
 def _missing_profile_fields(profile: StudentProfile) -> list[str]:
     required = [
         "nombre",
         "edad",
         "correo",
         "codigo",
-        "programa",
         "semestre",
         "promedio",
         "ocupacion",
@@ -289,9 +273,9 @@ def _apply_target_field(
     if field == "nombre":
         candidate = _extract_name(text)
         if candidate:
-            updates["nombre"] = candidate.title()
+            updates["nombre"] = candidate
         else:
-            issues.append("nombre y apellidos requeridos")
+            issues.append("nombre solo puede contener letras y espacios")
         return updates, issues
 
     if field == "edad":
@@ -315,19 +299,11 @@ def _apply_target_field(
         return updates, issues
 
     if field == "codigo":
-        match = re.search(r"[a-z0-9-]{3,}", normalized)
+        match = re.fullmatch(r"\s*(\d+)\s*", text)
         if match:
-            updates["codigo"] = match.group(0)
+            updates["codigo"] = match.group(1)
         else:
-            issues.append("codigo invalido")
-        return updates, issues
-
-    if field == "programa":
-        programa = _normalize_programa(text)
-        if programa:
-            updates["programa"] = programa
-        else:
-            issues.append("programa debe ser Ingenieria de Sistemas y Computacion")
+            issues.append("codigo debe ser numerico")
         return updates, issues
 
     if field == "semestre":
@@ -367,9 +343,9 @@ def _apply_target_field(
 
 def _extract_name(text: str) -> str:
     patterns = [
-        r"nombre\s*[:\-]?\s*([a-zA-ZÀ-ÿ'\s-]+)",
-        r"me llamo\s+([a-zA-ZÀ-ÿ'\s-]+)",
-        r"soy\s+([a-zA-ZÀ-ÿ'\s-]+)",
+        r"nombre\s*[:\-]?\s*([^\n]+)",
+        r"me llamo\s+([^\n]+)",
+        r"soy\s+([^\n]+)",
     ]
     for pattern in patterns:
         match = re.search(pattern, text, re.IGNORECASE)
@@ -380,14 +356,18 @@ def _extract_name(text: str) -> str:
 
 
 def _clean_name(value: str) -> str:
-    cleaned = re.sub(r"[^a-zA-ZÀ-ÿ'\s-]", "", value).strip()
+    cleaned = str(value).strip()
+    if not cleaned:
+        return ""
+    if not _NAME_ALLOWED_PATTERN.fullmatch(cleaned):
+        return ""
     cleaned = " ".join(cleaned.split())
     if len(cleaned) < 2:
         return ""
     parts = [part for part in cleaned.split(" ") if part]
-    if len(parts) < 3:
+    if len(parts) < 2:
         return ""
-    return cleaned
+    return cleaned.title()
 
 
 def _extract_allowed_email(text: str) -> str:

@@ -20,7 +20,6 @@ def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
             "edad": 20,
             "correo": "ana@gmail.com",
             "codigo": "12345",
-            "programa": "Ingenieria de Sistemas y Computacion",
             "semestre": 6,
             "promedio": 85.0,
             "ocupacion": "solo_estudio",
@@ -32,3 +31,23 @@ def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
 
     assert "Empecemos" not in prompt
     assert "nombre completo" in prompt.lower()
+
+
+def test_confirm_profile_summary_excludes_program_field() -> None:
+    state = AgentState(
+        phase="profile_confirm",
+        student_profile={
+            "nombre": "Ana Maria Perez",
+            "edad": 20,
+            "correo": "ana@gmail.com",
+            "codigo": "12345",
+            "semestre": 6,
+            "promedio": 85.0,
+            "ocupacion": "solo_estudio",
+        },
+    )
+
+    update = confirm_profile(state)
+    prompt = update["messages"][0].content.lower()
+
+    assert "programa" not in prompt

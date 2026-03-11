@@ -80,7 +80,6 @@ def _route_collect_profile(state: AgentState) -> str:
         "edad",
         "correo",
         "codigo",
-        "programa",
         "semestre",
         "promedio",
         "ocupacion",
@@ -116,16 +115,12 @@ def _route_request_schedules(state: AgentState) -> str:
         return "parse_schedules_to_events"
 
     if ocupacion == "solo_trabajo":
-        if not raw_inputs.get("horario_laboral_tipo"):
-            return "request_schedules"
         if not raw_inputs.get("horario_laboral_text"):
             return "request_schedules"
         return "parse_schedules_to_events"
 
     if ocupacion == "ambos":
         if not raw_inputs.get("horario_academico_text"):
-            return "request_schedules"
-        if not raw_inputs.get("horario_laboral_tipo"):
             return "request_schedules"
         if not raw_inputs.get("horario_laboral_text"):
             return "request_schedules"

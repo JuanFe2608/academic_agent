@@ -3,6 +3,7 @@
 import pytest
 
 from agents.support.tools.schedule_parser import (
+    extract_natural_schedule_components,
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
@@ -28,6 +29,7 @@ from agents.support.tools.schedule_parser import (
         ("Lunes 19:00-22:00", ["Lunes"], "19:00", "22:00"),
         ("Martes de 7:30 am a 9:00 am", ["Martes"], "07:30", "09:00"),
         ("Trabajo todos los dias de 05:00 a 06:00", ["Lunes", "Martes", "Miercoles", "Jueves", "Viernes", "Sabado", "Domingo"], "05:00", "06:00"),
+        ("Lunes de 5 a 6 am", ["Lunes"], "05:00", "06:00"),
     ],
 )
 def test_parse_work_schedule_text(text, expected_days, start, end):
@@ -76,3 +78,34 @@ def test_parse_academic_schedule_accepts_am_pm_literal():
     assert events[0].inicio == "05:00"
     assert events[0].fin == "06:00"
     assert events[0].titulo == "Gym"
+
+
+def test_extract_natural_schedule_components_handles_all_days_phrase():
+    parsed = extract_natural_schedule_components(
+        "Voy todos los dias al gym desde las 5 am hasta las 6 am"
+    )
+
+    assert parsed["days"] == [
+        "Lunes",
+        "Martes",
+        "Miercoles",
+        "Jueves",
+        "Viernes",
+        "Sabado",
+        "Domingo",
+    ]
+    assert parsed["is_all_days"] is True
+    assert parsed["start"] == "05:00"
+    assert parsed["end"] == "06:00"
+
+
+def test_parse_work_schedule_text_splits_overnight_ranges_into_two_days():
+    events = parse_work_schedule_text("Lunes de 6 pm a 3 am")
+
+    assert len(events) == 2
+    assert events[0].dia == "Lunes"
+    assert events[0].inicio == "18:00"
+    assert events[0].fin == "23:59"
+    assert events[1].dia == "Martes"
+    assert events[1].inicio == "00:00"
+    assert events[1].fin == "03:00"
