@@ -24,12 +24,12 @@ def render_week_schedule(
     events: list[Event],
     out_dir: str = "tmp",
     filename: str = "schedule.png",
-    start_hour: int = 6,
-    end_hour: int = 22,
+    start_hour: int = 0,
+    end_hour: int = 24,
 ) -> str:
     """Genera una tabla semanal con eventos y retorna el PNG generado.
 
-    El rango visible por defecto es 06:00 a 22:00. Los eventos que caen fuera
+    El rango visible por defecto es 00:00 a 23:59. Los eventos que caen fuera
     de este rango se recortan al borde visible o se omiten si quedan fuera.
     """
 
@@ -44,7 +44,7 @@ def render_week_schedule(
     width = 1200
     left_margin = 80
     header_height = 40
-    row_height = 45
+    row_height = 32
     height = header_height + hour_count * row_height + 20
     col_width = int((width - left_margin) / len(days))
 
@@ -107,8 +107,9 @@ def _draw_grid(
     for hour in range(hour_count + 1):
         y = header_height + hour * row_height
         draw.line([0, y, width, y], fill="black")
-        label = f"{start_hour + hour:02d}:00"
-        draw.text((5, y + 2), label, fill="black", font=font)
+        if hour < hour_count:
+            label = f"{start_hour + hour:02d}:00"
+            draw.text((5, y + 2), label, fill="black", font=font)
 
 
 def _draw_event(

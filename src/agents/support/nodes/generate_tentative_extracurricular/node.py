@@ -41,6 +41,9 @@ _TIME_RANGE_PATTERN = re.compile(
     r"(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)\s*(?:-|a|hasta)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)"
 )
 _COUNT_PATTERN = re.compile(r"(\d+)\s*veces")
+_ALL_DAYS_PATTERN = re.compile(
+    r"\b(?:todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
+)
 
 
 def generate_tentative_extracurricular(state: AgentState) -> dict:
@@ -169,6 +172,9 @@ def _ensure_extracurricular_item(item: ExtracurricularItem | dict) -> Extracurri
 
 def _extract_days(text: str) -> list[str]:
     normalized = normalize_text(text)
+    if _ALL_DAYS_PATTERN.search(normalized):
+        return list(DAY_ORDER)
+
     range_match = _RANGE_PATTERN.search(normalized)
     if range_match:
         start_day = _normalize_day_token(range_match.group(1))

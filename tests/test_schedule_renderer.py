@@ -2,6 +2,8 @@
 
 import os
 
+from PIL import Image
+
 from agents.support.tools.schedule_renderer import render_week_schedule
 from agents.support.state import Event, new_event_id
 
@@ -48,3 +50,5 @@ def test_render_week_schedule(tmp_path):
 
     assert os.path.exists(output_path)
     assert os.path.getsize(output_path) > 0
+    with Image.open(output_path) as image:
+        assert image.size == (1200, 828)

@@ -24,32 +24,36 @@ _DAY_TOKEN_PATTERN = (
     r"domingo|dom|do|d"
     r")"
 )
+_TIME_TOKEN_PATTERN = r"\d{1,2}(?::\d{2})?(?::\d{2})?\s*(?:[ap]m?)?"
+_ALL_DAYS_PATTERN = re.compile(
+    r"\b(?:todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
+)
 
 _RANGE_PATTERN = re.compile(
     rf"\b({_DAY_TOKEN_PATTERN})\b\s*(?:-|a|hasta)\s*\b({_DAY_TOKEN_PATTERN})\b"
 )
 _SINGLE_DAY_PATTERN = re.compile(rf"\b({_DAY_TOKEN_PATTERN})\b")
 _TIME_RANGE_PATTERN = re.compile(
-    r"(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)\s*(?:-|a|hasta)\s*(\d{1,2}(?::\d{2})?\s*(?:[ap]m?)?)"
+    rf"({_TIME_TOKEN_PATTERN})\s*(?:-|a|hasta)\s*({_TIME_TOKEN_PATTERN})"
 )
 
 _WORK_DAY_LINE_PATTERN = re.compile(
-    r"(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
-    r"\s+(?P<start>\d{1,2}(?::\d{2})?)\s*(?:-|a|hasta)\s*(?P<end>\d{1,2}(?::\d{2})?)",
+    r"^\s*(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
+    rf"\s+(?:de\s+)?(?P<start>{_TIME_TOKEN_PATTERN})\s*(?:-|a|hasta)\s*(?P<end>{_TIME_TOKEN_PATTERN})",
     re.IGNORECASE,
 )
 
 _ACADEMIC_DAYS_PATTERN = re.compile(
     r"(?P<days>(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM)(?:\s*,\s*(?:LUN|MAR|MIE|JUE|VIE|SAB|DOM))*)"
-    r"\s+(?P<start>\d{1,2}:\d{2}(?::\d{2})?)\s*-\s*(?P<end>\d{1,2}:\d{2}(?::\d{2})?)",
+    rf"\s+(?P<start>{_TIME_TOKEN_PATTERN})\s*-\s*(?P<end>{_TIME_TOKEN_PATTERN})",
     re.IGNORECASE,
 )
 
 _DATE_LINE = re.compile(r"\b\d{2}-\d{2}-\d{4}\b")
 
 _DAY_LINE_PATTERN = re.compile(
-    r"(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
-    r"\s+(?P<start>\d{1,2}(?::\d{2})?)\s*(?:-|a|hasta)\s*(?P<end>\d{1,2}(?::\d{2})?)"
+    r"^\s*(?P<day>lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo)"
+    rf"\s+(?:de\s+)?(?P<start>{_TIME_TOKEN_PATTERN})\s*(?:-|a|hasta)\s*(?P<end>{_TIME_TOKEN_PATTERN})"
     r"(?:\s+(?P<title>.+))?",
     re.IGNORECASE,
 )
@@ -130,35 +134,22 @@ def _parse_work_day_lines(text: str, timezone: str) -> list[Event]:
 
 
 def _normalize_time_range(start_raw: str, end_raw: str, context: str = "") -> tuple[str, str]:
-    start = normalize_time(start_raw)
-    end = normalize_time(end_raw)
+    start = normalize_time(_strip_seconds(start_raw))
+    end = normalize_time(_strip_seconds(end_raw))
 
-    # Si no hay AM/PM ni formato 24h y el fin es menor, asumimos PM en la hora final.
-    if _has_meridiem(start_raw) or _has_meridiem(end_raw):
-        return start, end
-    if _looks_24h(start_raw) or _looks_24h(end_raw):
-        return start, end
-
-    start_h, start_m = _extract_hour_minute(start_raw)
-    end_h, end_m = _extract_hour_minute(end_raw)
-
-    if _has_afternoon_marker(context):
-        if start_h < 12 and end_h < 12 and end_h >= start_h:
-            start = f"{start_h + 12:02d}:{start_m:02d}"
-            end = f"{end_h + 12:02d}:{end_m:02d}"
-            return start, end
-
-    if _has_morning_marker(context):
-        return start, end
-
-    if start_h <= 5 and end_h <= 7:
-        start = f"{min(start_h + 12, 23):02d}:{start_m:02d}"
-        end = f"{min(end_h + 12, 23):02d}:{end_m:02d}"
-        return start, end
-
-    if end_h < start_h:
-        end_h = min(end_h + 12, 23)
-        end = f"{end_h:02d}:{end_m:02d}"
+    start_minutes = int(start[:2]) * 60 + int(start[3:])
+    end_minutes = int(end[:2]) * 60 + int(end[3:])
+    if end_minutes <= start_minutes:
+        if (
+            _has_meridiem(start_raw)
+            or _has_meridiem(end_raw)
+            or _looks_24h(start_raw)
+            or _looks_24h(end_raw)
+        ):
+            raise ValueError(f"invalid time range: {context or f'{start_raw}-{end_raw}'}")
+        raise ValueError(
+            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
+        )
     return start, end
 
 
@@ -209,8 +200,11 @@ def parse_academic_schedule_text(
 
         for match in _ACADEMIC_DAYS_PATTERN.finditer(line):
             days = _split_days(match.group("days"))
-            start = normalize_time(_strip_seconds(match.group("start")))
-            end = normalize_time(_strip_seconds(match.group("end")))
+            start, end = _normalize_time_range(
+                match.group("start"),
+                match.group("end"),
+                line,
+            )
             title = current_subject or "Clase"
             for day in days:
                 key = (day, start, end, title)
@@ -300,32 +294,14 @@ def _extract_time_range(text: str) -> tuple[str, str]:
     return match.group(1), match.group(2)
 
 
-def _extract_hour_minute(value: str) -> tuple[int, int]:
-    raw = str(value).strip().lower()
-    match = re.match(r"^(\d{1,2})(?::(\d{2}))?", raw)
-    if not match:
-        return 0, 0
-    hour = int(match.group(1))
-    minute = int(match.group(2) or 0)
-    return hour, minute
-
-
 def _has_meridiem(value: str) -> bool:
     return bool(re.search(r"\b([ap]m)\b", str(value).lower()))
 
 
-def _has_afternoon_marker(context: str) -> bool:
-    normalized = _strip_accents(context.lower())
-    return "tarde" in normalized or "noche" in normalized
-
-
-def _has_morning_marker(context: str) -> bool:
-    normalized = _strip_accents(context.lower())
-    return "manana" in normalized or "mañana" in normalized
-
-
 def _looks_24h(value: str) -> bool:
-    hour, _ = _extract_hour_minute(value)
+    raw = str(value).strip().lower()
+    match = re.match(r"^(\d{1,2})", raw)
+    hour = int(match.group(1)) if match else 0
     return hour >= 13
 
 
@@ -337,6 +313,9 @@ def _strip_seconds(value: str) -> str:
 
 def _extract_days(text: str) -> list[str]:
     """Extrae dias desde un rango o un dia individual."""
+    if _ALL_DAYS_PATTERN.search(text):
+        return list(DAY_ORDER)
+
     range_match = _RANGE_PATTERN.search(text)
     if range_match:
         start_token, end_token = range_match.group(1), range_match.group(2)

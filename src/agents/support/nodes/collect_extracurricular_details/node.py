@@ -23,7 +23,7 @@ from .prompt import (
 )
 
 _DAY_MARKER_PATTERN = re.compile(
-    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|lun|mar|mie|jue|vie|sab|dom)\b"
+    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|lun|mar|mie|jue|vie|sab|dom|todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
 )
 _STOPWORDS = {
     "a",

@@ -8,7 +8,7 @@ PROMPT_TYPE = (
 
 PROMPT_FIXED_DETAILS = (
     "Comparte nombre y horario fijo de la actividad. "
-    "Ejemplo: Natacion, martes y jueves 18:00-19:00."
+    "Ejemplo: Natacion, martes y jueves 18:00-19:00 o Gym todos los dias de 5 am a 6 am."
 )
 
 PROMPT_FLEXIBLE_DETAILS = (

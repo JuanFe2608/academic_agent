@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agents.support.nodes.utils import append_message
-from agents.support.state import DAY_ORDER, AgentState, Event
+from agents.support.state import DAY_ORDER, AgentState, Event, sort_events
 from agents.support.tools.schedule_renderer import render_week_schedule
 
 from .prompt import PROMPT
@@ -32,20 +32,26 @@ def render_schedule_preview(state: AgentState) -> dict:
 
 
 def _build_text_preview(events: list[Event]) -> str:
+    ordered_events = sort_events(events)
+    by_day: dict[str, list[Event]] = {day: [] for day in DAY_ORDER}
+    for event in ordered_events:
+        day = event.get("dia")
+        if day in by_day:
+            by_day[day].append(event)
+
     lines: list[str] = []
     for day in DAY_ORDER:
-        day_events = [event for event in events if event.get("dia") == day]
+        day_events = by_day[day]
         if not day_events:
+            lines.append(f"{day}: Sin eventos")
             continue
         parts = [
             f"{event.get('inicio')}-{event.get('fin')} "
-            f"{event.get('titulo')} ({event.get('tipo')})"
+            f"{event.get('titulo')} ({event.get('categoria')}, {event.get('tipo')})"
             for event in day_events
         ]
         lines.append(f"{day}: " + "; ".join(parts))
-    if not lines:
-        return "No hay eventos para mostrar."
-    return "\n".join(lines)
+    return "\n".join(lines) if lines else "No hay eventos para mostrar."
 
 
 def _encode_image(path: str) -> str:
