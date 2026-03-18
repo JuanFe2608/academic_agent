@@ -33,14 +33,12 @@ def test_collect_extracurricular_requests_free_text_details() -> None:
     update = collect_extracurricular_details(state)
 
     assert update["extras_collect_stage"] == "awaiting_details"
-    assert "texto libre" in update["messages"][0].content.lower()
+    prompt = update["messages"][0].content.lower()
+    assert "actividades extracurriculares" in prompt
+    assert "nombre, días y horas" in prompt
 
 
-def test_collect_extracurricular_details_adds_item_and_moves_to_more(monkeypatch) -> None:
-    monkeypatch.setattr(
-        "agents.support.nodes.collect_extracurricular_details.node.llm_normalize_extracurricular_items",
-        lambda _text: None,
-    )
+def test_collect_extracurricular_details_adds_item_and_moves_to_more() -> None:
     state = AgentState(
         phase="extras",
         extras_collect_stage="awaiting_details",
@@ -58,6 +56,7 @@ def test_collect_extracurricular_details_adds_item_and_moves_to_more(monkeypatch
     assert update["extracurricular"][0].es_variable is False
     assert update["extracurricular"][0].hora_inicio == "18:00"
     assert update["extracurricular"][0].hora_fin == "19:00"
+    assert any(block.block_type == "extracurricular" for block in update["schedule"]["blocks"])
 
 
 def test_collect_extracurricular_awaiting_more_no_uses_preview_message() -> None:
@@ -74,5 +73,4 @@ def test_collect_extracurricular_awaiting_more_no_uses_preview_message() -> None
     assert update["phase"] == "draft"
     assert update["awaiting_user_input"] is False
     message = update["messages"][0].content.lower()
-    assert "vista previa" in message
-    assert "continuemos con el horario" not in message
+    assert "resumen" in message

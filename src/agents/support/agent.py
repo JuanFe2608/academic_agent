@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
-from agents.support.nodes.apply_modifications import apply_modifications
+from agents.support.nodes.apply_schedule_correction import apply_schedule_correction
 from agents.support.nodes.ask_extracurricular import ask_extracurricular
 from agents.support.nodes.build_draft_schedule import build_draft_schedule
 from agents.support.nodes.collect_extracurricular_details import (
@@ -13,10 +13,8 @@ from agents.support.nodes.collect_extracurricular_details import (
 from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
 from agents.support.nodes.persist_profile import persist_profile
-from agents.support.nodes.generate_tentative_extracurricular import (
-    generate_tentative_extracurricular,
-)
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
+from agents.support.nodes.persist_schedule import persist_schedule
 from agents.support.nodes.render_schedule_preview import render_schedule_preview
 from agents.support.nodes.request_schedules import request_schedules
 from agents.support.nodes.send_email_verification import send_email_verification
@@ -79,6 +77,10 @@ def _route_from_phase(state: AgentState) -> str:
         if not preview.get("text") and not preview.get("image_path"):
             return "render_schedule_preview"
         return "validate_schedule"
+    if phase == "schedule_edit":
+        return "apply_schedule_correction"
+    if phase == "schedule_persist":
+        return "persist_schedule"
     if phase == "sync":
         return "end"
     return "welcome_consent"
@@ -160,11 +162,6 @@ def _route_request_schedules(state: AgentState) -> str:
             return "request_schedules"
         return "parse_schedules_to_events"
 
-    if occupation == "solo_trabajo":
-        if not raw_inputs.get("horario_laboral_text"):
-            return "request_schedules"
-        return "parse_schedules_to_events"
-
     if occupation == "ambos":
         if not raw_inputs.get("horario_academico_text"):
             return "request_schedules"
@@ -191,24 +188,33 @@ def _route_collect_extracurricular(state: AgentState) -> str:
         return "end"
     stage = state.get("extras_collect_stage")
     if stage == "done":
-        return "generate_tentative_extracurricular"
+        return "build_draft_schedule"
     return "collect_extracurricular_details"
 
 
 def _route_validate(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
-    if state.get("events_validated"):
+    phase = state.get("phase")
+    if phase == "schedule_edit":
+        return "apply_schedule_correction"
+    if phase == "schedule_persist":
+        return "persist_schedule"
+    return "end"
+
+
+def _route_after_schedule_edit(state: AgentState) -> str:
+    if _should_wait(state):
         return "end"
-    if (state.get("replan", {}) or {}).get("return_to_menu"):
-        return "render_schedule_preview"
-    return "apply_modifications"
-
-
-def _route_after_apply_modifications(state: AgentState) -> str:
-    if state.get("awaiting_user_input"):
+    if state.get("phase") == "validate":
         return "validate_schedule"
-    return "render_schedule_preview"
+    return "build_draft_schedule"
+
+
+def _route_after_persist_schedule(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    return "end"
 
 
 def build_agent() -> StateGraph:
@@ -225,11 +231,11 @@ def build_agent() -> StateGraph:
     graph.add_node("parse_schedules_to_events", parse_schedules_to_events)
     graph.add_node("ask_extracurricular", ask_extracurricular)
     graph.add_node("collect_extracurricular_details", collect_extracurricular_details)
-    graph.add_node("generate_tentative_extracurricular", generate_tentative_extracurricular)
     graph.add_node("build_draft_schedule", build_draft_schedule)
     graph.add_node("render_schedule_preview", render_schedule_preview)
     graph.add_node("validate_schedule", validate_schedule)
-    graph.add_node("apply_modifications", apply_modifications)
+    graph.add_node("apply_schedule_correction", apply_schedule_correction)
+    graph.add_node("persist_schedule", persist_schedule)
 
     graph.set_entry_point("welcome_consent")
 
@@ -249,6 +255,8 @@ def build_agent() -> StateGraph:
             "build_draft_schedule": "build_draft_schedule",
             "render_schedule_preview": "render_schedule_preview",
             "validate_schedule": "validate_schedule",
+            "apply_schedule_correction": "apply_schedule_correction",
+            "persist_schedule": "persist_schedule",
             "end": END,
         },
     )
@@ -330,28 +338,35 @@ def build_agent() -> StateGraph:
         _route_collect_extracurricular,
         {
             "collect_extracurricular_details": "collect_extracurricular_details",
-            "generate_tentative_extracurricular": "generate_tentative_extracurricular",
+            "build_draft_schedule": "build_draft_schedule",
             "end": END,
         },
     )
-    graph.add_edge("generate_tentative_extracurricular", "build_draft_schedule")
     graph.add_edge("build_draft_schedule", "render_schedule_preview")
     graph.add_edge("render_schedule_preview", "validate_schedule")
     graph.add_conditional_edges(
         "validate_schedule",
         _route_validate,
         {
-            "apply_modifications": "apply_modifications",
-            "render_schedule_preview": "render_schedule_preview",
+            "apply_schedule_correction": "apply_schedule_correction",
+            "persist_schedule": "persist_schedule",
             "end": END,
         },
     )
     graph.add_conditional_edges(
-        "apply_modifications",
-        _route_after_apply_modifications,
+        "apply_schedule_correction",
+        _route_after_schedule_edit,
         {
             "validate_schedule": "validate_schedule",
-            "render_schedule_preview": "render_schedule_preview",
+            "build_draft_schedule": "build_draft_schedule",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "persist_schedule",
+        _route_after_persist_schedule,
+        {
+            "end": END,
         },
     )
 

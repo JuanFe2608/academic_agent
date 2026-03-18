@@ -1,4 +1,4 @@
-"""Nodo para solicitar horarios crudos segun ocupacion."""
+"""Nodo para solicitar el horario semanal según la ocupación."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ from .prompt import (
 
 
 def request_schedules(state: AgentState) -> dict:
-    """Solicita horarios academicos y/o laborales segun ocupacion."""
+    """Solicita horarios académicos y/o laborales según ocupación."""
     messages = state.get("messages", [])
     has_new_input, last_text, current_count = detect_new_input(
         messages,
@@ -55,6 +55,7 @@ def request_schedules(state: AgentState) -> dict:
         return {
             "student_profile": profile,
             "phase": "end",
+            "awaiting_user_input": False,
             "messages": append_message(messages, "assistant", PROMPT_NINGUNA),
         }
 
@@ -94,12 +95,6 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, occupation
     if not clean_text:
         return updated
 
-    if occupation == "solo_trabajo":
-        if not updated.get("horario_laboral_text") and has_time_range(clean_text):
-            updated["horario_laboral_text"] = clean_text
-            updated["horario_laboral_tipo"] = _parse_work_type(clean_text) or "fijo"
-        return updated
-
     if occupation == "solo_estudio":
         if not updated.get("horario_academico_text"):
             updated["horario_academico_text"] = clean_text
@@ -109,9 +104,8 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, occupation
         if not updated.get("horario_academico_text"):
             updated["horario_academico_text"] = clean_text
             return updated
-        if not updated.get("horario_laboral_text") and has_time_range(clean_text):
+        if not updated.get("horario_laboral_text"):
             updated["horario_laboral_text"] = clean_text
-            updated["horario_laboral_tipo"] = _parse_work_type(clean_text) or "fijo"
         return updated
 
     return updated
@@ -119,11 +113,6 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, occupation
 
 def _missing_schedule_inputs(raw_inputs: RawInputs, occupation: str | None) -> list[str]:
     missing: list[str] = []
-    if occupation == "solo_trabajo":
-        if not raw_inputs.get("horario_laboral_text"):
-            missing.append("horario_laboral_text")
-        return missing
-
     if occupation == "solo_estudio":
         if not raw_inputs.get("horario_academico_text"):
             missing.append("horario_academico_text")
@@ -142,12 +131,10 @@ def _build_prompt_for_missing(missing: list[str], occupation: str | None) -> str
         return "Comparte tus horarios en texto."
     first = missing[0]
     if first == "horario_academico_text":
-        return PROMPT_ACADEMICO
+        return PROMPT_AMBOS if occupation == "ambos" else PROMPT_ACADEMICO
     if first == "horario_laboral_text":
         return PROMPT_LABORAL
 
-    if occupation == "solo_trabajo":
-        return PROMPT_LABORAL
     if occupation == "solo_estudio":
         return PROMPT_ACADEMICO
     if occupation == "ambos":
@@ -159,27 +146,8 @@ def _parse_occupation(text: str) -> str | None:
     normalized = normalize_text(text)
     if normalized in {"1", "solo estudio", "solo estudiar"} or normalized.startswith("1"):
         return "solo_estudio"
-    if normalized in {"2", "solo trabajo", "solo trabajar"} or normalized.startswith("2"):
-        return "solo_trabajo"
-    if normalized in {"3", "ambos", "estudio y trabajo"} or normalized.startswith("3"):
+    if normalized in {"2", "ambos", "estudio y trabajo"} or normalized.startswith("2"):
         return "ambos"
-    if normalized in {"4", "ninguna"} or normalized.startswith("4"):
+    if normalized in {"3", "ninguna"} or normalized.startswith("3"):
         return "ninguna"
-    return None
-
-
-def _parse_work_type(text: str) -> str | None:
-    normalized = normalize_text(text)
-    if normalized in ("1", "1.", "1)", "fijo", "fija", "estable"):
-        return "fijo"
-    if normalized in ("2", "2.", "2)", "flexible", "variable", "rotativo"):
-        return "flexible"
-    if normalized.startswith("1"):
-        return "fijo"
-    if normalized.startswith("2"):
-        return "flexible"
-    if "fijo" in normalized or "fija" in normalized or "estable" in normalized:
-        return "fijo"
-    if "flexible" in normalized or "variable" in normalized or "rotativo" in normalized:
-        return "flexible"
     return None

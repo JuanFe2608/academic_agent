@@ -168,6 +168,62 @@ def llm_normalize_extracurricular_items(text: str) -> list[dict[str, Any]] | Non
     return items or None
 
 
+def llm_extract_schedule_blocks(
+    text: str,
+    schedule_type: str,
+) -> dict[str, Any] | None:
+    """Normaliza texto libre a bloques semanales recurrentes en JSON."""
+
+    llm = maybe_get_llm()
+    if not llm:
+        return None
+
+    raw_type = _strip_accents(str(schedule_type or "").lower()).strip()
+    normalized_type = {
+        "academic": "academic",
+        "academico": "academic",
+        "work": "work",
+        "laboral": "work",
+        "extracurricular": "extracurricular",
+    }.get(raw_type, "unknown")
+    prompt = (
+        "Convierte el siguiente texto en bloques recurrentes semanales y responde SOLO JSON valido.\n"
+        "Formato exacto:\n"
+        '{'
+        '"blocks":['
+        '{"title":"string","day_of_week":"monday|tuesday|wednesday|thursday|friday|saturday|sunday",'
+        '"start_time":"HH:MM","end_time":"HH:MM","source_text":"string","confidence":0.0,'
+        '"ambiguity_flags":["string"]}'
+        '],'
+        '"needs_clarification":false,'
+        '"clarifications":["string"]'
+        '}\n'
+        "Reglas:\n"
+        "- schedule_type esperado: academic, work o extracurricular.\n"
+        "- Solo crea bloques con día y rango horario exactos.\n"
+        "- Convierte horas a 24h.\n"
+        "- Expande rangos o listas de días en bloques separados.\n"
+        "- Si falta dia, hora de inicio o fin, no inventes datos: usa needs_clarification=true.\n"
+        "- Usa title='Trabajo' si el tipo es work y no hay un nombre mejor.\n"
+        "- No incluyas markdown ni texto fuera del JSON.\n"
+        f"- Tipo esperado: {normalized_type}.\n"
+        f"Texto:\n{text}\n"
+    )
+
+    _set_last_llm_error(None)
+    try:
+        response = llm.invoke(prompt)
+    except Exception as exc:
+        _set_last_llm_error(exc)
+        return None
+
+    raw_content = getattr(response, "content", response)
+    payload = _safe_json_loads_from_content(raw_content)
+    if not payload:
+        return None
+    return _normalize_schedule_blocks_payload(payload)
+
+
 def llm_extract_schedule_from_image(
     image_ref: str, schedule_hint: str | None = None
 ) -> dict[str, Any] | None:
@@ -441,6 +497,49 @@ def _normalize_extracurricular_payload(data: Any) -> list[dict[str, Any]]:
             }
         )
     return normalized
+
+
+def _normalize_schedule_blocks_payload(data: Any) -> dict[str, Any] | None:
+    if not isinstance(data, dict):
+        return None
+    blocks_raw = data.get("blocks")
+    if not isinstance(blocks_raw, list):
+        blocks_raw = []
+
+    normalized_blocks: list[dict[str, Any]] = []
+    for item in blocks_raw:
+        if not isinstance(item, dict):
+            continue
+        title = str(item.get("title") or item.get("nombre") or "").strip()
+        day_of_week = str(item.get("day_of_week") or item.get("day") or "").strip().lower()
+        start_time = str(item.get("start_time") or item.get("start") or "").strip()
+        end_time = str(item.get("end_time") or item.get("end") or "").strip()
+        source_text = str(item.get("source_text") or item.get("source") or "").strip()
+        confidence = item.get("confidence")
+        ambiguity_flags = item.get("ambiguity_flags") or []
+        if not isinstance(ambiguity_flags, list):
+            ambiguity_flags = [str(ambiguity_flags)]
+        normalized_blocks.append(
+            {
+                "title": title,
+                "day_of_week": day_of_week,
+                "start_time": start_time,
+                "end_time": end_time,
+                "source_text": source_text,
+                "confidence": confidence,
+                "ambiguity_flags": [str(flag).strip() for flag in ambiguity_flags if str(flag).strip()],
+            }
+        )
+
+    clarifications = data.get("clarifications") or []
+    if not isinstance(clarifications, list):
+        clarifications = [str(clarifications)]
+
+    return {
+        "blocks": normalized_blocks,
+        "needs_clarification": bool(data.get("needs_clarification")),
+        "clarifications": [str(item).strip() for item in clarifications if str(item).strip()],
+    }
 
 
 def _coerce_image_url(image_ref: str) -> str:

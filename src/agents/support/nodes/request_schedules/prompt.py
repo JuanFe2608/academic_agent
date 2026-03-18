@@ -1,25 +1,26 @@
-"""Prompts base para solicitar horarios."""
+"""Prompts base para solicitar el horario semanal recurrente."""
 
 PROMPT_OCCUPATION = (
-    "Antes de pedirte los horarios, necesito saber como esta distribuida tu rutina.\n"
-    "Elige una opcion:\n"
-    "1) Solo estudio\n"
-    "2) Solo trabajo\n"
-    "3) Estudio y trabajo\n"
-    "4) Ninguna de las anteriores"
-)
-PROMPT_LABORAL = (
-    "Dime tu horario laboral en texto. "
-    "Puedes usar AM/PM o 24h. "
-    "Ejemplo: L-V 7am-4pm; Sab 08:00-12:00; Domingo 17:00-21:00."
+    "Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
+    "Elige una opción:\n"
+    "1. Solo estudio\n"
+    "2. Estudio y trabajo\n"
+    "3. Ninguna de las anteriores"
 )
 PROMPT_ACADEMICO = (
-    "Comparte tu horario academico en texto (pegado tal cual del correo). "
-    "Puedes usar horas como 5 am, 05:00 o 17:00; se interpretaran literal."
+    "📚 Compárteme tu horario académico en un solo mensaje.\n"
+    "Puedes copiarlo tal como te llegó al correo o como te aparece cuando inscribiste tus materias."
+)
+PROMPT_LABORAL = (
+    "💼 Ahora compárteme tu horario laboral.\n"
+    "Por favor incluye los días y las horas, por ejemplo: lunes a viernes de 7:00 a 18:00."
 )
 PROMPT_AMBOS = (
-    "Primero comparte tu horario academico en texto. "
-    "Despues comparte tu horario laboral en texto. "
-    "Puedes escribir horas en AM/PM o en 24 horas."
+    "Perfecto. Empecemos por tu horario académico 📚\n"
+    "Envíamelo en un solo mensaje, idealmente como lo tienes en tu correo o en el portal."
 )
-PROMPT_NINGUNA = "Si no tienes horarios, lo dejamos hasta aqui."
+PROMPT_NINGUNA = (
+    "Soy un agente especializado en gestión del tiempo, planificación de actividades y "
+    "recomendación de métodos de estudio. Lo siento, no puedo ayudarte en este momento "
+    "porque necesito que actualmente estés estudiando."
+)

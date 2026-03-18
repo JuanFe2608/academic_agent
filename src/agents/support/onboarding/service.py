@@ -9,7 +9,6 @@ import secrets
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Any
-from urllib.parse import quote
 
 from agents.support.onboarding.config import OnboardingConfig, load_onboarding_config
 from agents.support.onboarding.email_sender import DisabledEmailSender, EmailSender
@@ -23,6 +22,7 @@ from agents.support.onboarding.repository import (
     VerificationChallengeRecord,
     build_postgres_repository,
 )
+from agents.support.tools.db_config import database_url_from_env
 from agents.support.onboarding.validators import profile_value
 
 
@@ -242,8 +242,7 @@ def build_onboarding_service() -> OnboardingService:
 def _build_repository() -> OnboardingRepository:
     if os.getenv("ACADEMIC_AGENT_USE_IN_MEMORY_ONBOARDING_REPO", "").strip() == "1":
         return InMemoryOnboardingRepository()
-    database_url = _database_url_from_env()
-    return build_postgres_repository(database_url)
+    return build_postgres_repository(database_url_from_env())
 
 
 def _generate_numeric_code(length: int) -> str:
@@ -265,22 +264,3 @@ def _ensure_aware(value: datetime) -> datetime:
     if value.tzinfo is not None:
         return value
     return value.replace(tzinfo=timezone.utc)
-
-
-def _database_url_from_env() -> str:
-    explicit_url = os.getenv("ACADEMIC_AGENT_DATABASE_URL", "").strip()
-    if explicit_url:
-        return explicit_url
-
-    host = os.getenv("PGHOST", "").strip()
-    port = os.getenv("PGPORT", "").strip() or "5432"
-    database = os.getenv("PGDATABASE", "").strip()
-    user = os.getenv("PGUSER", "").strip()
-    password = os.getenv("PGPASSWORD", "").strip()
-
-    if not (host and database and user):
-        return ""
-
-    user_part = quote(user, safe="")
-    password_part = f":{quote(password, safe='')}" if password else ""
-    return f"postgresql://{user_part}{password_part}@{host}:{port}/{database}"

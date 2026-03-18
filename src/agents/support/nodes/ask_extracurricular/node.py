@@ -49,7 +49,11 @@ def ask_extracurricular(state: AgentState) -> dict:
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
             "last_user_text": last_text if has_new_input else state.get("last_user_text"),
             "awaiting_user_input": False,
-            "messages": append_message(messages, "assistant", "Perfecto, continuemos."),
+            "messages": append_message(
+                messages,
+                "assistant",
+                "Perfecto. Voy a revisar el horario con lo que ya me compartiste.",
+            ),
         }
 
     return {

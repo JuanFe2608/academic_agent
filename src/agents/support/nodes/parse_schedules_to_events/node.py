@@ -1,42 +1,42 @@
-"""Nodo para convertir horarios crudos en eventos."""
+"""Nodo para normalizar horarios académicos y laborales a bloques semanales."""
 
 from __future__ import annotations
 
-from typing import Callable
-
-from agents.support.nodes.utils import append_message, has_ambiguous_time_range
-from agents.support.state import AgentState, Event, validate_event
-from agents.support.tools.llm import (
-    llm_normalize_schedule,
-)
-from agents.support.tools.schedule_parser import (
-    parse_academic_schedule_text,
-    parse_work_schedule_text,
-)
-
-from .prompt import PROMPT_ERROR
+from agents.support.nodes.utils import append_message
+from agents.support.scheduling import normalize_schedule_section, replace_section_blocks
+from agents.support.scheduling.render import blocks_to_events
+from agents.support.state import AgentState
 
 
 def parse_schedules_to_events(state: AgentState) -> dict:
-    """Convierte horarios en eventos y avanza a extras."""
+    """Normaliza entradas crudas y prepara los bloques base del horario."""
+
     raw_inputs = dict(state.get("raw_inputs", {}))
     messages = state.get("messages", [])
-    events: list[Event] = [
-        event
-        for event in list(state.get("events", []))
-        if event.get("categoria") not in {"laboral", "academico"}
-    ]
-    initial_count = len(events)
-    errors = list(state.get("errors", []))
-    laboral_text = str(raw_inputs.get("horario_laboral_text") or "").strip()
-    academico_text = str(raw_inputs.get("horario_academico_text") or "").strip()
-    invalid_messages: list[str] = []
+    schedule_state = dict(state.get("schedule", {}))
+    existing_blocks = list(schedule_state.get("blocks", []))
+    timezone = state.get("timezone", "America/Bogota")
+    occupation = str(state.get("student_profile", {}).get("occupation") or "").strip()
 
-    if raw_inputs.get("horario_laboral_img") and not laboral_text:
+    academic_text = str(raw_inputs.get("horario_academico_text") or "").strip()
+    work_text = str(raw_inputs.get("horario_laboral_text") or "").strip()
+
+    if raw_inputs.get("horario_academico_img") and not academic_text:
         return {
-            "errors": errors,
-            "raw_inputs": raw_inputs,
             "phase": "schedules",
+            "raw_inputs": raw_inputs,
+            "awaiting_user_input": True,
+            "messages": append_message(
+                messages,
+                "assistant",
+                "Necesito tu horario académico por escrito para poder interpretarlo.",
+            ),
+        }
+
+    if raw_inputs.get("horario_laboral_img") and not work_text:
+        return {
+            "phase": "schedules",
+            "raw_inputs": raw_inputs,
             "awaiting_user_input": True,
             "messages": append_message(
                 messages,
@@ -45,146 +45,63 @@ def parse_schedules_to_events(state: AgentState) -> dict:
             ),
         }
 
-    if raw_inputs.get("horario_academico_img") and not academico_text:
+    blocks = list(existing_blocks)
+    clarifications: list[str] = []
+
+    if academic_text:
+        academic_result = normalize_schedule_section(
+            academic_text,
+            "academic",
+            timezone=timezone,
+        )
+        if academic_result.needs_clarification:
+            clarifications.extend(academic_result.clarifications)
+        else:
+            blocks = replace_section_blocks(blocks, "academic", academic_result.blocks)
+
+    if occupation == "ambos" or work_text:
+        work_result = normalize_schedule_section(
+            work_text,
+            "work",
+            timezone=timezone,
+        )
+        if work_result.needs_clarification:
+            clarifications.extend(work_result.clarifications)
+        else:
+            blocks = replace_section_blocks(blocks, "work", work_result.blocks)
+
+    if clarifications:
         return {
-            "errors": errors,
-            "raw_inputs": raw_inputs,
             "phase": "schedules",
+            "raw_inputs": raw_inputs,
+            "events": blocks_to_events(blocks),
+            "schedule": {
+                **schedule_state,
+                "blocks": blocks,
+                "summary_text": None,
+                "review_stage": "idle",
+            },
             "awaiting_user_input": True,
             "messages": append_message(
                 messages,
                 "assistant",
-                "Necesito tu horario academico por escrito para poder interpretarlo.",
-            ),
-        }
-
-    if laboral_text:
-        if has_ambiguous_time_range(laboral_text):
-            invalid_messages.append(
-                "Tu horario laboral tiene horas ambiguas (ej: 9-10). "
-                "Por favor aclara AM o PM en cada rango."
-            )
-            laboral_parsed = []
-            laboral_error = None
-        else:
-            laboral_parsed, laboral_error = _parse_first_valid(
-                _build_schedule_candidates(laboral_text, "laboral"),
-                lambda candidate: parse_work_schedule_text(
-                    candidate, state.get("timezone", "America/Bogota")
-                ),
-            )
-        if not laboral_parsed and laboral_error:
-            if laboral_error:
-                errors.append(f"Horario laboral invalido: {laboral_error}")
-                invalid_messages.append(PROMPT_ERROR)
-
-        for event in laboral_parsed:
-            try:
-                validate_event(event)
-            except ValueError as exc:
-                errors.append(f"Evento laboral invalido: {exc}")
-                continue
-            events.append(event)
-
-    if academico_text:
-        if has_ambiguous_time_range(academico_text):
-            invalid_messages.append(
-                "Tu horario academico tiene horas ambiguas (ej: 9-10). "
-                "Por favor aclara AM o PM en cada rango."
-            )
-            academico_parsed = []
-            academico_error = None
-        else:
-            academico_parsed, academico_error = _parse_first_valid(
-                _build_schedule_candidates(academico_text, "academico"),
-                lambda candidate: parse_academic_schedule_text(
-                    candidate, state.get("timezone", "America/Bogota")
-                ),
-            )
-        if not academico_parsed and academico_error:
-            errors.append(f"Horario academico invalido: {academico_error}")
-            invalid_messages.append(
-                "Tu horario academico no se pudo interpretar. "
-                "Comparte el texto con dias y horas (ej: Lunes 08:00-10:00 Algebra)."
-            )
-
-        for event in academico_parsed:
-            try:
-                validate_event(event)
-            except ValueError as exc:
-                errors.append(f"Evento academico invalido: {exc}")
-                continue
-            events.append(event)
-
-    has_schedule_inputs = bool(
-        laboral_text
-        or academico_text
-    )
-    if invalid_messages:
-        return {
-            "events": events,
-            "errors": errors,
-            "raw_inputs": raw_inputs,
-            "phase": "schedules",
-            "awaiting_user_input": True,
-            "messages": append_message(messages, "assistant", "\n".join(invalid_messages)),
-        }
-    if len(events) == initial_count and has_schedule_inputs:
-        return {
-            "errors": errors,
-            "raw_inputs": raw_inputs,
-            "phase": "schedules",
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                "No pude interpretar tu horario. "
-                "Comparte el texto con formato de dias y horas "
-                "(ej: Lunes 08:00-10:00 Algebra).",
+                "\n".join(dict.fromkeys(clarifications)),
             ),
         }
 
     return {
-        "events": events,
-        "errors": errors,
         "raw_inputs": raw_inputs,
+        "events": blocks_to_events(blocks),
+        "schedule": {
+            **schedule_state,
+            "blocks": blocks,
+            "summary_text": None,
+            "review_stage": "idle",
+            "conflicts": [],
+            "correction_target": None,
+            "pending_correction_text": None,
+            "conflicts_accepted": False,
+        },
         "phase": "extras",
         "awaiting_user_input": False,
     }
-
-
-def _build_schedule_candidates(text: str, hint: str) -> list[str]:
-    candidates: list[str] = []
-    normalized = llm_normalize_schedule(text, hint)
-    if normalized:
-        candidates.append(normalized)
-    candidates.append(text)
-    return _dedupe_candidates(candidates)
-
-
-def _dedupe_candidates(candidates: list[str]) -> list[str]:
-    seen: set[str] = set()
-    deduped: list[str] = []
-    for item in candidates:
-        normalized = str(item or "").strip()
-        if not normalized or normalized in seen:
-            continue
-        seen.add(normalized)
-        deduped.append(normalized)
-    return deduped
-
-
-def _parse_first_valid(
-    candidates: list[str],
-    parser: Callable[[str], list[Event]],
-) -> tuple[list[Event], str | None]:
-    last_error: str | None = None
-    for candidate in candidates:
-        try:
-            parsed = parser(candidate)
-        except ValueError as exc:
-            last_error = str(exc)
-            continue
-        if parsed:
-            return parsed, None
-    return [], last_error

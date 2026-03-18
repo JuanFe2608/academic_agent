@@ -16,6 +16,8 @@ from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 from pydantic import BaseModel, Field
 
+from agents.support.scheduling.models import ScheduleFlowState
+
 Phase = Literal[
     "consent",
     "profile",
@@ -27,6 +29,8 @@ Phase = Literal[
     "extras",
     "draft",
     "validate",
+    "schedule_edit",
+    "schedule_persist",
     "sync",
     "priorities",
     "study_plan",
@@ -38,7 +42,7 @@ Phase = Literal[
 EventType = Literal["confirmado", "tentativo"]
 EventCategory = Literal["academico", "laboral", "extracurricular", "estudio"]
 CalendarProvider = Literal["outlook", "google"]
-Occupation = Literal["solo_estudio", "solo_trabajo", "ambos", "ninguna"]
+Occupation = Literal["solo_estudio", "ambos", "ninguna"]
 Ocupacion = Occupation
 Prioridad = Literal["alta", "media", "baja"]
 ExtrasCollectStage = Literal["awaiting_type", "awaiting_details", "awaiting_more", "done"]
@@ -231,6 +235,7 @@ class AgentState(BaseStateModel):
     events: list[Event] = Field(default_factory=list)
     events_validated: bool = False
     schedule_preview: SchedulePreview = Field(default_factory=SchedulePreview)
+    schedule: ScheduleFlowState = Field(default_factory=ScheduleFlowState)
     calendar: CalendarState = Field(default_factory=CalendarState)
     subjects: list[SubjectItem] = Field(default_factory=list)
     study_profile: StudyProfile = Field(default_factory=StudyProfile)

@@ -1,82 +1,120 @@
-"""Pruebas para la vista previa textual del horario."""
+"""Pruebas para la vista previa resumida del horario."""
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from agents.support.nodes.render_schedule_preview.node import render_schedule_preview
-import agents.support.nodes.render_schedule_preview.node as preview_node
-from agents.support.state import AgentState, Event, new_event_id
+from agents.support.scheduling.formatter import build_schedule_summary
+from agents.support.scheduling.models import ScheduleConflict, WeeklyScheduleBlock
+from agents.support.state import AgentState
 
 
-def test_render_schedule_preview_lists_all_days_and_mentions_full_day(monkeypatch, tmp_path) -> None:
+def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp_path) -> None:
     image_path = tmp_path / "schedule.png"
     image_path.write_bytes(b"fake-png")
 
     monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node.render_week_schedule",
-        lambda _events, **_kwargs: str(image_path),
+        "agents.support.nodes.render_schedule_preview.node.render_recurring_schedule",
+        lambda _blocks, **_kwargs: str(image_path),
     )
     monkeypatch.setattr(
         "agents.support.nodes.render_schedule_preview.node._encode_image",
         lambda _path: "data:image/png;base64,abc",
     )
 
-    state = AgentState(
-        events=[
-            Event(
-                id=new_event_id(),
-                dia="Lunes",
-                inicio="05:00",
-                fin="06:00",
-                titulo="Gym",
-                tipo="confirmado",
-                categoria="extracurricular",
-                origen="user_text",
-                timezone="America/Bogota",
-            ),
-            Event(
-                id=new_event_id(),
-                dia="Viernes",
-                inicio="17:00",
-                fin="18:00",
-                titulo="Trabajo",
-                tipo="confirmado",
-                categoria="laboral",
-                origen="user_text",
-                timezone="America/Bogota",
-            ),
-        ]
-    )
+    blocks = [
+        WeeklyScheduleBlock(
+            block_type="academic",
+            title="Calculo",
+            day_of_week="monday",
+            start_time="06:00",
+            end_time="08:00",
+            source_text="Lunes cálculo de 6 a 8 am",
+        ),
+        WeeklyScheduleBlock(
+            block_type="work",
+            title="Trabajo",
+            day_of_week="tuesday",
+            start_time="07:00",
+            end_time="18:00",
+            source_text="Martes trabajo 7 a 18",
+        ),
+    ]
 
-    preview_text = preview_node._build_text_preview(
-        state.get("events", []),
-        "America/Bogota",
-        datetime(2026, 3, 10, 9, 0),
-    )
-    monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node._build_text_preview",
-        lambda _events, _timezone_name: preview_text,
+    state = AgentState(
+        schedule={
+            "blocks": blocks,
+            "conflicts": [],
+            "summary_text": build_schedule_summary(blocks),
+        }
     )
 
     update = render_schedule_preview(state)
 
-    preview_text = update["schedule_preview"]["text"]
-    assert update["schedule_preview"]["image_path"] == str(image_path)
-    assert "Semana del 9 al 15 de Marzo de 2026" in preview_text
-    assert "| Dia" in preview_text
-    assert "| Lunes 09/03/2026" in preview_text
-    assert "| Gym" in preview_text
-    assert "| 05:00-06:00" in preview_text
-    assert "| Martes 10/03/2026" in preview_text
-    assert "| Sin eventos" in preview_text
-    assert "| Trabajo laboral" in preview_text
+    text = update["messages"][0].content[0]["text"]
+    assert "Esto fue lo que entendí" in text
+    assert "- Lunes: Calculo" in text
+    assert "- Martes: Trabajo" in text
+    assert "¿Entendí bien tu horario?" in text
+    assert update["messages"][0].content[1]["image_url"]["url"] == "data:image/png;base64,abc"
 
-    message = update["messages"][0].content
-    assert message[0]["type"] == "text"
-    assert "00:00 a 23:59" in message[0]["text"]
-    assert "| Martes 10/03/2026" in message[0]["text"]
-    assert "1) Modificar horario o actividad" in message[0]["text"]
-    assert "4) Confirmar que todo esta bien" in message[0]["text"]
-    assert message[1]["type"] == "image_url"
-    assert message[1]["image_url"]["url"] == "data:image/png;base64,abc"
+
+def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_path) -> None:
+    image_path = tmp_path / "schedule.png"
+    image_path.write_bytes(b"fake-png")
+
+    monkeypatch.setattr(
+        "agents.support.nodes.render_schedule_preview.node.render_recurring_schedule",
+        lambda _blocks, **_kwargs: str(image_path),
+    )
+    monkeypatch.setattr(
+        "agents.support.nodes.render_schedule_preview.node._encode_image",
+        lambda _path: "data:image/png;base64,abc",
+    )
+
+    blocks = [
+        WeeklyScheduleBlock(
+            block_type="academic",
+            title="Programacion",
+            day_of_week="wednesday",
+            start_time="08:00",
+            end_time="10:00",
+            source_text="Miércoles programación 8-10",
+            has_conflict=True,
+        ),
+        WeeklyScheduleBlock(
+            block_type="work",
+            title="Trabajo",
+            day_of_week="wednesday",
+            start_time="09:00",
+            end_time="18:00",
+            source_text="Miércoles trabajo 9-18",
+            has_conflict=True,
+        ),
+    ]
+    conflict = ScheduleConflict(
+        day_of_week="wednesday",
+        left_block_id=blocks[0].block_id,
+        right_block_id=blocks[1].block_id,
+        left_title="Programacion",
+        right_title="Trabajo",
+        left_type="academic",
+        right_type="work",
+        overlap_start="09:00",
+        overlap_end="10:00",
+    )
+
+    state = AgentState(
+        schedule={
+            "blocks": blocks,
+            "conflicts": [conflict],
+            "summary_text": build_schedule_summary(blocks),
+        }
+    )
+
+    update = render_schedule_preview(state)
+
+    text = update["messages"][0].content[0]["text"]
+    assert "Encontré cruces" in text
+    assert "Miércoles" in text
+    assert "Programacion" in text
+    assert "Trabajo" in text

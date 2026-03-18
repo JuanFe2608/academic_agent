@@ -39,6 +39,9 @@ _TIME_TOKEN_PATTERN = r"\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?"
 _ALL_DAYS_PATTERN = re.compile(
     r"\b(?:todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
 )
+_ALL_DAYS_EXCEPT_PATTERN = re.compile(
+    r"\b(?:todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día)\b\s+menos\s+(?P<excluded>.+)"
+)
 
 _RANGE_PATTERN = re.compile(
     rf"\b({_DAY_TOKEN_PATTERN})\b\s*(?:-|a|hasta)\s*\b({_DAY_TOKEN_PATTERN})\b"
@@ -392,6 +395,15 @@ def _extract_days(text: str) -> list[str]:
 
 def _extract_days_with_meta(text: str) -> tuple[list[str], bool]:
     """Extrae dias desde un rango o un dia individual."""
+    except_match = _ALL_DAYS_EXCEPT_PATTERN.search(text)
+    if except_match:
+        excluded: list[str] = []
+        for token in _STRICT_DAY_PATTERN.findall(except_match.group("excluded")):
+            day = _normalize_day_token(token)
+            if day not in excluded:
+                excluded.append(day)
+        return [day for day in DAY_ORDER if day not in excluded], False
+
     if _ALL_DAYS_PATTERN.search(text):
         return list(DAY_ORDER), True
 
