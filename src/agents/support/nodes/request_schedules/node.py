@@ -15,6 +15,7 @@ from .prompt import (
     PROMPT_AMBOS,
     PROMPT_LABORAL,
     PROMPT_NINGUNA,
+    PROMPT_OCCUPATION,
 )
 
 
@@ -28,20 +29,39 @@ def request_schedules(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
-    ocupacion = state.get("student_profile", {}).get("ocupacion")
+    profile = dict(state.get("student_profile", {}))
+    occupation = profile.get("occupation")
 
-    if ocupacion == "ninguna":
+    if has_new_input and last_text:
+        if not occupation:
+            occupation = _parse_occupation(last_text)
+            if occupation:
+                profile["occupation"] = occupation
+        else:
+            raw_inputs = _consume_schedule_text_by_stage(raw_inputs, last_text, occupation)
+
+    if not occupation:
         return {
+            "student_profile": profile,
+            "raw_inputs": raw_inputs,
+            "phase": "schedules",
+            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+            "awaiting_user_input": True,
+            "messages": append_message(messages, "assistant", PROMPT_OCCUPATION),
+        }
+
+    if occupation == "ninguna":
+        return {
+            "student_profile": profile,
             "phase": "end",
             "messages": append_message(messages, "assistant", PROMPT_NINGUNA),
         }
 
-    if has_new_input and last_text:
-        raw_inputs = _consume_schedule_text_by_stage(raw_inputs, last_text, ocupacion)
-
-    missing = _missing_schedule_inputs(raw_inputs, ocupacion)
+    missing = _missing_schedule_inputs(raw_inputs, occupation)
     if missing:
         return {
+            "student_profile": profile,
             "raw_inputs": raw_inputs,
             "phase": "schedules",
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
@@ -50,11 +70,12 @@ def request_schedules(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                _build_prompt_for_missing(missing, ocupacion),
+                _build_prompt_for_missing(missing, occupation),
             ),
         }
 
     return {
+        "student_profile": profile,
         "raw_inputs": raw_inputs,
         "phase": "schedules",
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
@@ -66,25 +87,25 @@ def request_schedules(state: AgentState) -> dict:
     }
 
 
-def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion: str | None) -> RawInputs:
+def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, occupation: str | None) -> RawInputs:
     """Consume texto segun el paso pendiente del flujo de horarios."""
     updated = dict(raw_inputs)
     clean_text = str(text or "").strip()
     if not clean_text:
         return updated
 
-    if ocupacion == "solo_trabajo":
+    if occupation == "solo_trabajo":
         if not updated.get("horario_laboral_text") and has_time_range(clean_text):
             updated["horario_laboral_text"] = clean_text
             updated["horario_laboral_tipo"] = _parse_work_type(clean_text) or "fijo"
         return updated
 
-    if ocupacion == "solo_estudio":
+    if occupation == "solo_estudio":
         if not updated.get("horario_academico_text"):
             updated["horario_academico_text"] = clean_text
         return updated
 
-    if ocupacion == "ambos":
+    if occupation == "ambos":
         if not updated.get("horario_academico_text"):
             updated["horario_academico_text"] = clean_text
             return updated
@@ -96,19 +117,19 @@ def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, ocupacion:
     return updated
 
 
-def _missing_schedule_inputs(raw_inputs: RawInputs, ocupacion: str | None) -> list[str]:
+def _missing_schedule_inputs(raw_inputs: RawInputs, occupation: str | None) -> list[str]:
     missing: list[str] = []
-    if ocupacion == "solo_trabajo":
+    if occupation == "solo_trabajo":
         if not raw_inputs.get("horario_laboral_text"):
             missing.append("horario_laboral_text")
         return missing
 
-    if ocupacion == "solo_estudio":
+    if occupation == "solo_estudio":
         if not raw_inputs.get("horario_academico_text"):
             missing.append("horario_academico_text")
         return missing
 
-    if ocupacion == "ambos":
+    if occupation == "ambos":
         if not raw_inputs.get("horario_academico_text"):
             missing.append("horario_academico_text")
         elif not raw_inputs.get("horario_laboral_text"):
@@ -116,7 +137,7 @@ def _missing_schedule_inputs(raw_inputs: RawInputs, ocupacion: str | None) -> li
     return missing
 
 
-def _build_prompt_for_missing(missing: list[str], ocupacion: str | None) -> str:
+def _build_prompt_for_missing(missing: list[str], occupation: str | None) -> str:
     if not missing:
         return "Comparte tus horarios en texto."
     first = missing[0]
@@ -125,13 +146,26 @@ def _build_prompt_for_missing(missing: list[str], ocupacion: str | None) -> str:
     if first == "horario_laboral_text":
         return PROMPT_LABORAL
 
-    if ocupacion == "solo_trabajo":
+    if occupation == "solo_trabajo":
         return PROMPT_LABORAL
-    if ocupacion == "solo_estudio":
+    if occupation == "solo_estudio":
         return PROMPT_ACADEMICO
-    if ocupacion == "ambos":
+    if occupation == "ambos":
         return PROMPT_AMBOS
     return "Comparte tus horarios."
+
+
+def _parse_occupation(text: str) -> str | None:
+    normalized = normalize_text(text)
+    if normalized in {"1", "solo estudio", "solo estudiar"} or normalized.startswith("1"):
+        return "solo_estudio"
+    if normalized in {"2", "solo trabajo", "solo trabajar"} or normalized.startswith("2"):
+        return "solo_trabajo"
+    if normalized in {"3", "ambos", "estudio y trabajo"} or normalized.startswith("3"):
+        return "ambos"
+    if normalized in {"4", "ninguna"} or normalized.startswith("4"):
+        return "ninguna"
+    return None
 
 
 def _parse_work_type(text: str) -> str | None:

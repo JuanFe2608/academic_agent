@@ -13,6 +13,7 @@ from agents.support.tools.calendar_logic import (
 )
 from agents.support.tools.event_labels import normalize_activity_label
 from agents.support.tools.schedule_renderer import render_week_schedule
+from agents.support.nodes.validate_schedule.prompt import PROMPT_CONFIRM
 
 from .prompt import PROMPT
 
@@ -26,14 +27,17 @@ def render_schedule_preview(state: AgentState) -> dict:
     preview_text = _build_text_preview(events, timezone_name)
     image_path = render_week_schedule(events, timezone_name=timezone_name)
     image_data_url = _encode_image(image_path)
+    replan = dict(state.get("replan", {}))
+    replan["return_to_menu"] = None
 
     return {
         "schedule_preview": {"text": preview_text, "image_path": image_path},
+        "replan": replan,
         "messages": append_message(
             state.get("messages", []),
             "assistant",
             [
-                {"type": "text", "text": f"{PROMPT}\n{preview_text}"},
+                {"type": "text", "text": f"{PROMPT}\n{preview_text}\n\n{PROMPT_CONFIRM}"},
                 {"type": "image_url", "image_url": {"url": image_data_url}},
             ],
         ),

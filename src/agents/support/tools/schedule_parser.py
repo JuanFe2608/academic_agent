@@ -21,7 +21,7 @@ _DAY_TOKEN_PATTERN = (
     r"jueves|jue|ju|j|"
     r"viernes|vie|vi|v|"
     r"sabados|sabado|sab|sa|s|"
-    r"domingo|dom|do|d"
+    r"domingos|domingo|dom|do|d"
     r")"
 )
 _DAY_TOKEN_STRICT_PATTERN = (
@@ -32,7 +32,7 @@ _DAY_TOKEN_STRICT_PATTERN = (
     r"jueves|jue|"
     r"viernes|vie|"
     r"sabados|sabado|sab|"
-    r"domingo|dom"
+    r"domingos|domingo|dom"
     r")"
 )
 _TIME_TOKEN_PATTERN = r"\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?"
@@ -508,6 +508,9 @@ def _parse_time_token(value: str) -> tuple[str, bool, bool]:
     has_colon = ":" in raw
 
     if meridiem:
+        if hour > 12:
+            normalized = normalize_time(f"{hour}:{minute:02d}")
+            return normalized, False, False
         normalized = normalize_time(f"{hour}:{minute:02d}{meridiem}")
         return normalized, False, True
 

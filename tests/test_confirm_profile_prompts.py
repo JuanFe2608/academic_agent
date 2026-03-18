@@ -16,13 +16,15 @@ def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
         user_message_count=0,
         messages=[HumanMessage(content="nombre")],
         student_profile={
-            "nombre": "Ana Maria Perez Lopez",
-            "edad": 20,
-            "correo": "ana@gmail.com",
-            "codigo": "12345",
-            "semestre": 6,
-            "promedio": 85.0,
-            "ocupacion": "solo_estudio",
+            "full_name": "Ana Maria Perez Lopez",
+            "student_code": "67000912",
+            "age": 20,
+            "institutional_email": "ana@ucatolica.edu.co",
+            "email_verified": True,
+            "supported_program": True,
+            "academic_program": "Ingenieria de Sistemas y Computacion",
+            "semester": 6,
+            "average_grade": 85.0,
         },
     )
 
@@ -30,24 +32,27 @@ def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
     prompt = update["messages"][0].content
 
     assert "Empecemos" not in prompt
-    assert "nombre completo" in prompt.lower()
+    assert "como te llamas" in prompt.lower()
 
 
-def test_confirm_profile_summary_excludes_program_field() -> None:
+def test_confirm_profile_summary_includes_program_and_verified_email() -> None:
     state = AgentState(
         phase="profile_confirm",
         student_profile={
-            "nombre": "Ana Maria Perez",
-            "edad": 20,
-            "correo": "ana@gmail.com",
-            "codigo": "12345",
-            "semestre": 6,
-            "promedio": 85.0,
-            "ocupacion": "solo_estudio",
+            "full_name": "Ana Maria Perez",
+            "student_code": "67000912",
+            "age": 20,
+            "institutional_email": "ana@ucatolica.edu.co",
+            "email_verified": True,
+            "supported_program": True,
+            "academic_program": "Ingenieria de Sistemas y Computacion",
+            "semester": 6,
+            "average_grade": 85.0,
         },
     )
 
     update = confirm_profile(state)
     prompt = update["messages"][0].content.lower()
 
-    assert "programa" not in prompt
+    assert "programa" in prompt
+    assert "correo verificado: si" in prompt

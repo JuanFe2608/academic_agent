@@ -13,7 +13,7 @@ from agents.support.state import AgentState, Event, new_event_id
 def test_route_request_schedules_requires_academic_first_for_ambos() -> None:
     state = AgentState(
         phase="schedules",
-        student_profile={"ocupacion": "ambos"},
+        student_profile={"occupation": "ambos"},
         raw_inputs={
             "horario_laboral_text": "L-V 07:00-16:00",
         },
@@ -25,7 +25,7 @@ def test_route_request_schedules_requires_academic_first_for_ambos() -> None:
 def test_route_request_schedules_requires_work_type_after_academic_for_ambos() -> None:
     state = AgentState(
         phase="schedules",
-        student_profile={"ocupacion": "ambos"},
+        student_profile={"occupation": "ambos"},
         raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
     )
 
@@ -35,7 +35,7 @@ def test_route_request_schedules_requires_work_type_after_academic_for_ambos() -
 def test_route_request_schedules_when_all_text_ready_goes_parse() -> None:
     state = AgentState(
         phase="schedules",
-        student_profile={"ocupacion": "ambos"},
+        student_profile={"occupation": "ambos"},
         raw_inputs={
             "horario_academico_text": "Lunes 08:00-10:00 Algebra",
             "horario_laboral_text": "L-V 07:00-16:00",
@@ -45,10 +45,20 @@ def test_route_request_schedules_when_all_text_ready_goes_parse() -> None:
     assert _route_request_schedules(state) == "parse_schedules_to_events"
 
 
+def test_request_schedules_prompts_for_occupation_when_missing() -> None:
+    state = AgentState(phase="schedules")
+
+    update = request_schedules(state)
+
+    assert update["phase"] == "schedules"
+    assert update["awaiting_user_input"] is True
+    assert "elige una opcion" in update["messages"][0].content.lower()
+
+
 def test_request_schedules_ambos_prompts_academic_first() -> None:
     state = AgentState(
         phase="schedules",
-        student_profile={"ocupacion": "ambos"},
+        student_profile={"occupation": "ambos"},
     )
 
     update = request_schedules(state)
@@ -62,7 +72,7 @@ def test_request_schedules_ambos_after_academic_prompts_work_text() -> None:
     state = AgentState(
         phase="schedules",
         awaiting_user_input=True,
-        student_profile={"ocupacion": "ambos"},
+        student_profile={"occupation": "ambos"},
         user_message_count=0,
         messages=[HumanMessage(content="Lunes 08:00-10:00 Algebra")],
     )

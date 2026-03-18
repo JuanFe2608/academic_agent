@@ -12,15 +12,22 @@ from agents.support.nodes.collect_extracurricular_details import (
 )
 from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
+from agents.support.nodes.persist_profile import persist_profile
 from agents.support.nodes.generate_tentative_extracurricular import (
     generate_tentative_extracurricular,
 )
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
 from agents.support.nodes.render_schedule_preview import render_schedule_preview
 from agents.support.nodes.request_schedules import request_schedules
+from agents.support.nodes.send_email_verification import send_email_verification
 from agents.support.nodes.validate_schedule import validate_schedule
+from agents.support.nodes.verify_email_code import verify_email_code
 from agents.support.nodes.welcome_consent import welcome_consent
 from agents.support.nodes.utils import detect_new_input
+from agents.support.onboarding.validators import (
+    get_missing_profile_fields,
+    profile_requires_email_verification,
+)
 from agents.support.state import AgentState
 
 
@@ -53,8 +60,14 @@ def _route_from_phase(state: AgentState) -> str:
     phase = state.get("phase")
     if phase == "profile":
         return "collect_profile"
+    if phase == "email_verification_send":
+        return "send_email_verification"
+    if phase == "email_verification":
+        return "verify_email_code"
     if phase == "profile_confirm":
         return "confirm_profile"
+    if phase == "profile_persist":
+        return "persist_profile"
     if phase == "schedules":
         return "request_schedules"
     if phase == "extras":
@@ -75,18 +88,31 @@ def _route_collect_profile(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
     profile = state.get("student_profile", {})
-    required = [
-        "nombre",
-        "edad",
-        "correo",
-        "codigo",
-        "semestre",
-        "promedio",
-        "ocupacion",
-    ]
-    if all(profile.get(field) for field in required):
+    if profile_requires_email_verification(profile):
+        return "send_email_verification"
+    if not get_missing_profile_fields(profile):
         return "confirm_profile"
     return "collect_profile"
+
+
+def _route_send_email_verification(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "profile":
+        return "collect_profile"
+    return "verify_email_code"
+
+
+def _route_verify_email_code(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "email_verification_send":
+        return "send_email_verification"
+    if phase == "profile":
+        return "collect_profile"
+    return "verify_email_code"
 
 
 def _route_confirm_profile(state: AgentState) -> str:
@@ -95,31 +121,51 @@ def _route_confirm_profile(state: AgentState) -> str:
     phase = state.get("phase")
     if phase == "profile":
         return "collect_profile"
+    if phase == "profile_persist":
+        return "persist_profile"
     if phase == "schedules":
         return "request_schedules"
     return "confirm_profile"
 
 
+def _route_persist_profile(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "profile":
+        return "collect_profile"
+    if phase == "profile_confirm":
+        return "confirm_profile"
+    if phase == "email_verification":
+        return "verify_email_code"
+    if phase == "schedules":
+        return "request_schedules"
+    return "persist_profile"
+
+
 def _route_request_schedules(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
-    ocupacion = state.get("student_profile", {}).get("ocupacion")
+    occupation = state.get("student_profile", {}).get("occupation")
     raw_inputs = state.get("raw_inputs", {})
 
-    if ocupacion == "ninguna":
+    if not occupation:
+        return "request_schedules"
+
+    if occupation == "ninguna":
         return "end"
 
-    if ocupacion == "solo_estudio":
+    if occupation == "solo_estudio":
         if not raw_inputs.get("horario_academico_text"):
             return "request_schedules"
         return "parse_schedules_to_events"
 
-    if ocupacion == "solo_trabajo":
+    if occupation == "solo_trabajo":
         if not raw_inputs.get("horario_laboral_text"):
             return "request_schedules"
         return "parse_schedules_to_events"
 
-    if ocupacion == "ambos":
+    if occupation == "ambos":
         if not raw_inputs.get("horario_academico_text"):
             return "request_schedules"
         if not raw_inputs.get("horario_laboral_text"):
@@ -154,7 +200,15 @@ def _route_validate(state: AgentState) -> str:
         return "end"
     if state.get("events_validated"):
         return "end"
+    if (state.get("replan", {}) or {}).get("return_to_menu"):
+        return "render_schedule_preview"
     return "apply_modifications"
+
+
+def _route_after_apply_modifications(state: AgentState) -> str:
+    if state.get("awaiting_user_input"):
+        return "validate_schedule"
+    return "render_schedule_preview"
 
 
 def build_agent() -> StateGraph:
@@ -163,7 +217,10 @@ def build_agent() -> StateGraph:
 
     graph.add_node("welcome_consent", welcome_consent)
     graph.add_node("collect_profile", collect_profile)
+    graph.add_node("send_email_verification", send_email_verification)
+    graph.add_node("verify_email_code", verify_email_code)
     graph.add_node("confirm_profile", confirm_profile)
+    graph.add_node("persist_profile", persist_profile)
     graph.add_node("request_schedules", request_schedules)
     graph.add_node("parse_schedules_to_events", parse_schedules_to_events)
     graph.add_node("ask_extracurricular", ask_extracurricular)
@@ -182,7 +239,10 @@ def build_agent() -> StateGraph:
         {
             "welcome_consent": "welcome_consent",
             "collect_profile": "collect_profile",
+            "send_email_verification": "send_email_verification",
+            "verify_email_code": "verify_email_code",
             "confirm_profile": "confirm_profile",
+            "persist_profile": "persist_profile",
             "request_schedules": "request_schedules",
             "ask_extracurricular": "ask_extracurricular",
             "collect_extracurricular_details": "collect_extracurricular_details",
@@ -197,7 +257,27 @@ def build_agent() -> StateGraph:
         _route_collect_profile,
         {
             "collect_profile": "collect_profile",
+            "send_email_verification": "send_email_verification",
             "confirm_profile": "confirm_profile",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "send_email_verification",
+        _route_send_email_verification,
+        {
+            "collect_profile": "collect_profile",
+            "verify_email_code": "verify_email_code",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "verify_email_code",
+        _route_verify_email_code,
+        {
+            "send_email_verification": "send_email_verification",
+            "collect_profile": "collect_profile",
+            "verify_email_code": "verify_email_code",
             "end": END,
         },
     )
@@ -207,6 +287,19 @@ def build_agent() -> StateGraph:
         {
             "confirm_profile": "confirm_profile",
             "collect_profile": "collect_profile",
+            "persist_profile": "persist_profile",
+            "request_schedules": "request_schedules",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "persist_profile",
+        _route_persist_profile,
+        {
+            "persist_profile": "persist_profile",
+            "collect_profile": "collect_profile",
+            "verify_email_code": "verify_email_code",
+            "confirm_profile": "confirm_profile",
             "request_schedules": "request_schedules",
             "end": END,
         },
@@ -249,10 +342,18 @@ def build_agent() -> StateGraph:
         _route_validate,
         {
             "apply_modifications": "apply_modifications",
+            "render_schedule_preview": "render_schedule_preview",
             "end": END,
         },
     )
-    graph.add_edge("apply_modifications", "render_schedule_preview")
+    graph.add_conditional_edges(
+        "apply_modifications",
+        _route_after_apply_modifications,
+        {
+            "validate_schedule": "validate_schedule",
+            "render_schedule_preview": "render_schedule_preview",
+        },
+    )
 
     return graph.compile()
 

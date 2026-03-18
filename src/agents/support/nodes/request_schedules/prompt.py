@@ -1,5 +1,13 @@
 """Prompts base para solicitar horarios."""
 
+PROMPT_OCCUPATION = (
+    "Antes de pedirte los horarios, necesito saber como esta distribuida tu rutina.\n"
+    "Elige una opcion:\n"
+    "1) Solo estudio\n"
+    "2) Solo trabajo\n"
+    "3) Estudio y trabajo\n"
+    "4) Ninguna de las anteriores"
+)
 PROMPT_LABORAL = (
     "Dime tu horario laboral en texto. "
     "Puedes usar AM/PM o 24h. "

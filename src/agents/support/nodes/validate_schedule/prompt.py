@@ -5,8 +5,7 @@ PROMPT_CONFIRM = (
     "1) Modificar horario o actividad\n"
     "2) Anadir alguna actividad\n"
     "3) Eliminar una actividad\n"
-    "4) Confirmar que todo esta bien\n"
-    "Tambien puedes escribir directamente el cambio en lenguaje natural."
+    "4) Confirmar que todo esta bien"
 )
 PROMPT_MODIFY = (
     "Que deseas hacer ahora?\n"

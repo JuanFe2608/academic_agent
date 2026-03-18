@@ -1,24 +1,18 @@
-"""Prompts para recolectar perfil del estudiante paso a paso."""
+"""Compatibilidad de prompts del perfil."""
+
+from agents.support.onboarding.config import load_onboarding_config
+from agents.support.onboarding.messages import build_field_prompt
+
+_CONFIG = load_onboarding_config()
 
 PROMPTS_BY_FIELD = {
-    "nombre": "Empecemos. ¿Cuál es tu nombre completo? Usa solo letras y espacios.",
-    "edad": "¿Cuántos años tienes? Escribe solo números.",
-    "correo": (
-        "¿Cuál es tu correo institucional o personal? "
-        "(Ej: usuario@ucatolica.edu.co, usuario@gmail.com, usuario@outlook.com)"
-    ),
-    "codigo": "¿Cuál es tu código estudiantil? Escribe solo números.",
-    "semestre": "¿En qué semestre estás? Escribe solo números.",
-    "promedio": "¿Cuál es tu promedio actual? Escribe solo números.",
-    "ocupacion": (
-        "¿Cuál es tu ocupación? Elige una opción:\n"
-        "1) solo estudio\n"
-        "2) solo trabajo\n"
-        "3) estudio y trabajo\n"
-        "4) ninguna"
-    ),
+    "full_name": build_field_prompt("full_name", _CONFIG),
+    "student_code": build_field_prompt("student_code", _CONFIG),
+    "age": build_field_prompt("age", _CONFIG),
+    "institutional_email": build_field_prompt("institutional_email", _CONFIG),
+    "supported_program": build_field_prompt("supported_program", _CONFIG),
+    "semester": build_field_prompt("semester", _CONFIG),
+    "average_grade": build_field_prompt("average_grade", _CONFIG),
 }
 
-FALLBACK_PROMPT = (
-    "Necesito algunos datos para crear tu perfil. Empecemos con tu nombre."
-)
+FALLBACK_PROMPT = PROMPTS_BY_FIELD["full_name"]

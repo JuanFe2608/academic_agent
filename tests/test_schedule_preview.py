@@ -76,5 +76,7 @@ def test_render_schedule_preview_lists_all_days_and_mentions_full_day(monkeypatc
     assert message[0]["type"] == "text"
     assert "00:00 a 23:59" in message[0]["text"]
     assert "| Martes 10/03/2026" in message[0]["text"]
+    assert "1) Modificar horario o actividad" in message[0]["text"]
+    assert "4) Confirmar que todo esta bien" in message[0]["text"]
     assert message[1]["type"] == "image_url"
     assert message[1]["image_url"]["url"] == "data:image/png;base64,abc"

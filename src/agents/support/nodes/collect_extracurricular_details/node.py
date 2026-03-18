@@ -20,7 +20,7 @@ from .prompt import (
 )
 
 _DAY_MARKER_PATTERN = re.compile(
-    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|lun|mar|mie|jue|vie|sab|dom|todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
+    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingos|domingo|lun|mar|mie|jue|vie|sab|dom|todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
 )
 _STOPWORDS = {
     "a",
@@ -378,10 +378,11 @@ def _split_chunk_on_activity_boundaries(text: str) -> list[str]:
         boundary = _find_activity_boundary(text, match.end(), next_match.start())
         if boundary is None:
             continue
-        chunk = text[cursor:boundary].strip(" ,")
+        chunk_end, next_cursor = boundary
+        chunk = text[cursor:chunk_end].strip(" ,")
         if chunk:
             chunks.append(chunk)
-        cursor = boundary
+        cursor = next_cursor
 
     tail = text[cursor:].strip(" ,")
     if tail:
@@ -389,12 +390,12 @@ def _split_chunk_on_activity_boundaries(text: str) -> list[str]:
     return chunks or [text.strip(" ,")]
 
 
-def _find_activity_boundary(text: str, start: int, end: int) -> int | None:
+def _find_activity_boundary(text: str, start: int, end: int) -> tuple[int, int] | None:
     between = text[start:end]
     separator = _ACTIVITY_SEPARATOR_PATTERN.search(between)
     if not separator:
         return None
-    return start + separator.end()
+    return start + separator.start(), start + separator.end()
 
 
 def _compact_activity_name(name: str) -> str:

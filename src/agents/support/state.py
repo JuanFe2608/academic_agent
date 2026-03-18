@@ -19,7 +19,10 @@ from pydantic import BaseModel, Field
 Phase = Literal[
     "consent",
     "profile",
+    "email_verification_send",
+    "email_verification",
     "profile_confirm",
+    "profile_persist",
     "schedules",
     "extras",
     "draft",
@@ -35,7 +38,8 @@ Phase = Literal[
 EventType = Literal["confirmado", "tentativo"]
 EventCategory = Literal["academico", "laboral", "extracurricular", "estudio"]
 CalendarProvider = Literal["outlook", "google"]
-Ocupacion = Literal["solo_estudio", "solo_trabajo", "ambos", "ninguna"]
+Occupation = Literal["solo_estudio", "solo_trabajo", "ambos", "ninguna"]
+Ocupacion = Occupation
 Prioridad = Literal["alta", "media", "baja"]
 ExtrasCollectStage = Literal["awaiting_type", "awaiting_details", "awaiting_more", "done"]
 
@@ -79,14 +83,37 @@ class ConsentState(BaseStateModel):
 class StudentProfile(BaseStateModel):
     """Atributos del perfil del estudiante recolectados al inicio."""
 
-    nombre: Optional[str] = None
-    edad: Optional[int] = None
-    correo: Optional[str] = None
-    codigo: Optional[str] = None
-    programa: Optional[str] = None
-    semestre: Optional[int] = None
-    promedio: Optional[float] = None
-    ocupacion: Optional[Ocupacion] = None
+    full_name: Optional[str] = None
+    student_code: Optional[str] = None
+    age: Optional[int] = None
+    institutional_email: Optional[str] = None
+    email_verified: bool = False
+    academic_program: Optional[str] = None
+    supported_program: Optional[bool] = None
+    semester: Optional[int] = None
+    average_grade: Optional[float] = None
+    occupation: Optional[Occupation] = None
+    persisted_student_id: Optional[int] = None
+
+
+class EmailVerificationState(BaseStateModel):
+    """Estado transitorio de verificacion del correo institucional."""
+
+    status: Literal["idle", "sent", "verified"] = "idle"
+    attempts: int = 0
+    resend_count: int = 0
+    expires_at: Optional[str] = None
+    last_error: Optional[str] = None
+
+
+class OnboardingState(BaseStateModel):
+    """Metadatos operativos del flujo de onboarding."""
+
+    current_field: Optional[str] = None
+    email_verification: EmailVerificationState = Field(
+        default_factory=EmailVerificationState
+    )
+    persistence_error: Optional[str] = None
 
 
 class RawInputs(BaseStateModel):
@@ -159,6 +186,8 @@ class ReplanState(BaseStateModel):
     change_request: Optional[dict[str, object]] = None
     proposals: list[list[Event]] = Field(default_factory=list)
     selected_index: Optional[int] = None
+    pending_prompt: Optional[str] = None
+    return_to_menu: Optional[bool] = None
 
 
 class RemindersState(BaseStateModel):
@@ -193,6 +222,7 @@ class AgentState(BaseStateModel):
     awaiting_user_input: bool = False
     consent: ConsentState = Field(default_factory=ConsentState)
     student_profile: StudentProfile = Field(default_factory=StudentProfile)
+    onboarding: OnboardingState = Field(default_factory=OnboardingState)
     raw_inputs: RawInputs = Field(default_factory=RawInputs)
     extras_has_any: Optional[bool] = None
     extras_collect_stage: Optional[ExtrasCollectStage] = None

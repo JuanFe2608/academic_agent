@@ -140,3 +140,27 @@ def test_parse_extracurricular_items_compacts_long_activity_name(monkeypatch) ->
     assert missing == []
     assert len(items) == 1
     assert items[0].nombre.lower() == "salida con amigas"
+
+
+def test_parse_extracurricular_items_accepts_plural_days_and_mixed_24h_with_pm(monkeypatch) -> None:
+    monkeypatch.setattr(
+        extras_node,
+        "llm_normalize_extracurricular_items",
+        lambda _text: None,
+    )
+
+    items, missing = extras_node.parse_extracurricular_items(
+        "Hago ejercicio todos los dias de 5 am a 6 am y saco a mi perro los lunes de 11 am a 13 pm,voy a bailar los domingos de 1 pm a 3pm"
+    )
+
+    assert missing == []
+    assert len(items) == 3
+    assert items[0].nombre == "Ejercicio"
+    assert items[1].nombre == "Sacar al perro"
+    assert items[1].dias == ["Lunes"]
+    assert items[1].hora_inicio == "11:00"
+    assert items[1].hora_fin == "13:00"
+    assert items[2].nombre == "Bailar"
+    assert items[2].dias == ["Domingo"]
+    assert items[2].hora_inicio == "13:00"
+    assert items[2].hora_fin == "15:00"

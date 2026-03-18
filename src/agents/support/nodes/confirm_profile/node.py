@@ -2,34 +2,33 @@
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import (
-    append_message,
-    detect_new_input,
-    normalize_text,
-    parse_yes_no,
-)
+from agents.support.nodes.utils import append_message, detect_new_input
+from agents.support.onboarding.config import load_onboarding_config
+from agents.support.onboarding.messages import build_field_prompt
+from agents.support.onboarding.validators import normalize_text, parse_yes_no
 from agents.support.state import AgentState
-from agents.support.nodes.collect_profile.prompt import PROMPTS_BY_FIELD
 
 from .prompt import PROMPT_FIELD
 
 _FIELD_ALIASES = {
-    "nombre": "nombre",
-    "edad": "edad",
-    "correo": "correo",
-    "email": "correo",
-    "mail": "correo",
-    "codigo": "codigo",
-    "código": "codigo",
-    "semestre": "semestre",
-    "promedio": "promedio",
-    "ocupacion": "ocupacion",
-    "ocupación": "ocupacion",
+    "nombre": "full_name",
+    "nombre completo": "full_name",
+    "codigo": "student_code",
+    "codigo estudiantil": "student_code",
+    "edad": "age",
+    "correo": "institutional_email",
+    "correo institucional": "institutional_email",
+    "email": "institutional_email",
+    "programa": "supported_program",
+    "semestre": "semester",
+    "promedio": "average_grade",
 }
 
 
 def confirm_profile(state: AgentState) -> dict:
-    """Muestra resumen del perfil y solicita confirmacion."""
+    """Muestra resumen del perfil y solicita confirmacion final."""
+
+    config = load_onboarding_config()
     messages = state.get("messages", [])
     has_new_input, last_text, current_count = detect_new_input(
         messages,
@@ -38,16 +37,11 @@ def confirm_profile(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     profile = dict(state.get("student_profile", {}))
+    onboarding = _onboarding_dict(state)
     edit_target = state.get("profile_edit_target")
 
     if not has_new_input:
-        if edit_target:
-            return {
-                "phase": "profile_confirm",
-                "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", PROMPT_FIELD),
-            }
-        prompt = _build_confirm_prompt(profile)
+        prompt = PROMPT_FIELD if edit_target else _build_confirm_prompt(profile, config.supported_program_name)
         return {
             "phase": "profile_confirm",
             "awaiting_user_input": True,
@@ -68,42 +62,47 @@ def confirm_profile(state: AgentState) -> dict:
                 "awaiting_user_input": True,
                 "messages": append_message(messages, "assistant", PROMPT_FIELD),
             }
-        profile[field] = None
-        prompt = _prompt_for_field(field, is_edit=True)
+        _reset_profile_field(profile, onboarding, field)
         return {
             "student_profile": profile,
+            "onboarding": onboarding,
             "profile_edit_target": None,
             "phase": "profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
-            "messages": append_message(messages, "assistant", prompt),
+            "messages": append_message(
+                messages,
+                "assistant",
+                _prompt_for_field(field, config),
+            ),
         }
 
     if answer is True:
         return {
-            "phase": "schedules",
+            "phase": "profile_persist",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": False,
-            "messages": append_message(
-                messages, "assistant", "Gracias. Ahora necesito tus horarios."
-            ),
         }
 
     if answer is False:
         field = _extract_field(normalized)
         if field:
-            profile[field] = None
-            prompt = _prompt_for_field(field, is_edit=True)
+            _reset_profile_field(profile, onboarding, field)
             return {
                 "student_profile": profile,
+                "onboarding": onboarding,
                 "profile_edit_target": None,
                 "phase": "profile",
                 "user_message_count": current_count,
                 "last_user_text": last_text,
                 "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", prompt),
+                "messages": append_message(
+                    messages,
+                    "assistant",
+                    _prompt_for_field(field, config),
+                ),
             }
         return {
             "profile_edit_target": "awaiting_field",
@@ -119,34 +118,33 @@ def confirm_profile(state: AgentState) -> dict:
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": True,
-        "messages": append_message(messages, "assistant", _build_confirm_prompt(profile)),
+        "messages": append_message(
+            messages,
+            "assistant",
+            _build_confirm_prompt(profile, config.supported_program_name),
+        ),
     }
 
 
-def _build_confirm_prompt(profile: dict) -> str:
-    ocupacion = _format_ocupacion(profile.get("ocupacion"))
+def _build_confirm_prompt(profile: dict, supported_program_name: str) -> str:
+    program = (
+        supported_program_name
+        if profile.get("supported_program")
+        else "No confirmado dentro del alcance actual"
+    )
     lines = [
         "Verifica tu informacion:",
-        f"Nombre: {_display_value(profile.get('nombre'))}",
-        f"Edad: {_display_value(profile.get('edad'))}",
-        f"Correo: {_display_value(profile.get('correo'))}",
-        f"Codigo: {_display_value(profile.get('codigo'))}",
-        f"Semestre: {_display_value(profile.get('semestre'))}",
-        f"Promedio: {_display_value(profile.get('promedio'))}",
-        f"Ocupacion: {ocupacion}",
+        f"Nombre: {_display_value(profile.get('full_name'))}",
+        f"Codigo estudiantil: {_display_value(profile.get('student_code'))}",
+        f"Edad: {_display_value(profile.get('age'))}",
+        f"Correo institucional: {_display_value(profile.get('institutional_email'))}",
+        f"Correo verificado: {'Si' if profile.get('email_verified') else 'No'}",
+        f"Programa: {program}",
+        f"Semestre: {_display_value(profile.get('semester'))}",
+        f"Promedio acumulado: {_display_value(profile.get('average_grade'))}",
         "\n¿Es correcta? Responde si o no.",
     ]
     return "\n".join(lines)
-
-
-def _format_ocupacion(value: str | None) -> str:
-    mapping = {
-        "solo_estudio": "Solo estudio",
-        "solo_trabajo": "Solo trabajo",
-        "ambos": "Estudio y trabajo",
-        "ninguna": "Ninguna",
-    }
-    return mapping.get(value or "", "Pendiente")
 
 
 def _extract_field(text: str) -> str | None:
@@ -162,33 +160,43 @@ def _display_value(value: object) -> str:
     if isinstance(value, str):
         cleaned = value.strip()
         return cleaned if cleaned else "Pendiente"
-    if isinstance(value, (int, float)):
+    if isinstance(value, (int, float, bool)):
         return str(value)
-    if isinstance(value, dict):
-        if "text" in value:
-            return str(value.get("text")).strip()
-        if "content" in value:
-            return str(value.get("content")).strip()
-        return str(value)
-    if isinstance(value, (list, tuple)):
-        parts = []
-        for item in value:
-            if isinstance(item, str):
-                parts.append(item.strip())
-            elif isinstance(item, dict):
-                if "text" in item:
-                    parts.append(str(item.get("text")).strip())
-                elif "content" in item:
-                    parts.append(str(item.get("content")).strip())
-        combined = " ".join(part for part in parts if part)
-        return combined if combined else "Pendiente"
     return str(value)
 
 
-def _prompt_for_field(field: str, is_edit: bool = False) -> str:
-    prompt = PROMPTS_BY_FIELD.get(field, "¿Cuál es el dato correcto?")
-    if not is_edit:
+def _reset_profile_field(profile: dict, onboarding: dict, field: str) -> None:
+    if field == "supported_program":
+        profile["supported_program"] = None
+        profile["academic_program"] = None
+        return
+
+    profile[field] = None
+    if field == "institutional_email":
+        profile["email_verified"] = False
+        onboarding["email_verification"] = {
+            "status": "idle",
+            "attempts": 0,
+            "resend_count": 0,
+            "expires_at": None,
+            "last_error": None,
+        }
+
+
+def _prompt_for_field(field: str, config) -> str:
+    prompt = build_field_prompt(field, config)
+    if field != "full_name":
         return prompt
-    if field == "nombre":
-        return prompt.replace("Empecemos. ", "").replace("Empecemos ", "")
-    return prompt
+    return (
+        "¿Como te llamas? Puedes escribirme tu nombre y apellido, por ejemplo: "
+        "Juan Perez"
+    )
+
+
+def _onboarding_dict(state: AgentState) -> dict:
+    onboarding_state = state.get("onboarding", {})
+    onboarding = dict(onboarding_state)
+    onboarding["email_verification"] = dict(
+        onboarding_state.get("email_verification", {})
+    )
+    return onboarding
