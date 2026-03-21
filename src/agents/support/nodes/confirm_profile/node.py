@@ -19,7 +19,6 @@ _FIELD_ALIASES = {
     "correo": "institutional_email",
     "correo institucional": "institutional_email",
     "email": "institutional_email",
-    "programa": "supported_program",
     "semestre": "semester",
     "promedio": "average_grade",
 }
@@ -41,7 +40,7 @@ def confirm_profile(state: AgentState) -> dict:
     edit_target = state.get("profile_edit_target")
 
     if not has_new_input:
-        prompt = PROMPT_FIELD if edit_target else _build_confirm_prompt(profile, config.supported_program_name)
+        prompt = PROMPT_FIELD if edit_target else _build_confirm_prompt(profile)
         return {
             "phase": "profile_confirm",
             "awaiting_user_input": True,
@@ -121,17 +120,13 @@ def confirm_profile(state: AgentState) -> dict:
         "messages": append_message(
             messages,
             "assistant",
-            _build_confirm_prompt(profile, config.supported_program_name),
+            _build_confirm_prompt(profile),
         ),
     }
 
 
-def _build_confirm_prompt(profile: dict, supported_program_name: str) -> str:
-    program = (
-        supported_program_name
-        if profile.get("supported_program")
-        else "No confirmado dentro del alcance actual"
-    )
+def _build_confirm_prompt(profile: dict) -> str:
+    program = profile.get("academic_program") or "Pendiente"
     lines = [
         "Verifica tu informacion:",
         f"Nombre: {_display_value(profile.get('full_name'))}",

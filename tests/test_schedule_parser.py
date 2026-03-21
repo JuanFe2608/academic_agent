@@ -7,6 +7,7 @@ from agents.support.tools.schedule_parser import (
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
+from agents.support.state import normalize_day
 
 
 @pytest.mark.parametrize(
@@ -109,3 +110,8 @@ def test_parse_work_schedule_text_splits_overnight_ranges_into_two_days():
     assert events[1].dia == "Martes"
     assert events[1].inicio == "00:00"
     assert events[1].fin == "03:00"
+
+
+def test_normalize_day_accepts_weekend_plurals():
+    assert normalize_day("sabados") == "Sabado"
+    assert normalize_day("domingos") == "Domingo"

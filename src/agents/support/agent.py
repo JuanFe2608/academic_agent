@@ -43,6 +43,14 @@ def _should_wait(state: AgentState) -> bool:
 
 
 def _route_welcome(state: AgentState) -> str:
+    if state.get("user_status") == "out_of_scope":
+        has_new_input, _, _ = detect_new_input(
+            state.get("messages", []),
+            state.get("user_message_count", 0),
+            state.get("awaiting_user_input", False),
+            state.get("last_user_text"),
+        )
+        return "welcome_consent" if has_new_input else "end"
     if _should_wait(state):
         return "end"
     if state.get("phase") == "end":

@@ -141,3 +141,27 @@ def test_parse_extracurricular_items_accepts_plural_days_and_mixed_24h_with_pm(m
     assert items[0].nombre == "Ejercicio"
     assert items[1].dias == ["Lunes"]
     assert items[2].dias == ["Domingo"]
+
+
+def test_parse_extracurricular_items_keeps_previous_day_for_then_clause_and_requests_missing_time(monkeypatch) -> None:
+    monkeypatch.setattr(
+        extras_parsing,
+        "llm_normalize_extracurricular_items",
+        lambda _text: None,
+    )
+
+    items, missing = extras_parsing.parse_extracurricular_items(
+        "voy los dias sabados al gimnasio de 10 am a 12 pm, luego voy al centro comercial de 2 pm a 4 pm y los domingos voy a la iglesia",
+        expected_is_variable=False,
+    )
+
+    assert len(items) == 2
+    assert items[0].nombre == "Gym"
+    assert items[0].dias == ["Sabado"]
+    assert items[0].hora_inicio == "10:00"
+    assert items[0].hora_fin == "12:00"
+    assert items[1].nombre == "Centro Comercial"
+    assert items[1].dias == ["Sabado"]
+    assert items[1].hora_inicio == "14:00"
+    assert items[1].hora_fin == "16:00"
+    assert missing == ["Iglesia: hora de inicio y fin"]

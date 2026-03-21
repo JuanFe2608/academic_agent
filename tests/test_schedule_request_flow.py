@@ -113,3 +113,95 @@ def test_parse_schedules_to_events_keeps_academic_when_work_needs_clarification(
     assert update["awaiting_user_input"] is True
     assert any(block.block_type == "academic" for block in update["schedule"]["blocks"])
     assert "am o pm" in update["messages"][0].content.lower()
+
+
+def test_parse_schedules_to_events_accepts_work_schedule_excluding_plural_weekends() -> None:
+    state = AgentState(
+        phase="schedules",
+        raw_inputs={
+            "horario_laboral_text": "Trabajo todos los dias menos los sabados y domingos de 7 pm a 10 pm",
+        },
+    )
+
+    update = parse_node.parse_schedules_to_events(state)
+
+    assert update["phase"] == "extras"
+    assert update["awaiting_user_input"] is False
+    work_blocks = [block for block in update["schedule"]["blocks"] if block.block_type == "work"]
+    assert [block.day_of_week for block in work_blocks] == [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+    ]
+    assert all(block.start_time == "19:00" for block in work_blocks)
+    assert all(block.end_time == "22:00" for block in work_blocks)
+
+
+def test_schedule_request_flow_remembers_pending_academic_context_between_turns() -> None:
+    first_state = AgentState(
+        phase="schedules",
+        student_profile={"occupation": "ambos"},
+        raw_inputs={
+            "horario_academico_text": (
+                "Lunes 08:00-10:00 Algebra\n"
+                "Martes y jueves Programacion de 6 a 8"
+            ),
+            "horario_laboral_text": "Lunes a viernes de 7 pm a 10 pm",
+        },
+    )
+
+    first_update = parse_node.parse_schedules_to_events(first_state)
+
+    assert first_update["phase"] == "schedules"
+    assert first_update["awaiting_user_input"] is True
+    assert len(first_update["academic_pending_items"]) == 1
+    prompt = first_update["messages"][0].content.lower()
+    assert "programacion" in prompt
+    assert "puedes responder solo con lo que falta" in prompt
+    assert any(
+        block.block_type == "academic"
+        and block.title == "Algebra"
+        and block.day_of_week == "monday"
+        for block in first_update["schedule"]["blocks"]
+    )
+
+    reply_state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "ambos"},
+        raw_inputs=first_update["raw_inputs"],
+        schedule=first_update["schedule"],
+        academic_pending_items=first_update["academic_pending_items"],
+        work_pending_items=first_update["work_pending_items"],
+        messages=[HumanMessage(content="pm")],
+    )
+
+    reply_update = request_schedules(reply_state)
+
+    assert reply_update["awaiting_user_input"] is False
+    assert reply_update["academic_pending_items"] == []
+    assert "Programacion" in reply_update["raw_inputs"]["horario_academico_text"]
+
+    final_state = AgentState(
+        phase="schedules",
+        student_profile={"occupation": "ambos"},
+        raw_inputs=reply_update["raw_inputs"],
+        schedule=reply_update["schedule"],
+    )
+
+    final_update = parse_node.parse_schedules_to_events(final_state)
+
+    assert final_update["phase"] == "extras"
+    academic_blocks = {
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in final_update["schedule"]["blocks"]
+        if block.block_type == "academic"
+    }
+    assert academic_blocks == {
+        ("Algebra", "monday", "08:00", "10:00"),
+        ("Programacion", "tuesday", "18:00", "20:00"),
+        ("Programacion", "thursday", "18:00", "20:00"),
+    }

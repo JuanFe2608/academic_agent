@@ -10,7 +10,6 @@ PROMPTS_BY_FIELD = {
     "student_code": build_field_prompt("student_code", _CONFIG),
     "age": build_field_prompt("age", _CONFIG),
     "institutional_email": build_field_prompt("institutional_email", _CONFIG),
-    "supported_program": build_field_prompt("supported_program", _CONFIG),
     "semester": build_field_prompt("semester", _CONFIG),
     "average_grade": build_field_prompt("average_grade", _CONFIG),
 }

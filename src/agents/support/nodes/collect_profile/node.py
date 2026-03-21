@@ -6,7 +6,7 @@ from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_field_prompt,
-    build_program_scope_note,
+    build_out_of_scope_program_message,
     build_prompt_with_error,
 )
 from agents.support.onboarding.validators import (
@@ -38,12 +38,14 @@ def collect_profile(state: AgentState) -> dict:
 
     validation_failed = False
     should_send_verification = False
-    extra_note = None
 
     if has_new_input and last_text and target_field:
         result = validate_profile_field(target_field, last_text, config)
         if result.is_valid:
             profile[target_field] = result.value
+            if target_field == "student_code":
+                profile["supported_program"] = True
+                profile["academic_program"] = config.supported_program_name
             if target_field == "institutional_email":
                 profile["email_verified"] = False
                 onboarding["email_verification"] = {
@@ -54,14 +56,27 @@ def collect_profile(state: AgentState) -> dict:
                     "last_error": None,
                 }
                 should_send_verification = True
-            elif target_field == "supported_program":
-                profile["academic_program"] = (
-                    config.supported_program_name if result.value else None
-                )
-                if result.value is False:
-                    extra_note = build_program_scope_note(config)
         else:
+            if target_field == "student_code":
+                return {
+                    "student_profile": profile,
+                    "onboarding": onboarding,
+                    "phase": "end",
+                    "user_status": "out_of_scope",
+                    "user_message_count": current_count,
+                    "last_user_text": last_text,
+                    "awaiting_user_input": False,
+                    "messages": append_message(
+                        messages,
+                        "assistant",
+                        build_out_of_scope_program_message(config),
+                    ),
+                }
             validation_failed = True
+
+    if profile.get("student_code"):
+        profile["supported_program"] = True
+        profile["academic_program"] = config.supported_program_name
 
     missing_after = get_missing_profile_fields(profile)
     next_field = missing_after[0] if missing_after else None
@@ -84,7 +99,6 @@ def collect_profile(state: AgentState) -> dict:
                 prompt_field,
                 config,
                 get_first_name(profile),
-                extra_note,
             )
         else:
             prompt = build_field_prompt(
@@ -92,11 +106,12 @@ def collect_profile(state: AgentState) -> dict:
                 config,
                 get_first_name(profile),
             )
-        if not validation_failed and extra_note and prompt_field != "supported_program":
-            prompt = f"{extra_note}\n{prompt}"
         return {
             "student_profile": profile,
             "onboarding": onboarding,
+            "user_status": state.get("user_status", "start")
+            if profile.get("student_code") in (None, "")
+            else "valid",
             "phase": "profile",
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
             "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -107,6 +122,7 @@ def collect_profile(state: AgentState) -> dict:
     return {
         "student_profile": profile,
         "onboarding": onboarding,
+        "user_status": "valid",
         "phase": "profile_confirm",
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),

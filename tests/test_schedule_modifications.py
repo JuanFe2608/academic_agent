@@ -189,3 +189,125 @@ def test_apply_schedule_correction_can_clear_extracurricular_section() -> None:
     assert update["phase"] == "draft"
     assert update["extras_has_any"] is False
     assert all(block.block_type != "extracurricular" for block in update["schedule"]["blocks"])
+
+
+def test_apply_schedule_correction_remembers_pending_extracurricular_context_between_turns() -> None:
+    state = AgentState(
+        phase="schedule_edit",
+        schedule={
+            "blocks": [_academic_block()],
+            "correction_target": "extracurricular",
+            "pending_correction_text": (
+                "voy los dias sabados al gimnasio de 10 am a 12 pm, "
+                "luego voy al centro comercial de 2 pm a 4 pm y los domingos voy a la iglesia"
+            ),
+            "review_stage": "idle",
+        },
+    )
+
+    first_update = apply_schedule_correction(state)
+
+    assert first_update["phase"] == "validate"
+    assert first_update["awaiting_user_input"] is True
+    assert len(first_update["extracurricular"]) == 2
+    assert [item.nombre for item in first_update["extracurricular"]] == ["Gym", "Centro Comercial"]
+    prompt = first_update["messages"][0].content.lower()
+    assert "iglesia" in prompt
+    assert "puedes responder solo con lo que falta" in prompt
+
+    validate_state = AgentState(
+        phase="validate",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="el horario de la iglesia es de 7 am a 8 am")],
+        schedule=first_update["schedule"],
+        extracurricular=first_update["extracurricular"],
+        extras_pending_items=first_update["extras_pending_items"],
+    )
+
+    validation_update = validate_schedule(validate_state)
+
+    assert validation_update["phase"] == "schedule_edit"
+
+    second_state = AgentState(
+        phase="schedule_edit",
+        extracurricular=first_update["extracurricular"],
+        extras_pending_items=first_update["extras_pending_items"],
+        schedule=validation_update["schedule"],
+    )
+
+    second_update = apply_schedule_correction(second_state)
+
+    assert second_update["phase"] == "draft"
+    assert second_update["extras_pending_items"] == []
+    assert [item.nombre for item in second_update["extracurricular"]] == [
+        "Gym",
+        "Centro Comercial",
+        "Iglesia",
+    ]
+    blocks = [block for block in second_update["schedule"]["blocks"] if block.block_type == "extracurricular"]
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in blocks] == [
+        ("Gym", "saturday", "10:00", "12:00"),
+        ("Centro Comercial", "saturday", "14:00", "16:00"),
+        ("Iglesia", "sunday", "07:00", "08:00"),
+    ]
+
+
+def test_apply_schedule_correction_remembers_pending_work_context_between_turns() -> None:
+    state = AgentState(
+        phase="schedule_edit",
+        raw_inputs={"horario_laboral_text": "Lunes 09:00-18:00"},
+        schedule={
+            "blocks": [_academic_block(), _work_block()],
+            "correction_target": "work",
+            "pending_correction_text": "Trabajo de lunes a viernes de 7 a 10",
+            "review_stage": "idle",
+        },
+    )
+
+    first_update = apply_schedule_correction(state)
+
+    assert first_update["phase"] == "validate"
+    assert first_update["awaiting_user_input"] is True
+    assert len(first_update["work_pending_items"]) == 1
+    prompt = first_update["messages"][0].content.lower()
+    assert "trabajo" in prompt
+    assert "puedes responder solo con lo que falta" in prompt
+
+    validate_state = AgentState(
+        phase="validate",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="pm")],
+        schedule=first_update["schedule"],
+        work_pending_items=first_update["work_pending_items"],
+        raw_inputs=state.raw_inputs,
+    )
+
+    validation_update = validate_schedule(validate_state)
+
+    assert validation_update["phase"] == "schedule_edit"
+
+    second_state = AgentState(
+        phase="schedule_edit",
+        raw_inputs=state.raw_inputs,
+        work_pending_items=first_update["work_pending_items"],
+        schedule=validation_update["schedule"],
+    )
+
+    second_update = apply_schedule_correction(second_state)
+
+    assert second_update["phase"] == "draft"
+    assert second_update["work_pending_items"] == []
+    blocks = {
+        (block.day_of_week, block.start_time, block.end_time)
+        for block in second_update["schedule"]["blocks"]
+        if block.block_type == "work"
+    }
+    assert blocks == {
+        ("monday", "19:00", "22:00"),
+        ("tuesday", "19:00", "22:00"),
+        ("wednesday", "19:00", "22:00"),
+        ("thursday", "19:00", "22:00"),
+        ("friday", "19:00", "22:00"),
+    }

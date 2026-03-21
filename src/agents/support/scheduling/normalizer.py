@@ -147,32 +147,18 @@ def _normalize_extracurricular_schedule(
     timezone: str,
 ) -> NormalizedScheduleResult:
     items, missing = parse_extracurricular_items(text, expected_is_variable=False)
-    if items and not missing:
-        blocks: list[WeeklyScheduleBlock] = []
-        for item in items:
-            if not item.dias or not item.hora_inicio or not item.hora_fin:
-                return NormalizedScheduleResult(
-                    needs_clarification=True,
-                    clarifications=[
-                        "Cada actividad extracurricular debe incluir nombre, días y hora de inicio y fin."
-                    ],
-                )
-            blocks.extend(
-                WeeklyScheduleBlock(
-                    block_type="extracurricular",
-                    title=item.nombre.strip() or "Actividad extracurricular",
-                    day_of_week=_to_day_key(day),
-                    start_time=normalize_time(item.hora_inicio),
-                    end_time=normalize_time(item.hora_fin),
-                    timezone=timezone,
-                    source_text=item.detalle or text,
-                    confidence=0.9,
-                )
-                for day in item.dias
+    if items:
+        blocks = _blocks_from_extracurricular_items(items, text, timezone)
+        if not missing:
+            return NormalizedScheduleResult(
+                blocks=blocks,
+                parser_used="deterministic_extracurricular",
             )
         return NormalizedScheduleResult(
-            blocks=_dedupe_blocks(blocks),
-            parser_used="deterministic_extracurricular",
+            blocks=blocks,
+            needs_clarification=True,
+            clarifications=[_humanize_missing_fields(missing)],
+            parser_used="deterministic_extracurricular_partial",
         )
     llm_result = _normalize_with_json_llm(text, "extracurricular", timezone)
     if llm_result.blocks:
@@ -324,6 +310,31 @@ def _blocks_from_events(
         )
         for event in events
     ]
+
+
+def _blocks_from_extracurricular_items(
+    items: list,
+    source_text: str,
+    timezone: str,
+) -> list[WeeklyScheduleBlock]:
+    blocks: list[WeeklyScheduleBlock] = []
+    for item in items:
+        if not item.dias or not item.hora_inicio or not item.hora_fin:
+            continue
+        blocks.extend(
+            WeeklyScheduleBlock(
+                block_type="extracurricular",
+                title=item.nombre.strip() or "Actividad extracurricular",
+                day_of_week=_to_day_key(day),
+                start_time=normalize_time(item.hora_inicio),
+                end_time=normalize_time(item.hora_fin),
+                timezone=timezone,
+                source_text=item.detalle or source_text,
+                confidence=0.9,
+            )
+            for day in item.dias
+        )
+    return _dedupe_blocks(blocks)
 
 
 def _dedupe_blocks(blocks: list[WeeklyScheduleBlock]) -> list[WeeklyScheduleBlock]:

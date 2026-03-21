@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+from agents.support.scheduling import merge_section_blocks, replace_section_blocks
+from agents.support.scheduling.contextual_parser import (
+    build_schedule_pending_prompt,
+    complete_pending_schedule_item,
+    serialize_blocks_for_schedule_type,
+)
 from agents.support.nodes.utils import (
     append_message,
     detect_new_input,
-    has_time_range,
     normalize_text,
 )
-from agents.support.state import AgentState, RawInputs
+from agents.support.state import AgentState, PendingScheduleItem, RawInputs
 
 from .prompt import (
     PROMPT_ACADEMICO,
@@ -29,8 +34,25 @@ def request_schedules(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
+    schedule_state = dict(state.get("schedule", {}))
     profile = dict(state.get("student_profile", {}))
     occupation = profile.get("occupation")
+    academic_pending_items = _coerce_pending_items(state.get("academic_pending_items", []))
+    work_pending_items = _coerce_pending_items(state.get("work_pending_items", []))
+
+    if has_new_input and last_text and (academic_pending_items or work_pending_items):
+        pending_update = _consume_pending_schedule_reply(
+            state,
+            raw_inputs=raw_inputs,
+            schedule_state=schedule_state,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            response_text=last_text,
+            current_count=current_count,
+        )
+        if pending_update is not None:
+            pending_update["student_profile"] = profile
+            return pending_update
 
     if has_new_input and last_text:
         if not occupation:
@@ -44,6 +66,9 @@ def request_schedules(state: AgentState) -> dict:
         return {
             "student_profile": profile,
             "raw_inputs": raw_inputs,
+            "schedule": schedule_state,
+            "academic_pending_items": academic_pending_items,
+            "work_pending_items": work_pending_items,
             "phase": "schedules",
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
             "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -54,6 +79,10 @@ def request_schedules(state: AgentState) -> dict:
     if occupation == "ninguna":
         return {
             "student_profile": profile,
+            "raw_inputs": raw_inputs,
+            "schedule": schedule_state,
+            "academic_pending_items": academic_pending_items,
+            "work_pending_items": work_pending_items,
             "phase": "end",
             "awaiting_user_input": False,
             "messages": append_message(messages, "assistant", PROMPT_NINGUNA),
@@ -64,6 +93,9 @@ def request_schedules(state: AgentState) -> dict:
         return {
             "student_profile": profile,
             "raw_inputs": raw_inputs,
+            "schedule": schedule_state,
+            "academic_pending_items": academic_pending_items,
+            "work_pending_items": work_pending_items,
             "phase": "schedules",
             "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
             "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -78,6 +110,9 @@ def request_schedules(state: AgentState) -> dict:
     return {
         "student_profile": profile,
         "raw_inputs": raw_inputs,
+        "schedule": schedule_state,
+        "academic_pending_items": academic_pending_items,
+        "work_pending_items": work_pending_items,
         "phase": "schedules",
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -151,3 +186,119 @@ def _parse_occupation(text: str) -> str | None:
     if normalized in {"3", "ninguna"} or normalized.startswith("3"):
         return "ninguna"
     return None
+
+
+def _coerce_pending_items(
+    raw_items: list[PendingScheduleItem] | list[dict],
+) -> list[PendingScheduleItem]:
+    return [
+        item if isinstance(item, PendingScheduleItem) else PendingScheduleItem(**item)
+        for item in raw_items
+    ]
+
+
+def _consume_pending_schedule_reply(
+    state: AgentState,
+    *,
+    raw_inputs: RawInputs,
+    schedule_state: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    response_text: str,
+    current_count: int,
+) -> dict | None:
+    target = "academic" if academic_pending_items else "work"
+    pending_items = academic_pending_items if academic_pending_items else work_pending_items
+    if not pending_items:
+        return None
+
+    completed_blocks, _clarifications, updated_pending = complete_pending_schedule_item(
+        response_text,
+        pending_items[0],
+        timezone=state.get("timezone", "America/Bogota"),
+    )
+    if updated_pending is not None:
+        refreshed_items = [updated_pending] + pending_items[1:]
+        return {
+            "raw_inputs": raw_inputs,
+            "schedule": schedule_state,
+            "academic_pending_items": refreshed_items if target == "academic" else academic_pending_items,
+            "work_pending_items": refreshed_items if target == "work" else work_pending_items,
+            "phase": "schedules",
+            "user_message_count": current_count,
+            "last_user_text": response_text,
+            "awaiting_user_input": True,
+            "messages": append_message(
+                state.get("messages", []),
+                "assistant",
+                build_schedule_pending_prompt(target, refreshed_items),
+            ),
+        }
+
+    existing_blocks = list(schedule_state.get("blocks", []))
+    current_section_blocks = [
+        block
+        for block in existing_blocks
+        if str(block.get("block_type") if isinstance(block, dict) else block.block_type) == target
+    ]
+    merged_target_blocks = merge_section_blocks(current_section_blocks, completed_blocks)
+    updated_blocks = replace_section_blocks(existing_blocks, target, merged_target_blocks)
+
+    updated_raw_inputs = dict(raw_inputs)
+    if target == "academic":
+        updated_raw_inputs["horario_academico_text"] = serialize_blocks_for_schedule_type(
+            merged_target_blocks,
+            "academic",
+        )
+        academic_pending_items = pending_items[1:]
+    else:
+        updated_raw_inputs["horario_laboral_text"] = serialize_blocks_for_schedule_type(
+            merged_target_blocks,
+            "work",
+        )
+        work_pending_items = pending_items[1:]
+
+    next_target, next_items = _next_pending_items(academic_pending_items, work_pending_items)
+    if next_target is not None and next_items:
+        return {
+            "raw_inputs": updated_raw_inputs,
+            "schedule": {**schedule_state, "blocks": updated_blocks},
+            "academic_pending_items": academic_pending_items,
+            "work_pending_items": work_pending_items,
+            "phase": "schedules",
+            "user_message_count": current_count,
+            "last_user_text": response_text,
+            "awaiting_user_input": True,
+            "messages": append_message(
+                state.get("messages", []),
+                "assistant",
+                build_schedule_pending_prompt(next_target, next_items),
+            ),
+        }
+
+    return {
+        "raw_inputs": updated_raw_inputs,
+        "schedule": {**schedule_state, "blocks": updated_blocks},
+        "academic_pending_items": academic_pending_items,
+        "work_pending_items": work_pending_items,
+        "phase": "schedules",
+        "user_message_count": current_count,
+        "last_user_text": response_text,
+        "awaiting_user_input": False,
+        "messages": append_message(
+            state.get("messages", []),
+            "assistant",
+            "Gracias. Voy a procesar tus horarios.",
+        ),
+    }
+
+
+def _next_pending_items(
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+) -> tuple[str | None, list[PendingScheduleItem]]:
+    if academic_pending_items:
+        return "academic", academic_pending_items
+    if work_pending_items:
+        return "work", work_pending_items
+    return None, []

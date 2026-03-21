@@ -9,7 +9,6 @@ PROFILE_FIELD_ORDER = (
     "student_code",
     "age",
     "institutional_email",
-    "supported_program",
     "semester",
     "average_grade",
 )
@@ -130,6 +129,17 @@ def build_program_scope_note(config: OnboardingConfig) -> str:
         "Puedes continuar si lo deseas. Solo ten presente que el alcance "
         "actual del MVP esta disenado para estudiantes de "
         f"{config.supported_program_name}."
+    )
+
+
+def build_out_of_scope_program_message(config: OnboardingConfig) -> str:
+    """Mensaje final cuando el codigo deja al usuario fuera del alcance."""
+
+    return (
+        "Este agente ha sido disenado unicamente para estudiantes de "
+        f"{config.supported_program_name}.\n"
+        "Actualmente no puedo ayudarte porque el alcance del proyecto esta "
+        "dirigido solo a este programa academico."
     )
 
 

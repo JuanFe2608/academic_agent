@@ -46,6 +46,8 @@ Occupation = Literal["solo_estudio", "ambos", "ninguna"]
 Ocupacion = Occupation
 Prioridad = Literal["alta", "media", "baja"]
 ExtrasCollectStage = Literal["awaiting_type", "awaiting_details", "awaiting_more", "done"]
+UserStatus = Literal["start", "valid", "out_of_scope"]
+ScheduleContextType = Literal["academic", "work"]
 
 
 class BaseStateModel(BaseModel):
@@ -144,6 +146,26 @@ class ExtracurricularItem(BaseStateModel):
     tentativo: list[Event] = Field(default_factory=list)
 
 
+class PendingExtracurricularItem(BaseStateModel):
+    """Contexto pendiente para completar una actividad extracurricular."""
+
+    nombre: str = ""
+    dias: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+    es_variable: Optional[bool] = None
+    raw_text: str = ""
+
+
+class PendingScheduleItem(BaseStateModel):
+    """Contexto pendiente para completar un bloque academico o laboral."""
+
+    schedule_type: ScheduleContextType
+    title: str = ""
+    days: list[str] = Field(default_factory=list)
+    missing_fields: list[str] = Field(default_factory=list)
+    raw_text: str = ""
+
+
 class SchedulePreview(BaseStateModel):
     """Vista previa de datos de horario parseados."""
 
@@ -218,6 +240,7 @@ class AgentState(BaseStateModel):
     phase: Phase = "consent"
     errors: list[str] = Field(default_factory=list)
     timezone: str = "America/Bogota"
+    user_status: UserStatus = "start"
     welcome_sent: bool = False
     last_user_text: Optional[str] = None
     last_user_images: list[str] = Field(default_factory=list)
@@ -231,6 +254,9 @@ class AgentState(BaseStateModel):
     extras_has_any: Optional[bool] = None
     extras_collect_stage: Optional[ExtrasCollectStage] = None
     extras_pending_is_variable: Optional[bool] = None
+    extras_pending_items: list[PendingExtracurricularItem] = Field(default_factory=list)
+    academic_pending_items: list[PendingScheduleItem] = Field(default_factory=list)
+    work_pending_items: list[PendingScheduleItem] = Field(default_factory=list)
     extracurricular: list[ExtracurricularItem] = Field(default_factory=list)
     events: list[Event] = Field(default_factory=list)
     events_validated: bool = False
@@ -280,10 +306,12 @@ DAY_ALIASES = {
     "sa": "Sabado",
     "sab": "Sabado",
     "sabado": "Sabado",
+    "sabados": "Sabado",
     "d": "Domingo",
     "do": "Domingo",
     "dom": "Domingo",
     "domingo": "Domingo",
+    "domingos": "Domingo",
 }
 
 EVENT_TYPES = {"confirmado", "tentativo"}

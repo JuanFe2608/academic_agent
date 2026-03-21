@@ -54,13 +54,26 @@ def validate_full_name(raw: str, config: OnboardingConfig) -> ValidationResult:
     return ValidationResult(value=cleaned)
 
 
-def validate_student_code(raw: str, config: OnboardingConfig) -> ValidationResult:
-    """Valida codigo estudiantil como cadena numerica parametrizable."""
+def validate_student_code(code: str) -> bool:
+    """Determina si el codigo pertenece al alcance del proyecto."""
+
+    normalized = str(code or "").strip()
+    return (
+        normalized.isdigit()
+        and len(normalized) == 8
+        and normalized.startswith("67")
+    )
+
+
+def validate_student_code_field(raw: str, config: OnboardingConfig) -> ValidationResult:
+    """Valida el codigo estudiantil para el onboarding."""
 
     normalized = str(raw or "").strip()
     if not normalized.isdigit():
         return ValidationResult(error="invalid_student_code")
     if len(normalized) != config.student_code_length:
+        return ValidationResult(error="invalid_student_code")
+    if not validate_student_code(normalized):
         return ValidationResult(error="invalid_student_code")
     return ValidationResult(value=normalized)
 
@@ -146,7 +159,7 @@ def validate_profile_field(
 
     validators = {
         "full_name": validate_full_name,
-        "student_code": validate_student_code,
+        "student_code": validate_student_code_field,
         "age": validate_age,
         "institutional_email": validate_institutional_email,
         "supported_program": validate_supported_program,
@@ -165,10 +178,6 @@ def get_missing_profile_fields(profile: Any) -> list[str]:
     missing: list[str] = []
     for field in PROFILE_FIELD_ORDER:
         value = profile_value(profile, field)
-        if field == "supported_program":
-            if value is None:
-                missing.append(field)
-            continue
         if value in (None, ""):
             missing.append(field)
     return missing
