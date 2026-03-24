@@ -7,11 +7,13 @@ from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_field_prompt,
     build_out_of_scope_program_message,
+    build_student_code_scope_prompt,
     build_prompt_with_error,
 )
 from agents.support.onboarding.validators import (
     get_first_name,
     get_missing_profile_fields,
+    parse_yes_no,
     validate_profile_field,
 )
 from agents.support.state import AgentState
@@ -36,6 +38,54 @@ def collect_profile(state: AgentState) -> dict:
     onboarding["current_field"] = target_field
     onboarding["persistence_error"] = None
 
+    if onboarding.get("pending_student_code_scope_confirmation"):
+        decision = parse_yes_no(last_text or "") if has_new_input else None
+        if decision is True:
+            onboarding["pending_student_code_scope_confirmation"] = False
+            return {
+                "student_profile": profile,
+                "onboarding": onboarding,
+                "user_status": "start",
+                "phase": "profile",
+                "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+                "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+                "awaiting_user_input": True,
+                "messages": append_message(
+                    messages,
+                    "assistant",
+                    build_field_prompt("student_code", config, get_first_name(profile)),
+                ),
+            }
+        if decision is False:
+            onboarding["pending_student_code_scope_confirmation"] = False
+            return {
+                "student_profile": profile,
+                "onboarding": onboarding,
+                "phase": "end",
+                "user_status": "out_of_scope",
+                "user_message_count": current_count,
+                "last_user_text": last_text,
+                "awaiting_user_input": False,
+                "messages": append_message(
+                    messages,
+                    "assistant",
+                    build_out_of_scope_program_message(config),
+                ),
+            }
+        return {
+            "student_profile": profile,
+            "onboarding": onboarding,
+            "phase": "profile",
+            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+            "awaiting_user_input": True,
+            "messages": append_message(
+                messages,
+                "assistant",
+                build_student_code_scope_prompt(config),
+            ),
+        }
+
     validation_failed = False
     should_send_verification = False
 
@@ -57,19 +107,20 @@ def collect_profile(state: AgentState) -> dict:
                 }
                 should_send_verification = True
         else:
-            if target_field == "student_code":
+            if target_field == "student_code" and result.error == "unsupported_student_code":
+                onboarding["pending_student_code_scope_confirmation"] = True
                 return {
                     "student_profile": profile,
                     "onboarding": onboarding,
-                    "phase": "end",
-                    "user_status": "out_of_scope",
+                    "phase": "profile",
+                    "user_status": "start",
                     "user_message_count": current_count,
                     "last_user_text": last_text,
-                    "awaiting_user_input": False,
+                    "awaiting_user_input": True,
                     "messages": append_message(
                         messages,
                         "assistant",
-                        build_out_of_scope_program_message(config),
+                        build_student_code_scope_prompt(config),
                     ),
                 }
             validation_failed = True

@@ -22,6 +22,11 @@ ScheduleReviewStage = Literal[
     "awaiting_correction_target",
     "awaiting_correction_payload",
 ]
+ScheduleCaptureStage = Literal[
+    "idle",
+    "awaiting_input",
+    "awaiting_more",
+]
 CorrectionTarget = Literal["academic", "work", "extracurricular"]
 
 DAY_ORDER: list[DayOfWeek] = [
@@ -59,4 +64,3 @@ BLOCK_TYPE_TO_EVENT_CATEGORY = {
     "work": "laboral",
     "extracurricular": "extracurricular",
 }
-

@@ -29,6 +29,9 @@ def detect_schedule_conflicts(
             key=lambda item: _minutes(item.start_time),
         )
         flags: dict[str, bool] = {block.block_id: False for block in day_blocks}
+        metadata_by_block: dict[str, list[dict[str, str]]] = {
+            block.block_id: [] for block in day_blocks
+        }
         for left_index, left in enumerate(day_blocks):
             for right in day_blocks[left_index + 1 :]:
                 if _minutes(right.start_time) >= _minutes(left.end_time):
@@ -53,8 +56,35 @@ def detect_schedule_conflicts(
                         accepted=bool(left.conflict_accepted and right.conflict_accepted),
                     )
                 )
+                metadata_by_block[left.block_id].append(
+                    {
+                        "with_block_id": right.block_id,
+                        "with_title": right.title,
+                        "with_type": right.block_type,
+                        "overlap_start": _format_minutes(overlap_start),
+                        "overlap_end": _format_minutes(overlap_end),
+                    }
+                )
+                metadata_by_block[right.block_id].append(
+                    {
+                        "with_block_id": left.block_id,
+                        "with_title": left.title,
+                        "with_type": left.block_type,
+                        "overlap_start": _format_minutes(overlap_start),
+                        "overlap_end": _format_minutes(overlap_end),
+                    }
+                )
         for block in day_blocks:
-            updated.append(block.model_copy(update={"has_conflict": flags[block.block_id]}))
+            metadata = dict(block.metadata)
+            metadata["conflicts"] = metadata_by_block[block.block_id]
+            updated.append(
+                block.model_copy(
+                    update={
+                        "has_conflict": flags[block.block_id],
+                        "metadata": metadata,
+                    }
+                )
+            )
 
     return updated, conflicts
 

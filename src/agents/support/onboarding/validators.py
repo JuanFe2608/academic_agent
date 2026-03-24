@@ -74,7 +74,7 @@ def validate_student_code_field(raw: str, config: OnboardingConfig) -> Validatio
     if len(normalized) != config.student_code_length:
         return ValidationResult(error="invalid_student_code")
     if not validate_student_code(normalized):
-        return ValidationResult(error="invalid_student_code")
+        return ValidationResult(error="unsupported_student_code")
     return ValidationResult(value=normalized)
 
 

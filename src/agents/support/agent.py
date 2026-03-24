@@ -95,6 +95,8 @@ def _route_from_phase(state: AgentState) -> str:
 
 
 def _route_collect_profile(state: AgentState) -> str:
+    if state.get("user_status") == "out_of_scope" or state.get("phase") == "end":
+        return "end"
     if _should_wait(state):
         return "end"
     profile = state.get("student_profile", {})
@@ -158,6 +160,19 @@ def _route_request_schedules(state: AgentState) -> str:
         return "end"
     occupation = state.get("student_profile", {}).get("occupation")
     raw_inputs = state.get("raw_inputs", {})
+    academic_pending_items = state.get("academic_pending_items", [])
+    work_pending_items = state.get("work_pending_items", [])
+    schedule_state = state.get("schedule", {})
+    capture_target = (
+        schedule_state.get("capture_target")
+        if isinstance(schedule_state, dict)
+        else getattr(schedule_state, "capture_target", None)
+    )
+    capture_stage = (
+        schedule_state.get("capture_stage")
+        if isinstance(schedule_state, dict)
+        else getattr(schedule_state, "capture_stage", "idle")
+    )
 
     if not occupation:
         return "request_schedules"
@@ -165,19 +180,30 @@ def _route_request_schedules(state: AgentState) -> str:
     if occupation == "ninguna":
         return "end"
 
-    if occupation == "solo_estudio":
-        if not raw_inputs.get("horario_academico_text"):
+    if academic_pending_items or work_pending_items:
+        return "request_schedules"
+
+    if capture_target in {"academic", "work"} and not state.get("awaiting_user_input"):
+        return "parse_schedules_to_events"
+
+    if (
+        not state.get("awaiting_user_input")
+        and (
+            raw_inputs.get("horario_academico_text")
+            or raw_inputs.get("horario_laboral_text")
+        )
+    ):
+        if occupation == "ambos" and not raw_inputs.get("horario_academico_text"):
             return "request_schedules"
         return "parse_schedules_to_events"
 
-    if occupation == "ambos":
-        if not raw_inputs.get("horario_academico_text"):
-            return "request_schedules"
-        if not raw_inputs.get("horario_laboral_text"):
-            return "request_schedules"
-        return "parse_schedules_to_events"
+    if state.get("phase") == "extras":
+        return "ask_extracurricular"
 
-    return "parse_schedules_to_events"
+    if capture_stage == "idle":
+        return "request_schedules"
+
+    return "request_schedules"
 
 
 def _route_extras(state: AgentState) -> str:
@@ -198,6 +224,14 @@ def _route_collect_extracurricular(state: AgentState) -> str:
     if stage == "done":
         return "build_draft_schedule"
     return "collect_extracurricular_details"
+
+
+def _route_after_parse_schedules(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    if state.get("phase") == "extras":
+        return "ask_extracurricular"
+    return "end"
 
 
 def _route_validate(state: AgentState) -> str:
@@ -223,6 +257,14 @@ def _route_after_persist_schedule(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
     return "end"
+
+
+def _has_block_type(blocks: list, block_type: str) -> bool:
+    for block in blocks or []:
+        current_type = block.get("block_type") if isinstance(block, dict) else getattr(block, "block_type", None)
+        if str(current_type) == block_type:
+            return True
+    return False
 
 
 def build_agent() -> StateGraph:
@@ -330,7 +372,14 @@ def build_agent() -> StateGraph:
         },
     )
 
-    graph.add_edge("parse_schedules_to_events", "ask_extracurricular")
+    graph.add_conditional_edges(
+        "parse_schedules_to_events",
+        _route_after_parse_schedules,
+        {
+            "ask_extracurricular": "ask_extracurricular",
+            "end": END,
+        },
+    )
     graph.add_conditional_edges(
         "ask_extracurricular",
         _route_extras,

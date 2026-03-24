@@ -228,12 +228,24 @@ def parse_yes_no(text: str) -> Optional[bool]:
         return None
     normalized = normalize_text(text)
     for token in _YES_TOKENS:
-        if token in normalized:
+        if contains_normalized_phrase(normalized, token):
             return True
     for token in _NO_TOKENS:
-        if token in normalized:
+        if contains_normalized_phrase(normalized, token):
             return False
     return None
+
+
+def contains_normalized_phrase(normalized_text: str, phrase: str) -> bool:
+    normalized_phrase = normalize_text(phrase)
+    if not normalized_text or not normalized_phrase:
+        return False
+    return bool(
+        re.search(
+            rf"(?<!\w){re.escape(normalized_phrase)}(?!\w)",
+            normalized_text,
+        )
+    )
 
 
 def detect_new_input(

@@ -19,6 +19,7 @@ from agents.support.tools.schedule_parser import (
 
 from .constants import DAY_ORDER, ScheduleBlockType, SPANISH_TO_ENGLISH
 from .models import NormalizedScheduleResult, WeeklyScheduleBlock, ensure_weekly_block
+from .titles import normalize_schedule_title
 
 _DAY_TOKEN_PATTERN = (
     r"(?:"
@@ -45,8 +46,8 @@ _ALL_DAYS_EXCEPT_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _TIME_RANGE_PATTERN = re.compile(
-    r"(?:de|desde)?\s*(?:las\s+)?\d{1,2}(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?\s*"
-    r"(?:-|a|hasta)\s*(?:las\s+)?\d{1,2}(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?",
+    r"(?:de|desde)?\s*(?:las\s+)?\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?\s*"
+    r"(?:-|a|hasta)\s*(?:las\s+)?\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?",
     re.IGNORECASE,
 )
 _SEPARATOR_PATTERN = re.compile(r"(?:[\n;]+|,\s*(?=[A-Za-zÁÉÍÓÚáéíóúÑñ]))")
@@ -275,11 +276,18 @@ def _heuristic_academic_blocks(text: str, timezone: str) -> list[WeeklyScheduleB
             raise ValueError("Falta el día del bloque académico.")
         start_time, end_time = _extract_time_range(segment)
         title = _infer_title(segment, default_title="Clase")
+        original_title, normalized_title = normalize_schedule_title(
+            title,
+            "academic",
+            segment,
+        )
         for day in effective_days:
             blocks.append(
                 WeeklyScheduleBlock(
                     block_type="academic",
-                    title=title,
+                    title=normalized_title,
+                    original_title=original_title,
+                    normalized_title=normalized_title,
                     day_of_week=day,
                     start_time=start_time,
                     end_time=end_time,
@@ -297,19 +305,28 @@ def _blocks_from_events(
     source_text: str,
     confidence: float,
 ) -> list[WeeklyScheduleBlock]:
-    return [
-        WeeklyScheduleBlock(
-            block_type=schedule_type,
-            title=str(event.titulo).strip() or ("Trabajo" if schedule_type == "work" else "Clase"),
-            day_of_week=_to_day_key(str(event.dia)),
-            start_time=normalize_time(str(event.inicio)),
-            end_time=normalize_time(str(event.fin)),
-            timezone=str(event.timezone or "America/Bogota"),
-            source_text=source_text,
-            confidence=confidence,
+    blocks: list[WeeklyScheduleBlock] = []
+    for event in events:
+        original_title, normalized_title = normalize_schedule_title(
+            str(event.titulo).strip() or ("Trabajo" if schedule_type == "work" else "Clase"),
+            schedule_type,
+            source_text,
         )
-        for event in events
-    ]
+        blocks.append(
+            WeeklyScheduleBlock(
+                block_type=schedule_type,
+                title=normalized_title,
+                original_title=original_title,
+                normalized_title=normalized_title,
+                day_of_week=_to_day_key(str(event.dia)),
+                start_time=normalize_time(str(event.inicio)),
+                end_time=normalize_time(str(event.fin)),
+                timezone=str(event.timezone or "America/Bogota"),
+                source_text=source_text,
+                confidence=confidence,
+            )
+        )
+    return blocks
 
 
 def _blocks_from_extracurricular_items(
@@ -321,10 +338,17 @@ def _blocks_from_extracurricular_items(
     for item in items:
         if not item.dias or not item.hora_inicio or not item.hora_fin:
             continue
+        original_title, normalized_title = normalize_schedule_title(
+            item.nombre.strip() or "Actividad extracurricular",
+            "extracurricular",
+            item.detalle or source_text,
+        )
         blocks.extend(
             WeeklyScheduleBlock(
                 block_type="extracurricular",
-                title=item.nombre.strip() or "Actividad extracurricular",
+                title=normalized_title,
+                original_title=original_title,
+                normalized_title=normalized_title,
                 day_of_week=_to_day_key(day),
                 start_time=normalize_time(item.hora_inicio),
                 end_time=normalize_time(item.hora_fin),
@@ -372,13 +396,13 @@ def _extract_days_from_text(text: str) -> list[str]:
             for match in _DAY_LIST_PATTERN.finditer(except_match.group("excluded"))
         }
         return [day for day in DAY_ORDER if day not in excluded]
-    if _ALL_DAYS_PATTERN.search(raw):
-        return list(DAY_ORDER)
     range_match = _DAY_RANGE_PATTERN.search(raw)
     if range_match:
         start_day = _normalize_day_token(range_match.group(1))
         end_day = _normalize_day_token(range_match.group(2))
         return _expand_day_range(start_day, end_day)
+    if _ALL_DAYS_PATTERN.search(raw):
+        return list(DAY_ORDER)
     days: list[str] = []
     for match in _DAY_LIST_PATTERN.finditer(raw):
         day = _normalize_day_token(match.group(1))

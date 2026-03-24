@@ -69,9 +69,9 @@ def test_collect_profile_rejects_non_numeric_student_code() -> None:
 
     update = collect_profile(state)
 
-    assert update["user_status"] == "out_of_scope"
-    assert update["phase"] == "end"
-    assert "disenado unicamente para estudiantes de ingenieria de sistemas y computacion" in update["messages"][0].content.lower()
+    assert update["phase"] == "profile"
+    assert update["awaiting_user_input"] is True
+    assert "codigo estudiantil solo en numeros" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_moves_to_email_verification_after_valid_institutional_email() -> None:
@@ -98,7 +98,7 @@ def test_collect_profile_moves_to_email_verification_after_valid_institutional_e
     assert _route_collect_profile(next_state) == "send_email_verification"
 
 
-def test_collect_profile_marks_wrong_prefix_code_as_out_of_scope() -> None:
+def test_collect_profile_prompts_scope_confirmation_for_wrong_prefix_code() -> None:
     state = AgentState(
         phase="profile",
         student_profile={
@@ -107,6 +107,42 @@ def test_collect_profile_marks_wrong_prefix_code_as_out_of_scope() -> None:
         awaiting_user_input=True,
         user_message_count=0,
         messages=[HumanMessage(content="57000912")],
+    )
+
+    update = collect_profile(state)
+
+    assert update["user_status"] == "start"
+    assert update["phase"] == "profile"
+    assert update["awaiting_user_input"] is True
+    assert "este codigo no corresponde a uno de ingenieria de sistemas" in update["messages"][0].content.lower()
+
+
+def test_collect_profile_allows_retry_when_user_confirms_belonging_to_program() -> None:
+    state = AgentState(
+        phase="profile",
+        onboarding={"pending_student_code_scope_confirmation": True},
+        student_profile={"full_name": "Ana Maria Perez"},
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="si")],
+    )
+
+    update = collect_profile(state)
+
+    assert update["phase"] == "profile"
+    assert update["awaiting_user_input"] is True
+    assert update["onboarding"]["pending_student_code_scope_confirmation"] is False
+    assert "ahora necesito tu codigo estudiantil" in update["messages"][0].content.lower()
+
+
+def test_collect_profile_sends_user_out_of_scope_when_program_is_not_supported() -> None:
+    state = AgentState(
+        phase="profile",
+        onboarding={"pending_student_code_scope_confirmation": True},
+        student_profile={"full_name": "Ana Maria Perez"},
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="no")],
     )
 
     update = collect_profile(state)

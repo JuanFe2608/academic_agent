@@ -100,6 +100,58 @@ def test_extract_natural_schedule_components_handles_all_days_phrase():
     assert parsed["end"] == "06:00"
 
 
+def test_extract_natural_schedule_components_prioritizes_explicit_range_over_all_days_phrase() -> None:
+    parsed = extract_natural_schedule_components(
+        "Trabajo todos los dias de lunes a viernes de 7 am a 10 pm"
+    )
+
+    assert parsed["days"] == [
+        "Lunes",
+        "Martes",
+        "Miercoles",
+        "Jueves",
+        "Viernes",
+    ]
+    assert parsed["is_all_days"] is False
+    assert parsed["start"] == "07:00"
+    assert parsed["end"] == "22:00"
+
+
+def test_extract_natural_schedule_components_tolerates_split_meridiem_typo() -> None:
+    parsed = extract_natural_schedule_components(
+        "Trabajo todos los dias de lunes a viernes de 7 a pm a 10 pm"
+    )
+
+    assert parsed["days"] == [
+        "Lunes",
+        "Martes",
+        "Miercoles",
+        "Jueves",
+        "Viernes",
+    ]
+    assert parsed["start"] == "19:00"
+    assert parsed["end"] == "22:00"
+
+
+def test_parse_work_schedule_text_accepts_whatsapp_meridiem_with_unicode_dash() -> None:
+    events = parse_work_schedule_text("Lunes 7 p. m. – 10 p. m. Trabajo")
+
+    assert len(events) == 1
+    assert events[0].dia == "Lunes"
+    assert events[0].inicio == "19:00"
+    assert events[0].fin == "22:00"
+
+
+def test_extract_natural_schedule_components_accepts_unicode_spaces_and_fullwidth_colon() -> None:
+    parsed = extract_natural_schedule_components(
+        "Trabajo lunes de 7\u202f：00 pm – 10\u202f：00 pm"
+    )
+
+    assert parsed["days"] == ["Lunes"]
+    assert parsed["start"] == "19:00"
+    assert parsed["end"] == "22:00"
+
+
 def test_parse_work_schedule_text_splits_overnight_ranges_into_two_days():
     events = parse_work_schedule_text("Lunes de 6 pm a 3 am")
 

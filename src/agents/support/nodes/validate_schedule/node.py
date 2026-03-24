@@ -8,6 +8,7 @@ from agents.support.nodes.utils import (
     normalize_text,
     parse_yes_no,
 )
+from agents.support.scheduling import build_section_summary
 from agents.support.scheduling.models import ensure_schedule_conflict, ensure_weekly_block
 from agents.support.state import AgentState
 
@@ -97,7 +98,7 @@ def validate_schedule(state: AgentState) -> dict:
                 "messages": append_message(
                     messages,
                     "assistant",
-                    _build_payload_prompt(target),
+                    _build_payload_prompt(target, schedule_state),
                 ),
             }
         return _prompt_correction_target(
@@ -115,7 +116,7 @@ def validate_schedule(state: AgentState) -> dict:
                 current_count,
                 last_text,
                 schedule_state,
-                _build_payload_prompt(str(correction_target or "academic")),
+                _build_payload_prompt(str(correction_target or "academic"), schedule_state),
             )
         return {
             "schedule": {
@@ -272,18 +273,22 @@ def _parse_correction_target(text: str | None, state: AgentState) -> str | None:
     return None
 
 
-def _build_payload_prompt(target: str) -> str:
+def _build_payload_prompt(target: str, schedule_state: dict) -> str:
+    current_section = build_section_summary(list(schedule_state.get("blocks", [])), target)  # type: ignore[arg-type]
     if target == "work":
         return (
-            "💼 Envíame de nuevo solo tu horario laboral.\n"
+            f"💼 {current_section}\n\n"
+            "Envíame de nuevo solo tu horario laboral.\n"
             "Incluye días y horas exactas, por ejemplo: lunes a viernes de 7:00 a 18:00."
         )
     if target == "extracurricular":
         return (
-            "🏃 Envíame de nuevo solo las actividades extracurriculares que quieres dejar activas.\n"
+            f"🏃 {current_section}\n\n"
+            "Envíame de nuevo solo las actividades extracurriculares que quieres dejar activas.\n"
             "Incluye nombre, días y horas. Si no quieres ninguna, responde: ninguna."
         )
     return (
-        "📚 Envíame de nuevo solo tu horario académico.\n"
+        f"📚 {current_section}\n\n"
+        "Envíame de nuevo solo tu horario académico.\n"
         "Incluye materias, días y horas en un solo mensaje."
     )

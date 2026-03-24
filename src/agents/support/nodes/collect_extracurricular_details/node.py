@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+import re
+
 from agents.support.nodes.utils import (
     append_message,
+    contains_normalized_phrase,
     detect_new_input,
+    has_time_range,
     normalize_text,
     parse_yes_no,
 )
@@ -18,6 +22,26 @@ from .prompt import (
 from .parsing import (
     complete_pending_extracurricular_item,
     parse_extracurricular_items_with_context,
+)
+
+_CONTINUE_TOKENS = {
+    "seguimos",
+    "seguir",
+    "siguiente",
+    "continuemos",
+    "continuar",
+    "listo",
+    "ya termine",
+    "ya terminé",
+    "terminado",
+    "eso es todo",
+    "nada mas",
+    "nada más",
+}
+_DAY_HINT_PATTERN = re.compile(
+    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|"
+    r"lun|mar|mie|jue|vie|sab|dom|todos los dias|todos los días|cada dia|cada día)\b",
+    re.IGNORECASE,
 )
 
 
@@ -35,8 +59,11 @@ def collect_extracurricular_details(state: AgentState) -> dict:
     pending_items = _coerce_pending_items(state.get("extras_pending_items", []))
 
     if stage == "awaiting_more":
+        normalized_reply = normalize_text(last_text or "") if has_new_input else ""
         answer = parse_yes_no(last_text) if has_new_input else None
-        if answer is False:
+        if normalized_reply in _CONTINUE_TOKENS or any(
+            contains_normalized_phrase(normalized_reply, token) for token in _CONTINUE_TOKENS
+        ):
             return {
                 "extras_collect_stage": "done",
                 "extras_pending_is_variable": None,
@@ -51,8 +78,30 @@ def collect_extracurricular_details(state: AgentState) -> dict:
                     "Listo. Voy a preparar el resumen de tu horario.",
                 ),
             }
-        if answer is True or (has_new_input and last_text and answer is None):
-            if answer is True:
+
+        if has_new_input and _looks_like_extracurricular_content(last_text):
+            stage = "awaiting_details"
+        else:
+            if answer is False:
+                return {
+                    "extras_collect_stage": "done",
+                    "extras_pending_is_variable": None,
+                    "extras_pending_items": [],
+                    "phase": "draft",
+                    "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+                    "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+                    "awaiting_user_input": False,
+                    "messages": append_message(
+                        messages,
+                        "assistant",
+                        "Listo. Voy a preparar el resumen de tu horario.",
+                    ),
+                }
+
+            if answer is True or any(
+                contains_normalized_phrase(normalized_reply, token)
+                for token in ("agregar", "mas", "más", "otro", "otra")
+            ):
                 return {
                     "extras_collect_stage": "awaiting_details",
                     "extras_pending_is_variable": None,
@@ -63,8 +112,7 @@ def collect_extracurricular_details(state: AgentState) -> dict:
                     "awaiting_user_input": True,
                     "messages": append_message(messages, "assistant", PROMPT_DETAILS),
                 }
-            stage = "awaiting_details"
-        else:
+
             return {
                 "extras_collect_stage": "awaiting_more",
                 "phase": "extras",
@@ -172,6 +220,19 @@ def collect_extracurricular_details(state: AgentState) -> dict:
         "awaiting_user_input": True,
         "messages": append_message(messages, "assistant", PROMPT_MORE),
     }
+
+
+def _looks_like_extracurricular_content(text: str | None) -> bool:
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    normalized = normalize_text(raw)
+    return bool(
+        has_time_range(raw)
+        or _DAY_HINT_PATTERN.search(raw)
+        or "todos los dias" in normalized
+        or "todos los días" in raw.lower()
+    )
 
 
 def _merge_extracurricular_items(

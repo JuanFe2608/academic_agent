@@ -7,7 +7,13 @@ from typing import Optional
 
 from pydantic import BaseModel, Field
 
-from .constants import CorrectionTarget, DayOfWeek, ScheduleBlockType, ScheduleReviewStage
+from .constants import (
+    CorrectionTarget,
+    DayOfWeek,
+    ScheduleBlockType,
+    ScheduleCaptureStage,
+    ScheduleReviewStage,
+)
 
 
 def new_block_id() -> str:
@@ -28,6 +34,8 @@ class WeeklyScheduleBlock(BaseModel):
     block_id: str = Field(default_factory=new_block_id)
     block_type: ScheduleBlockType
     title: str
+    original_title: Optional[str] = None
+    normalized_title: Optional[str] = None
     day_of_week: DayOfWeek
     start_time: str
     end_time: str
@@ -76,6 +84,8 @@ class ScheduleFlowState(BaseModel):
     conflicts: list[ScheduleConflict] = Field(default_factory=list)
     summary_text: Optional[str] = None
     review_stage: ScheduleReviewStage = "idle"
+    capture_target: Optional[ScheduleBlockType] = None
+    capture_stage: ScheduleCaptureStage = "idle"
     correction_target: Optional[CorrectionTarget] = None
     pending_correction_text: Optional[str] = None
     conflicts_accepted: bool = False

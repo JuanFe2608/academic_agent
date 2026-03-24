@@ -24,7 +24,7 @@ def test_parse_extracurricular_items_uses_llm_normalization(monkeypatch) -> None
 
     assert missing == []
     assert len(items) == 1
-    assert items[0].nombre == "Natacion"
+    assert items[0].nombre == "Natación"
     assert items[0].es_variable is False
 
 
@@ -58,7 +58,7 @@ def test_parse_extracurricular_text_normalizes_free_language_all_days(monkeypatc
 
     assert missing == []
     assert len(items) == 1
-    assert items[0].nombre == "Gym"
+    assert items[0].nombre == "Gimnasio"
     assert items[0].es_variable is False
     assert items[0].frecuencia == "todos los dias, desde lunes a domingo"
     assert items[0].hora_inicio == "05:00"
@@ -87,7 +87,7 @@ def test_parse_extracurricular_items_splits_multiple_free_text_activities(monkey
 
     assert missing == []
     assert len(items) == 2
-    assert items[0].nombre == "Gym"
+    assert items[0].nombre == "Gimnasio"
     assert items[1].nombre == "Sacar al perro"
 
 
@@ -104,7 +104,7 @@ def test_parse_extracurricular_items_splits_multiple_activities_by_comma(monkeyp
 
     assert missing == []
     assert len(items) == 2
-    assert items[0].nombre == "Gym"
+    assert items[0].nombre == "Gimnasio"
     assert items[1].nombre == "Sacar al perro"
 
 
@@ -156,7 +156,7 @@ def test_parse_extracurricular_items_keeps_previous_day_for_then_clause_and_requ
     )
 
     assert len(items) == 2
-    assert items[0].nombre == "Gym"
+    assert items[0].nombre == "Gimnasio"
     assert items[0].dias == ["Sabado"]
     assert items[0].hora_inicio == "10:00"
     assert items[0].hora_fin == "12:00"

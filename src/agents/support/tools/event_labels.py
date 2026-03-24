@@ -21,9 +21,11 @@ def normalize_activity_label(title: str, category: str | None = None) -> str:
     if "trabajo de grado" in normalized:
         return _compact_academic_label(raw)
     if "gym" in normalized or "gimnasio" in normalized:
-        return "Gym"
+        return "Gimnasio"
     if "perro" in normalized:
         return "Sacar al perro"
+    if "compr" in normalized and "amig" in normalized:
+        return "Compras con amigas"
     if "trabaj" in normalized and "universidad" in normalized:
         return "Trabajos universidad"
     if "trabaj" in normalized:

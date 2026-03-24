@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import re
 import unicodedata
+from dataclasses import dataclass
 from typing import Iterable
 
 from agents.support.state import DAY_ORDER, Event, new_event_id, normalize_day, normalize_time
@@ -86,11 +87,12 @@ def parse_work_schedule_text(
     if text is None or not str(text).strip():
         return []
 
-    line_events = _parse_work_day_lines(str(text), timezone)
+    prepared_text = _normalize_parser_text(str(text))
+    line_events = _parse_work_day_lines(prepared_text, timezone)
     if line_events:
         return line_events
 
-    normalized = _strip_accents(str(text).lower())
+    normalized = _strip_accents(prepared_text.lower())
     schedule = extract_natural_schedule_components(normalized)
     start = str(schedule["start"])
     end = str(schedule["end"])
@@ -118,7 +120,7 @@ def extract_natural_schedule_components(text: str) -> dict[str, object]:
     if text is None or not str(text).strip():
         raise ValueError("schedule text is required")
 
-    normalized = _strip_accents(str(text).lower())
+    normalized = _strip_accents(_normalize_parser_text(str(text)).lower())
     start_raw, end_raw = _extract_time_range(normalized)
     start, end, overnight = _normalize_time_range_info(start_raw, end_raw, normalized)
     days, is_all_days = _extract_days_with_meta(normalized)
@@ -135,19 +137,16 @@ def is_ambiguous_time_range(text: str) -> bool:
     """Indica si el rango horario requiere aclaracion adicional."""
     if text is None or not str(text).strip():
         return False
-    normalized = _strip_accents(str(text).lower())
-    if any(marker in normalized for marker in ("manana", "mañana", "tarde", "noche")):
-        return False
-
     try:
+        normalized = _strip_accents(_normalize_parser_text(str(text)).lower())
         start_raw, end_raw = _extract_time_range(normalized)
     except ValueError:
         return False
 
     try:
         _normalize_time_range_info(start_raw, end_raw, normalized)
-    except ValueError as exc:
-        return "ambiguous time range" in str(exc).lower()
+    except ValueError:
+        return False
     return False
 
 
@@ -193,47 +192,37 @@ def _normalize_time_range_info(
     end_raw: str,
     context: str = "",
 ) -> tuple[str, str, bool]:
-    start, start_ambiguous, start_has_meridiem = _parse_time_token(start_raw)
-    end, end_ambiguous, end_has_meridiem = _parse_time_token(end_raw)
-    propagated_meridiem = False
+    start_options = _parse_time_token(start_raw)
+    end_options = _parse_time_token(end_raw)
 
-    if start_ambiguous and end_ambiguous:
-        raise ValueError(
-            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
-        )
-
-    if start_ambiguous and end_has_meridiem:
-        start = _apply_meridiem(start_raw, _extract_meridiem(end_raw))
-        start_ambiguous = False
-        propagated_meridiem = True
-    elif end_ambiguous and start_has_meridiem:
-        end = _apply_meridiem(end_raw, _extract_meridiem(start_raw))
-        end_ambiguous = False
-        propagated_meridiem = True
-
-    if start_ambiguous or end_ambiguous:
-        raise ValueError(
-            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
-        )
-
-    start_minutes = int(start[:2]) * 60 + int(start[3:])
-    end_minutes = int(end[:2]) * 60 + int(end[3:])
-    if end_minutes <= start_minutes:
-        if propagated_meridiem:
-            raise ValueError(
-                "ambiguous time range; specify AM o PM o usa formato de 24 horas"
+    best_pair: tuple[str, str, bool] | None = None
+    best_score: tuple[int, int, int, int] | None = None
+    for start_option in start_options:
+        for end_option in end_options:
+            start_minutes = _minutes(start_option.value)
+            end_minutes = _minutes(end_option.value)
+            overnight = end_minutes <= start_minutes
+            duration = (
+                (end_minutes + 1440 - start_minutes)
+                if overnight
+                else (end_minutes - start_minutes)
             )
-        if (
-            start_has_meridiem
-            or end_has_meridiem
-            or _looks_24h(start_raw)
-            or _looks_24h(end_raw)
-        ):
-            return start, end, True
-        raise ValueError(
-            "ambiguous time range; specify AM o PM o usa formato de 24 horas"
-        )
-    return start, end, False
+            if duration <= 0:
+                continue
+
+            score = _score_time_pair(
+                start_option,
+                end_option,
+                duration=duration,
+                overnight=overnight,
+            )
+            if best_score is None or score > best_score:
+                best_score = score
+                best_pair = (start_option.value, end_option.value, overnight)
+
+    if best_pair is None:
+        raise ValueError("invalid time range")
+    return best_pair
 
 
 def parse_academic_schedule_text(
@@ -243,7 +232,7 @@ def parse_academic_schedule_text(
     if text is None or not str(text).strip():
         return []
 
-    lines = _normalize_lines(text)
+    lines = _normalize_lines(_normalize_parser_text(text))
     current_subject = ""
     events: list[Event] = []
     seen: set[tuple[str, str, str, str]] = set()
@@ -365,7 +354,8 @@ def _split_days(days_raw: str) -> list[str]:
 
 def _extract_time_range(text: str) -> tuple[str, str]:
     """Extrae el rango de horas desde el texto normalizado."""
-    match = _TIME_RANGE_PATTERN.search(text)
+    cleaned_text = _normalize_common_time_typos(text)
+    match = _TIME_RANGE_PATTERN.search(cleaned_text)
     if not match:
         raise ValueError("no time range found")
     return match.group(1), match.group(2)
@@ -404,15 +394,15 @@ def _extract_days_with_meta(text: str) -> tuple[list[str], bool]:
                 excluded.append(day)
         return [day for day in DAY_ORDER if day not in excluded], False
 
-    if _ALL_DAYS_PATTERN.search(text):
-        return list(DAY_ORDER), True
-
     range_match = _RANGE_PATTERN.search(text)
     if range_match:
         start_token, end_token = range_match.group(1), range_match.group(2)
         start_day = _normalize_day_token(start_token)
         end_day = _normalize_day_token(end_token)
         return _expand_day_range(start_day, end_day), False
+
+    if _ALL_DAYS_PATTERN.search(text):
+        return list(DAY_ORDER), True
 
     matches = _STRICT_DAY_PATTERN.findall(text)
     if matches:
@@ -508,7 +498,14 @@ def _build_day_events(
     return events
 
 
-def _parse_time_token(value: str) -> tuple[str, bool, bool]:
+@dataclass(frozen=True)
+class _TimeOption:
+    value: str
+    source: str
+    has_meridiem: bool
+
+
+def _parse_time_token(value: str) -> list[_TimeOption]:
     raw = _normalize_meridiem_token(_strip_seconds(value))
     match = re.match(r"^(\d{1,2})(?::(\d{2}))?([ap]m)?$", raw)
     if not match:
@@ -522,13 +519,17 @@ def _parse_time_token(value: str) -> tuple[str, bool, bool]:
     if meridiem:
         if hour > 12:
             normalized = normalize_time(f"{hour}:{minute:02d}")
-            return normalized, False, False
+            return [_TimeOption(normalized, "literal", False)]
         normalized = normalize_time(f"{hour}:{minute:02d}{meridiem}")
-        return normalized, False, True
+        return [_TimeOption(normalized, "explicit", True)]
 
     normalized = normalize_time(f"{hour}:{minute:02d}")
-    is_ambiguous = not has_colon and hour <= 12
-    return normalized, is_ambiguous, False
+    options = [_TimeOption(normalized, "literal", False)]
+    if not has_colon and 1 <= hour <= 11:
+        pm_value = normalize_time(f"{hour}:{minute:02d}pm")
+        if pm_value != normalized:
+            options.append(_TimeOption(pm_value, "pm_inferred", False))
+    return options
 
 
 def _extract_meridiem(value: str) -> str:
@@ -537,18 +538,70 @@ def _extract_meridiem(value: str) -> str:
     return match.group(1) if match else ""
 
 
-def _apply_meridiem(value: str, meridiem: str) -> str:
-    if not meridiem:
-        raise ValueError("ambiguous time range; specify AM o PM o usa formato de 24 horas")
-    raw = _normalize_meridiem_token(_strip_seconds(value))
-    if _extract_meridiem(raw):
-        return normalize_time(raw)
-    return normalize_time(f"{raw}{meridiem}")
-
-
 def _normalize_meridiem_token(value: str) -> str:
     raw = str(value).strip().lower()
     raw = raw.replace(".", "")
     raw = re.sub(r"\s+", "", raw)
     raw = raw.replace("a m", "am").replace("p m", "pm")
     return raw
+
+
+def _normalize_common_time_typos(text: str) -> str:
+    """Corrige variantes comunes de AM/PM copiadas desde WhatsApp."""
+    normalized = re.sub(
+        r"(\b\d{1,2}(?::\d{2})?(?::\d{2})?)\s+a\s+([ap])\s*\.?\s*m\.?\b",
+        r"\1 \2m",
+        str(text),
+        flags=re.IGNORECASE,
+    )
+    return re.sub(
+        r"(\b\d{1,2}(?::\d{2})?(?::\d{2})?)\s*([ap])(?:[\.\s]*m\.?)\b",
+        r"\1 \2m",
+        normalized,
+        flags=re.IGNORECASE,
+    )
+
+
+def _normalize_parser_text(text: str) -> str:
+    """Limpia separadores y espacios unicode antes de aplicar regex."""
+    normalized = str(text)
+    normalized = (
+        normalized.replace("\u00a0", " ")
+        .replace("\u202f", " ")
+        .replace("\u2009", " ")
+        .replace("：", ":")
+        .replace("．", ".")
+    )
+    normalized = re.sub(r"[–—−]", "-", normalized)
+    normalized = re.sub(r"\s*:\s*", ":", normalized)
+    return _normalize_common_time_typos(normalized)
+
+
+def _score_time_pair(
+    start: _TimeOption,
+    end: _TimeOption,
+    *,
+    duration: int,
+    overnight: bool,
+) -> tuple[int, int, int, int]:
+    overnight_penalty = 0 if not overnight else -200
+    duration_score = -abs(duration - 120)
+    literal_score = (
+        (25 if start.source == "literal" else 0)
+        + (25 if end.source == "literal" else 0)
+    )
+    inferred_pm_score = (
+        (15 if start.source == "pm_inferred" else 0)
+        + (15 if end.source == "pm_inferred" else 0)
+    )
+    return (
+        overnight_penalty,
+        -duration,
+        inferred_pm_score + literal_score,
+        duration_score,
+    )
+
+
+def _minutes(value: str) -> int:
+    normalized = normalize_time(value)
+    return (int(normalized[:2]) * 60) + int(normalized[3:])

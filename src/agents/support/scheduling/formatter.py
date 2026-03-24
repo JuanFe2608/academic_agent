@@ -4,13 +4,19 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .constants import DAY_LABELS, DAY_ORDER
+from .constants import DAY_LABELS, DAY_ORDER, ScheduleBlockType
 from .models import (
     ScheduleConflict,
     WeeklyScheduleBlock,
     ensure_schedule_conflict,
     ensure_weekly_block,
 )
+
+_TYPE_LABELS = {
+    "academic": "académico",
+    "work": "laboral",
+    "extracurricular": "extracurricular",
+}
 
 
 def build_schedule_summary(blocks: list[WeeklyScheduleBlock]) -> str:
@@ -44,11 +50,43 @@ def build_conflict_message(conflicts: list[ScheduleConflict]) -> str:
         conflict = ensure_schedule_conflict(raw_conflict)
         lines.append(
             f"- {DAY_LABELS[conflict.day_of_week]}: {conflict.left_title} "
-            f"{conflict.overlap_start}-{conflict.overlap_end} se cruza con {conflict.right_title}."
+            f"({_TYPE_LABELS.get(conflict.left_type, conflict.left_type)}) "
+            f"{conflict.overlap_start}-{conflict.overlap_end} se cruza con "
+            f"{conflict.right_title} ({_TYPE_LABELS.get(conflict.right_type, conflict.right_type)})."
         )
     lines.append("")
     lines.append(
         "No es lo más recomendable para una buena planificación. "
         "¿Quieres dejarlo así o prefieres corregirlo?"
     )
+    return "\n".join(lines)
+
+
+def build_section_summary(
+    blocks: list[WeeklyScheduleBlock],
+    block_type: ScheduleBlockType,
+) -> str:
+    """Construye un resumen corto de una sola sección del horario."""
+
+    normalized_blocks = [
+        ensure_weekly_block(block)
+        for block in blocks
+        if ensure_weekly_block(block).block_type == block_type
+    ]
+    normalized_blocks.sort(
+        key=lambda item: (DAY_ORDER.index(item.day_of_week), item.start_time, item.title.lower())
+    )
+    if not normalized_blocks:
+        return "No tengo registros para esa sección todavía."
+
+    section_label = {
+        "academic": "Horario académico actual:",
+        "work": "Horario laboral actual:",
+        "extracurricular": "Actividades extracurriculares actuales:",
+    }[block_type]
+    lines = [section_label]
+    for block in normalized_blocks:
+        lines.append(
+            f"- {DAY_LABELS[block.day_of_week]}: {block.title} — {block.start_time}-{block.end_time}"
+        )
     return "\n".join(lines)

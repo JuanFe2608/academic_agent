@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 
 from agents.support.nodes.ask_extracurricular.node import ask_extracurricular
 from agents.support.nodes.collect_extracurricular_details.node import collect_extracurricular_details
+from agents.support.nodes.utils import parse_yes_no
 from agents.support.state import AgentState
 
 
@@ -35,7 +36,8 @@ def test_collect_extracurricular_requests_free_text_details() -> None:
     assert update["extras_collect_stage"] == "awaiting_details"
     prompt = update["messages"][0].content.lower()
     assert "actividades extracurriculares" in prompt
-    assert "nombre, días y horas" in prompt
+    assert "indica siempre el día y la hora de inicio y fin" in prompt
+    assert "asumiré que usas horario militar" in prompt
 
 
 def test_collect_extracurricular_details_adds_item_and_moves_to_more() -> None:
@@ -76,6 +78,50 @@ def test_collect_extracurricular_awaiting_more_no_uses_preview_message() -> None
     assert "resumen" in message
 
 
+def test_parse_yes_no_does_not_treat_gimnasio_as_yes() -> None:
+    assert parse_yes_no("Voy a gimnasio los martes de 3 pm a 5 pm") is None
+
+
+def test_collect_extracurricular_awaiting_more_accepts_new_activity_content_directly() -> None:
+    first_state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_details",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="Saco a mi perro todos los dias de 9 am a 10 am")],
+    )
+
+    first_update = collect_extracurricular_details(first_state)
+
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage=first_update["extras_collect_stage"],
+        extracurricular=first_update["extracurricular"],
+        schedule=first_update["schedule"],
+        awaiting_user_input=True,
+        user_message_count=first_update["user_message_count"],
+        last_user_text=first_update["last_user_text"],
+        messages=[HumanMessage(content="Voy a gimnasio los martes de 3 pm a 5 pm")],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    assert update["phase"] == "extras"
+    assert update["extras_collect_stage"] == "awaiting_more"
+    assert update["awaiting_user_input"] is True
+    assert [item.nombre for item in update["extracurricular"]] == ["Sacar al perro", "Gimnasio"]
+    blocks = [block for block in update["schedule"]["blocks"] if block.block_type == "extracurricular"]
+    assert any(
+        block.title == "Gimnasio"
+        and block.day_of_week == "tuesday"
+        and block.start_time == "15:00"
+        and block.end_time == "17:00"
+        for block in blocks
+    )
+    prompt = update["messages"][0].content.lower()
+    assert "agregar más actividades" in prompt
+
+
 def test_collect_extracurricular_details_keeps_valid_items_and_requests_only_missing_data() -> None:
     state = AgentState(
         phase="extras",
@@ -99,10 +145,10 @@ def test_collect_extracurricular_details_keeps_valid_items_and_requests_only_mis
     assert update["extras_collect_stage"] == "awaiting_details"
     assert update["awaiting_user_input"] is True
     assert len(update["extracurricular"]) == 2
-    assert [item.nombre for item in update["extracurricular"]] == ["Gym", "Centro Comercial"]
+    assert [item.nombre for item in update["extracurricular"]] == ["Gimnasio", "Centro Comercial"]
     blocks = [block for block in update["schedule"]["blocks"] if block.block_type == "extracurricular"]
     assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in blocks] == [
-        ("Gym", "saturday", "10:00", "12:00"),
+        ("Gimnasio", "saturday", "10:00", "12:00"),
         ("Centro Comercial", "saturday", "14:00", "16:00"),
     ]
     prompt = update["messages"][0].content.lower()
@@ -151,13 +197,13 @@ def test_collect_extracurricular_details_remembers_pending_day_when_user_replies
     assert second_update["awaiting_user_input"] is True
     assert second_update["extras_pending_items"] == []
     assert [item.nombre for item in second_update["extracurricular"]] == [
-        "Gym",
+        "Gimnasio",
         "Centro Comercial",
         "Iglesia",
     ]
     blocks = [block for block in second_update["schedule"]["blocks"] if block.block_type == "extracurricular"]
     assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in blocks] == [
-        ("Gym", "saturday", "10:00", "12:00"),
+        ("Gimnasio", "saturday", "10:00", "12:00"),
         ("Centro Comercial", "saturday", "14:00", "16:00"),
         ("Iglesia", "sunday", "07:00", "08:00"),
     ]

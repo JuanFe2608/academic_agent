@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 
 from agents.support.nodes.utils import normalize_text
+from agents.support.scheduling.titles import normalize_schedule_title
 from agents.support.state import (
     DAY_ORDER,
     ExtracurricularItem,
@@ -97,7 +98,11 @@ def parse_extracurricular_text(
         nombre = _infer_nombre(text)
     if not nombre:
         missing.append("nombre")
-    nombre = _compact_activity_name(nombre)
+    nombre = normalize_schedule_title(
+        nombre,
+        "extracurricular",
+        text,
+    )[1]
 
     detalle = text.strip() if text.strip() else ""
     parsed_schedule: dict[str, object] | None = None
@@ -432,32 +437,7 @@ def _split_day_led_tail_after_last_time(text: str) -> list[str]:
 
 
 def _compact_activity_name(name: str) -> str:
-    raw = str(name or "").strip()
-    if not raw:
-        return ""
-    normalized = normalize_text(raw)
-
-    if "gym" in normalized or "gimnasio" in normalized:
-        return "Gym"
-    if "perro" in normalized and ("saco" in normalized or "pase" in normalized):
-        return "Sacar al perro"
-    if "salida" in normalized and "amig" in normalized:
-        return "Salida con amigas"
-
-    day_match = _DAY_MARKER_PATTERN.search(normalized)
-    if day_match:
-        normalized = normalized[: day_match.start()].strip(" ,:-")
-
-    words = [word for word in re.findall(r"[a-zA-ZÀ-ÿ]+", normalized) if word]
-    filtered = [word for word in words if word.lower() not in _STOPWORDS]
-    selected = filtered if filtered else words
-    if not selected:
-        return raw[:40].strip()
-
-    compact = " ".join(selected[:4]).strip()
-    if not compact:
-        compact = selected[0]
-    return compact.title()
+    return normalize_schedule_title(name, "extracurricular", name)[1]
 
 
 def _parse_schedule_with_optional_inheritance(

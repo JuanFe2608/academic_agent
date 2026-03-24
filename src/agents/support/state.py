@@ -116,6 +116,7 @@ class OnboardingState(BaseStateModel):
     """Metadatos operativos del flujo de onboarding."""
 
     current_field: Optional[str] = None
+    pending_student_code_scope_confirmation: bool = False
     email_verification: EmailVerificationState = Field(
         default_factory=EmailVerificationState
     )

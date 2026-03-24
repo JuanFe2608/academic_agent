@@ -5,15 +5,17 @@ from __future__ import annotations
 from agents.support.nodes.collect_extracurricular_details.parsing import (
     complete_pending_extracurricular_item,
     parse_extracurricular_items,
-    parse_extracurricular_items_with_context,
 )
 from agents.support.nodes.utils import append_message, normalize_text
 from agents.support.scheduling import merge_section_blocks, normalize_schedule_section, replace_section_blocks
 from agents.support.scheduling.contextual_parser import (
     build_schedule_pending_prompt,
     complete_pending_schedule_item,
-    parse_schedule_section_with_context,
     serialize_blocks_for_schedule_type,
+)
+from agents.support.scheduling.pipeline import (
+    parse_extracurricular_section,
+    parse_fixed_schedule_section,
 )
 from agents.support.state import (
     AgentState,
@@ -191,35 +193,36 @@ def apply_schedule_correction(state: AgentState) -> dict:
         }
 
     if target in {"academic", "work"}:
-        context_blocks, context_clarifications, context_pending_items = parse_schedule_section_with_context(
+        section_result = parse_fixed_schedule_section(
             text,
-            target,
+            target,  # type: ignore[arg-type]
             timezone=timezone,
         )
-        if context_pending_items:
-            updated_schedule_blocks = replace_section_blocks(blocks, target, context_blocks)
+        if section_result.pending_schedule_items:
+            updated_schedule_blocks = replace_section_blocks(blocks, target, section_result.blocks)
             return {
                 "schedule": {
                     **schedule_state,
                     "blocks": updated_schedule_blocks,
                     "review_stage": "awaiting_correction_payload",
                 },
-                "academic_pending_items": context_pending_items if target == "academic" else academic_pending_items,
-                "work_pending_items": context_pending_items if target == "work" else work_pending_items,
+                "academic_pending_items": section_result.pending_schedule_items if target == "academic" else academic_pending_items,
+                "work_pending_items": section_result.pending_schedule_items if target == "work" else work_pending_items,
                 "phase": "validate",
                 "awaiting_user_input": True,
                 "messages": append_message(
                     state.get("messages", []),
                     "assistant",
-                    build_schedule_pending_prompt(target, context_pending_items, context_clarifications),
+                    build_schedule_pending_prompt(target, section_result.pending_schedule_items, section_result.clarifications),
                 ),
             }
 
     result = normalize_schedule_section(text, target or "academic", timezone=timezone)
     if result.needs_clarification:
         if target == "extracurricular":
-            items, _missing, parsed_pending_items = parse_extracurricular_items_with_context(
+            section_result = parse_extracurricular_section(
                 text,
+                timezone=timezone,
                 expected_is_variable=False,
             )
             return {
@@ -227,34 +230,37 @@ def apply_schedule_correction(state: AgentState) -> dict:
                     **schedule_state,
                     "review_stage": "awaiting_correction_payload",
                 },
-                "extracurricular": items,
-                "extras_has_any": bool(items),
-                "extras_pending_items": parsed_pending_items,
+                "extracurricular": section_result.extracurricular_items,
+                "extras_has_any": bool(section_result.extracurricular_items),
+                "extras_pending_items": section_result.pending_extracurricular_items,
                 "phase": "validate",
                 "awaiting_user_input": True,
                 "messages": append_message(
                     state.get("messages", []),
                     "assistant",
-                    _build_extracurricular_correction_prompt(result.clarifications, parsed_pending_items),
+                    _build_extracurricular_correction_prompt(
+                        section_result.clarifications or result.clarifications,
+                        section_result.pending_extracurricular_items,
+                    ),
                 ),
             }
         if target in {"academic", "work"}:
-            partial_blocks, partial_clarifications, parsed_pending_items = parse_schedule_section_with_context(
+            section_result = parse_fixed_schedule_section(
                 text,
-                target,
+                target,  # type: ignore[arg-type]
                 timezone=timezone,
             )
-            if partial_blocks and not parsed_pending_items:
-                updated_schedule_blocks = replace_section_blocks(blocks, target, partial_blocks)
+            if section_result.blocks and not section_result.pending_schedule_items:
+                updated_schedule_blocks = replace_section_blocks(blocks, target, section_result.blocks)
                 raw_inputs = dict(state.get("raw_inputs", {}))
                 if target == "academic":
                     raw_inputs["horario_academico_text"] = serialize_blocks_for_schedule_type(
-                        partial_blocks,
+                        section_result.blocks,
                         "academic",
                     )
                 else:
                     raw_inputs["horario_laboral_text"] = serialize_blocks_for_schedule_type(
-                        partial_blocks,
+                        section_result.blocks,
                         "work",
                     )
                 return {
@@ -275,8 +281,10 @@ def apply_schedule_correction(state: AgentState) -> dict:
                     "extras_pending_items": [],
                     "awaiting_user_input": False,
                 }
-            updated_schedule_blocks = (
-                replace_section_blocks(blocks, target, partial_blocks)
+            updated_schedule_blocks = replace_section_blocks(
+                blocks,
+                target,
+                section_result.blocks,
             )
             return {
                 "schedule": {
@@ -284,8 +292,8 @@ def apply_schedule_correction(state: AgentState) -> dict:
                     "blocks": updated_schedule_blocks,
                     "review_stage": "awaiting_correction_payload",
                 },
-                "academic_pending_items": parsed_pending_items if target == "academic" else academic_pending_items,
-                "work_pending_items": parsed_pending_items if target == "work" else work_pending_items,
+                "academic_pending_items": section_result.pending_schedule_items if target == "academic" else academic_pending_items,
+                "work_pending_items": section_result.pending_schedule_items if target == "work" else work_pending_items,
                 "phase": "validate",
                 "awaiting_user_input": True,
                 "messages": append_message(
@@ -293,8 +301,8 @@ def apply_schedule_correction(state: AgentState) -> dict:
                     "assistant",
                     build_schedule_pending_prompt(
                         target,
-                        parsed_pending_items,
-                        partial_clarifications or result.clarifications,
+                        section_result.pending_schedule_items,
+                        section_result.clarifications or result.clarifications,
                     ),
                 ),
             }

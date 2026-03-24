@@ -143,6 +143,16 @@ def build_out_of_scope_program_message(config: OnboardingConfig) -> str:
     )
 
 
+def build_student_code_scope_prompt(config: OnboardingConfig) -> str:
+    """Pregunta de confirmacion cuando el codigo no coincide con el programa objetivo."""
+
+    return (
+        "Este codigo no corresponde a uno de Ingenieria de Sistemas. "
+        f"¿Perteneces al programa de {config.supported_program_name}? "
+        "Responde si o no."
+    )
+
+
 def build_verification_sent_prompt(config: OnboardingConfig) -> str:
     """Mensaje al enviar el codigo de verificacion."""
 

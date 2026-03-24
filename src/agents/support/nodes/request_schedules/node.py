@@ -1,6 +1,8 @@
-"""Nodo para solicitar el horario semanal según la ocupación."""
+"""Nodo para solicitar y ampliar el horario fijo por secciones."""
 
 from __future__ import annotations
+
+import re
 
 from agents.support.scheduling import merge_section_blocks, replace_section_blocks
 from agents.support.scheduling.contextual_parser import (
@@ -10,22 +12,45 @@ from agents.support.scheduling.contextual_parser import (
 )
 from agents.support.nodes.utils import (
     append_message,
+    contains_normalized_phrase,
     detect_new_input,
+    has_time_range,
     normalize_text,
 )
 from agents.support.state import AgentState, PendingScheduleItem, RawInputs
 
 from .prompt import (
     PROMPT_ACADEMICO,
-    PROMPT_AMBOS,
     PROMPT_LABORAL,
+    PROMPT_MORE_ACADEMIC,
+    PROMPT_MORE_WORK,
     PROMPT_NINGUNA,
     PROMPT_OCCUPATION,
 )
 
+_CONTINUE_TOKENS = {
+    "seguimos",
+    "seguir",
+    "siguiente",
+    "continuemos",
+    "continuar",
+    "listo",
+    "ya termine",
+    "ya terminé",
+    "terminado",
+    "eso es todo",
+    "nada mas",
+    "nada más",
+}
+_DAY_HINT_PATTERN = re.compile(
+    r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|lun|mar|mie|jue|vie|sab|dom)\b",
+    re.IGNORECASE,
+)
+
 
 def request_schedules(state: AgentState) -> dict:
-    """Solicita horarios académicos y/o laborales según ocupación."""
+    """Gestiona la captura incremental de horario académico y laboral."""
+
     messages = state.get("messages", [])
     has_new_input, last_text, current_count = detect_new_input(
         messages,
@@ -39,153 +64,413 @@ def request_schedules(state: AgentState) -> dict:
     occupation = profile.get("occupation")
     academic_pending_items = _coerce_pending_items(state.get("academic_pending_items", []))
     work_pending_items = _coerce_pending_items(state.get("work_pending_items", []))
+    schedule_input_text = last_text
+    occupation_reply_consumed = False
 
-    if has_new_input and last_text and (academic_pending_items or work_pending_items):
-        pending_update = _consume_pending_schedule_reply(
+    if not occupation and has_new_input and last_text:
+        parsed_occupation, extracted_schedule_text = _extract_occupation_reply(last_text)
+        if parsed_occupation:
+            occupation = parsed_occupation
+            profile["occupation"] = parsed_occupation
+            schedule_input_text = extracted_schedule_text
+            occupation_reply_consumed = not bool(extracted_schedule_text)
+
+    if not occupation:
+        return _build_schedule_update(
             state,
+            profile=profile,
             raw_inputs=raw_inputs,
             schedule_state=schedule_state,
             academic_pending_items=academic_pending_items,
             work_pending_items=work_pending_items,
-            response_text=last_text,
+            phase="schedules",
+            awaiting_user_input=True,
+            current_count=current_count if has_new_input else state.get("user_message_count", 0),
+            last_text=last_text if has_new_input else state.get("last_user_text"),
+            prompt=PROMPT_OCCUPATION,
+        )
+
+    if occupation == "ninguna":
+        return _build_schedule_update(
+            state,
+            profile=profile,
+            raw_inputs=raw_inputs,
+            schedule_state=schedule_state,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="end",
+            awaiting_user_input=False,
+            current_count=current_count if has_new_input else state.get("user_message_count", 0),
+            last_text=last_text if has_new_input else state.get("last_user_text"),
+            prompt=PROMPT_NINGUNA,
+        )
+
+    capture_target = _resolve_capture_target(
+        state,
+        occupation=occupation,
+        raw_inputs=raw_inputs,
+        schedule_state=schedule_state,
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+    )
+    capture_stage = str(schedule_state.get("capture_stage") or "idle")
+
+    if occupation_reply_consumed:
+        return _prompt_for_section_input(
+            state,
+            profile=profile,
+            occupation=occupation,
+            target=capture_target,
+            raw_inputs=raw_inputs,
+            schedule_state=schedule_state,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            current_count=current_count,
+            last_text=last_text,
+        )
+
+    if capture_target is None:
+        return _build_schedule_update(
+            state,
+            profile=profile,
+            raw_inputs=raw_inputs,
+            schedule_state={**schedule_state, "capture_target": None, "capture_stage": "idle"},
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="extras",
+            awaiting_user_input=False,
+            current_count=current_count if has_new_input else state.get("user_message_count", 0),
+            last_text=last_text if has_new_input else state.get("last_user_text"),
+        )
+
+    if has_new_input and schedule_input_text and (academic_pending_items or work_pending_items):
+        pending_update = _consume_pending_schedule_reply(
+            state,
+            raw_inputs=raw_inputs,
+            schedule_state={**schedule_state, "capture_target": capture_target},
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            response_text=schedule_input_text,
             current_count=current_count,
         )
         if pending_update is not None:
             pending_update["student_profile"] = profile
             return pending_update
 
-    if has_new_input and last_text:
-        if not occupation:
-            occupation = _parse_occupation(last_text)
-            if occupation:
-                profile["occupation"] = occupation
-        else:
-            raw_inputs = _consume_schedule_text_by_stage(raw_inputs, last_text, occupation)
+    if capture_stage == "awaiting_more":
+        if has_new_input and schedule_input_text:
+            decision = _parse_more_decision(schedule_input_text)
+            if decision == "continue":
+                return _advance_after_section(
+                    state,
+                    occupation=occupation,
+                    current_target=capture_target,
+                    raw_inputs=raw_inputs,
+                    schedule_state=schedule_state,
+                    academic_pending_items=academic_pending_items,
+                    work_pending_items=work_pending_items,
+                    current_count=current_count,
+                    last_text=last_text,
+                )
+            if decision == "more" and not _looks_like_schedule_content(schedule_input_text):
+                return _prompt_for_section_input(
+                    state,
+                    profile=profile,
+                    occupation=occupation,
+                    target=capture_target,
+                    raw_inputs=raw_inputs,
+                    schedule_state=schedule_state,
+                    academic_pending_items=academic_pending_items,
+                    work_pending_items=work_pending_items,
+                    current_count=current_count,
+                    last_text=last_text,
+                )
+            if decision in {"more", None} and _looks_like_schedule_content(schedule_input_text):
+                raw_inputs = _append_schedule_text(raw_inputs, capture_target, schedule_input_text)
+                return _build_schedule_update(
+                    state,
+                    profile=profile,
+                    raw_inputs=raw_inputs,
+                    schedule_state={
+                        **schedule_state,
+                        "capture_target": capture_target,
+                        "capture_stage": "awaiting_input",
+                    },
+                    academic_pending_items=academic_pending_items,
+                    work_pending_items=work_pending_items,
+                    phase="schedules",
+                    awaiting_user_input=False,
+                    current_count=current_count,
+                    last_text=last_text,
+                )
+        return _build_schedule_update(
+            state,
+            profile=profile,
+            raw_inputs=raw_inputs,
+            schedule_state={
+                **schedule_state,
+                "capture_target": capture_target,
+                "capture_stage": "awaiting_more",
+            },
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="schedules",
+            awaiting_user_input=True,
+            current_count=current_count if has_new_input else state.get("user_message_count", 0),
+            last_text=last_text if has_new_input else state.get("last_user_text"),
+            prompt=_prompt_for_more(capture_target),
+        )
 
-    if not occupation:
-        return {
-            "student_profile": profile,
-            "raw_inputs": raw_inputs,
-            "schedule": schedule_state,
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "schedules",
-            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-            "awaiting_user_input": True,
-            "messages": append_message(messages, "assistant", PROMPT_OCCUPATION),
-        }
+    if has_new_input and schedule_input_text:
+        raw_inputs = _append_schedule_text(raw_inputs, capture_target, schedule_input_text)
+        return _build_schedule_update(
+            state,
+            profile=profile,
+            raw_inputs=raw_inputs,
+            schedule_state={
+                **schedule_state,
+                "capture_target": capture_target,
+                "capture_stage": "awaiting_input",
+            },
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="schedules",
+            awaiting_user_input=False,
+            current_count=current_count,
+            last_text=last_text,
+        )
 
-    if occupation == "ninguna":
-        return {
-            "student_profile": profile,
-            "raw_inputs": raw_inputs,
-            "schedule": schedule_state,
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "end",
-            "awaiting_user_input": False,
-            "messages": append_message(messages, "assistant", PROMPT_NINGUNA),
-        }
-
-    missing = _missing_schedule_inputs(raw_inputs, occupation)
-    if missing:
-        return {
-            "student_profile": profile,
-            "raw_inputs": raw_inputs,
-            "schedule": schedule_state,
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "schedules",
-            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                _build_prompt_for_missing(missing, occupation),
-            ),
-        }
-
-    return {
-        "student_profile": profile,
-        "raw_inputs": raw_inputs,
-        "schedule": schedule_state,
-        "academic_pending_items": academic_pending_items,
-        "work_pending_items": work_pending_items,
-        "phase": "schedules",
-        "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-        "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-        "awaiting_user_input": False,
-        "messages": append_message(
-            messages, "assistant", "Gracias. Voy a procesar tus horarios."
-        ),
-    }
+    return _prompt_for_section_input(
+        state,
+        profile=profile,
+        occupation=occupation,
+        target=capture_target,
+        raw_inputs=raw_inputs,
+        schedule_state=schedule_state,
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+        current_count=state.get("user_message_count", 0),
+        last_text=state.get("last_user_text"),
+    )
 
 
-def _consume_schedule_text_by_stage(raw_inputs: RawInputs, text: str, occupation: str | None) -> RawInputs:
-    """Consume texto segun el paso pendiente del flujo de horarios."""
+def _prompt_for_section_input(
+    state: AgentState,
+    *,
+    profile: dict,
+    occupation: str,
+    target: str,
+    raw_inputs: RawInputs,
+    schedule_state: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    current_count: int,
+    last_text: str | None,
+) -> dict:
+    return _build_schedule_update(
+        state,
+        profile=profile,
+        raw_inputs=raw_inputs,
+        schedule_state={
+            **schedule_state,
+            "capture_target": target,
+            "capture_stage": "awaiting_input",
+        },
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+        phase="schedules",
+        awaiting_user_input=True,
+        current_count=current_count,
+        last_text=last_text,
+        prompt=_prompt_for_target(target, occupation),
+    )
+
+
+def _advance_after_section(
+    state: AgentState,
+    *,
+    occupation: str,
+    current_target: str,
+    raw_inputs: RawInputs,
+    schedule_state: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    current_count: int,
+    last_text: str,
+) -> dict:
+    next_target = _next_section_target(current_target, occupation)
+    if next_target is None:
+        return _build_schedule_update(
+            state,
+            profile=dict(state.get("student_profile", {})),
+            raw_inputs=raw_inputs,
+            schedule_state={
+                **schedule_state,
+                "capture_target": None,
+                "capture_stage": "idle",
+            },
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="extras",
+            awaiting_user_input=False,
+            current_count=current_count,
+            last_text=last_text,
+        )
+
+    return _build_schedule_update(
+        state,
+        profile=dict(state.get("student_profile", {})),
+        raw_inputs=raw_inputs,
+        schedule_state={
+            **schedule_state,
+            "capture_target": next_target,
+            "capture_stage": "awaiting_input",
+        },
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+        phase="schedules",
+        awaiting_user_input=True,
+        current_count=current_count,
+        last_text=last_text,
+        prompt=_prompt_for_target(next_target, occupation),
+    )
+
+
+def _append_schedule_text(raw_inputs: RawInputs, target: str, text: str) -> RawInputs:
     updated = dict(raw_inputs)
     clean_text = str(text or "").strip()
     if not clean_text:
         return updated
-
-    if occupation == "solo_estudio":
-        if not updated.get("horario_academico_text"):
-            updated["horario_academico_text"] = clean_text
-        return updated
-
-    if occupation == "ambos":
-        if not updated.get("horario_academico_text"):
-            updated["horario_academico_text"] = clean_text
-            return updated
-        if not updated.get("horario_laboral_text"):
-            updated["horario_laboral_text"] = clean_text
-        return updated
-
+    field = "horario_academico_text" if target == "academic" else "horario_laboral_text"
+    existing = str(updated.get(field) or "").strip()
+    updated[field] = "\n".join(part for part in [existing, clean_text] if part)
     return updated
 
 
-def _missing_schedule_inputs(raw_inputs: RawInputs, occupation: str | None) -> list[str]:
-    missing: list[str] = []
-    if occupation == "solo_estudio":
-        if not raw_inputs.get("horario_academico_text"):
-            missing.append("horario_academico_text")
-        return missing
+def _resolve_capture_target(
+    state: AgentState,
+    *,
+    occupation: str,
+    raw_inputs: RawInputs,
+    schedule_state: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+) -> str | None:
+    current_target = str(schedule_state.get("capture_target") or "").strip()
+    if current_target in {"academic", "work"}:
+        return current_target
 
-    if occupation == "ambos":
-        if not raw_inputs.get("horario_academico_text"):
-            missing.append("horario_academico_text")
-        elif not raw_inputs.get("horario_laboral_text"):
-            missing.append("horario_laboral_text")
-    return missing
+    blocks = list(schedule_state.get("blocks", []))
+    has_academic = bool(raw_inputs.get("horario_academico_text")) or _has_block_type(blocks, "academic")
+    has_work = bool(raw_inputs.get("horario_laboral_text")) or _has_block_type(blocks, "work")
+
+    if academic_pending_items:
+        return "academic"
+    if work_pending_items:
+        return "work"
+    if not has_academic:
+        return "academic"
+    if occupation == "ambos" and not has_work:
+        return "work"
+    return None
 
 
-def _build_prompt_for_missing(missing: list[str], occupation: str | None) -> str:
-    if not missing:
-        return "Comparte tus horarios en texto."
-    first = missing[0]
-    if first == "horario_academico_text":
-        return PROMPT_AMBOS if occupation == "ambos" else PROMPT_ACADEMICO
-    if first == "horario_laboral_text":
+def _prompt_for_target(target: str, occupation: str) -> str:
+    if target == "work":
         return PROMPT_LABORAL
+    return PROMPT_ACADEMICO if occupation in {"solo_estudio", "ambos"} else PROMPT_ACADEMICO
 
-    if occupation == "solo_estudio":
-        return PROMPT_ACADEMICO
-    if occupation == "ambos":
-        return PROMPT_AMBOS
-    return "Comparte tus horarios."
+
+def _prompt_for_more(target: str) -> str:
+    return PROMPT_MORE_WORK if target == "work" else PROMPT_MORE_ACADEMIC
+
+
+def _next_section_target(current_target: str, occupation: str) -> str | None:
+    if current_target == "academic" and occupation == "ambos":
+        return "work"
+    return None
 
 
 def _parse_occupation(text: str) -> str | None:
     normalized = normalize_text(text)
-    if normalized in {"1", "solo estudio", "solo estudiar"} or normalized.startswith("1"):
+    normalized = re.sub(r"\s+", " ", normalized).strip(" .:-")
+
+    if _matches_occupation_choice(normalized, "1", {"solo estudio", "solo estudiar"}):
         return "solo_estudio"
-    if normalized in {"2", "ambos", "estudio y trabajo"} or normalized.startswith("2"):
+    if _matches_occupation_choice(
+        normalized,
+        "2",
+        {"ambos", "estudio y trabajo", "trabajo y estudio"},
+    ):
         return "ambos"
-    if normalized in {"3", "ninguna"} or normalized.startswith("3"):
+    if _matches_occupation_choice(
+        normalized,
+        "3",
+        {"ninguna", "ninguna de las anteriores"},
+    ):
         return "ninguna"
     return None
+
+
+def _extract_occupation_reply(text: str) -> tuple[str | None, str | None]:
+    raw_text = str(text or "").strip()
+    if not raw_text:
+        return None, None
+
+    direct_match = _parse_occupation(raw_text)
+    if direct_match is not None:
+        return direct_match, None
+
+    lines = [line.strip() for line in raw_text.splitlines() if line.strip()]
+    if not lines:
+        return None, None
+
+    first_line_match = _parse_occupation(lines[0])
+    if first_line_match is None:
+        return None, None
+
+    remainder = "\n".join(lines[1:]).strip()
+    return first_line_match, remainder or None
+
+
+def _matches_occupation_choice(normalized: str, option_number: str, labels: set[str]) -> bool:
+    if normalized in labels:
+        return True
+    if normalized == option_number:
+        return True
+
+    option_match = re.fullmatch(
+        rf"(?:la\s+)?(?:opcion\s+)?{option_number}(?:\s+(?P<label>.+))?",
+        normalized,
+    )
+    if option_match is None:
+        return False
+
+    label = str(option_match.group("label") or "").strip(" .:-")
+    return not label or label in labels
+
+
+def _parse_more_decision(text: str | None) -> str | None:
+    normalized = normalize_text(text or "")
+    if not normalized:
+        return None
+    if normalized in _CONTINUE_TOKENS or any(
+        contains_normalized_phrase(normalized, token) for token in _CONTINUE_TOKENS
+    ):
+        return "continue"
+    if any(
+        contains_normalized_phrase(normalized, token)
+        for token in ("si", "sí", "claro", "agregar", "mas", "más", "otro", "otra")
+    ):
+        return "more"
+    return None
+
+
+def _looks_like_schedule_content(text: str | None) -> bool:
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+    return has_time_range(raw) or bool(_DAY_HINT_PATTERN.search(raw))
 
 
 def _coerce_pending_items(
@@ -221,7 +506,11 @@ def _consume_pending_schedule_reply(
         refreshed_items = [updated_pending] + pending_items[1:]
         return {
             "raw_inputs": raw_inputs,
-            "schedule": schedule_state,
+            "schedule": {
+                **schedule_state,
+                "capture_target": target,
+                "capture_stage": "awaiting_input",
+            },
             "academic_pending_items": refreshed_items if target == "academic" else academic_pending_items,
             "work_pending_items": refreshed_items if target == "work" else work_pending_items,
             "phase": "schedules",
@@ -262,7 +551,12 @@ def _consume_pending_schedule_reply(
     if next_target is not None and next_items:
         return {
             "raw_inputs": updated_raw_inputs,
-            "schedule": {**schedule_state, "blocks": updated_blocks},
+            "schedule": {
+                **schedule_state,
+                "blocks": updated_blocks,
+                "capture_target": next_target,
+                "capture_stage": "awaiting_input",
+            },
             "academic_pending_items": academic_pending_items,
             "work_pending_items": work_pending_items,
             "phase": "schedules",
@@ -278,19 +572,54 @@ def _consume_pending_schedule_reply(
 
     return {
         "raw_inputs": updated_raw_inputs,
-        "schedule": {**schedule_state, "blocks": updated_blocks},
+        "schedule": {
+            **schedule_state,
+            "blocks": updated_blocks,
+            "capture_target": target,
+            "capture_stage": "awaiting_more",
+        },
         "academic_pending_items": academic_pending_items,
         "work_pending_items": work_pending_items,
         "phase": "schedules",
         "user_message_count": current_count,
         "last_user_text": response_text,
-        "awaiting_user_input": False,
+        "awaiting_user_input": True,
         "messages": append_message(
             state.get("messages", []),
             "assistant",
-            "Gracias. Voy a procesar tus horarios.",
+            _prompt_for_more(target),
         ),
     }
+
+
+def _build_schedule_update(
+    state: AgentState,
+    *,
+    profile: dict,
+    raw_inputs: RawInputs,
+    schedule_state: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    phase: str,
+    awaiting_user_input: bool,
+    current_count: int,
+    last_text: str | None,
+    prompt: str | None = None,
+) -> dict:
+    update = {
+        "student_profile": profile,
+        "raw_inputs": raw_inputs,
+        "schedule": schedule_state,
+        "academic_pending_items": academic_pending_items,
+        "work_pending_items": work_pending_items,
+        "phase": phase,
+        "user_message_count": current_count,
+        "last_user_text": last_text,
+        "awaiting_user_input": awaiting_user_input,
+    }
+    if prompt:
+        update["messages"] = append_message(state.get("messages", []), "assistant", prompt)
+    return update
 
 
 def _next_pending_items(
@@ -302,3 +631,11 @@ def _next_pending_items(
     if work_pending_items:
         return "work", work_pending_items
     return None, []
+
+
+def _has_block_type(blocks: list, block_type: str) -> bool:
+    for block in blocks or []:
+        current_type = block.get("block_type") if isinstance(block, dict) else getattr(block, "block_type", None)
+        if str(current_type) == block_type:
+            return True
+    return False
