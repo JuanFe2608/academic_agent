@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
+from agents.support.nodes.collect_study_profile import collect_study_profile
 from agents.support.nodes.apply_schedule_correction import apply_schedule_correction
 from agents.support.nodes.ask_extracurricular import ask_extracurricular
 from agents.support.nodes.build_draft_schedule import build_draft_schedule
@@ -13,6 +14,7 @@ from agents.support.nodes.collect_extracurricular_details import (
 from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
 from agents.support.nodes.persist_profile import persist_profile
+from agents.support.nodes.persist_study_profile import persist_study_profile
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
 from agents.support.nodes.persist_schedule import persist_schedule
 from agents.support.nodes.render_schedule_preview import render_schedule_preview
@@ -26,6 +28,7 @@ from agents.support.onboarding.validators import (
     get_missing_profile_fields,
     profile_requires_email_verification,
 )
+from agents.support.personalization import is_personalization_enabled
 from agents.support.state import AgentState
 
 
@@ -90,7 +93,15 @@ def _route_from_phase(state: AgentState) -> str:
     if phase == "schedule_persist":
         return "persist_schedule"
     if phase == "sync":
+        if is_personalization_enabled():
+            study_profile = state.get("study_profile", {})
+            if study_profile.get("status") != "completed":
+                return "collect_study_profile"
         return "end"
+    if phase == "study_profile":
+        return "collect_study_profile"
+    if phase == "study_profile_persist":
+        return "persist_study_profile"
     return "welcome_consent"
 
 
@@ -256,6 +267,34 @@ def _route_after_schedule_edit(state: AgentState) -> str:
 def _route_after_persist_schedule(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
+    if not is_personalization_enabled():
+        return "end"
+    if state.get("phase") == "study_profile_persist":
+        return "persist_study_profile"
+    if state.get("phase") == "study_profile":
+        return "collect_study_profile"
+    study_profile = state.get("study_profile", {})
+    if state.get("phase") == "sync" and study_profile.get("status") != "completed":
+        return "collect_study_profile"
+    return "end"
+
+
+def _route_collect_study_profile(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "study_profile_persist":
+        return "persist_study_profile"
+    if phase == "end":
+        return "end"
+    return "collect_study_profile"
+
+
+def _route_persist_study_profile(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    if state.get("phase") == "study_profile":
+        return "collect_study_profile"
     return "end"
 
 
@@ -286,6 +325,8 @@ def build_agent() -> StateGraph:
     graph.add_node("validate_schedule", validate_schedule)
     graph.add_node("apply_schedule_correction", apply_schedule_correction)
     graph.add_node("persist_schedule", persist_schedule)
+    graph.add_node("collect_study_profile", collect_study_profile)
+    graph.add_node("persist_study_profile", persist_study_profile)
 
     graph.set_entry_point("welcome_consent")
 
@@ -307,6 +348,8 @@ def build_agent() -> StateGraph:
             "validate_schedule": "validate_schedule",
             "apply_schedule_correction": "apply_schedule_correction",
             "persist_schedule": "persist_schedule",
+            "collect_study_profile": "collect_study_profile",
+            "persist_study_profile": "persist_study_profile",
             "end": END,
         },
     )
@@ -423,6 +466,25 @@ def build_agent() -> StateGraph:
         "persist_schedule",
         _route_after_persist_schedule,
         {
+            "collect_study_profile": "collect_study_profile",
+            "persist_study_profile": "persist_study_profile",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "collect_study_profile",
+        _route_collect_study_profile,
+        {
+            "collect_study_profile": "collect_study_profile",
+            "persist_study_profile": "persist_study_profile",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "persist_study_profile",
+        _route_persist_study_profile,
+        {
+            "collect_study_profile": "collect_study_profile",
             "end": END,
         },
     )

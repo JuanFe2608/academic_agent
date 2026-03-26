@@ -32,6 +32,8 @@ Phase = Literal[
     "schedule_edit",
     "schedule_persist",
     "sync",
+    "study_profile",
+    "study_profile_persist",
     "priorities",
     "study_plan",
     "running",
@@ -194,7 +196,18 @@ class SubjectItem(BaseStateModel):
 class StudyProfile(BaseStateModel):
     """Cuestionario de metodo de estudio y metodo seleccionado."""
 
-    answers: dict[str, object] = Field(default_factory=dict)
+    questionnaire_version: Optional[str] = None
+    scoring_version: Optional[str] = None
+    status: Literal["idle", "collecting", "completed"] = "idle"
+    current_question_index: int = 0
+    answers: dict[str, int] = Field(default_factory=dict)
+    weakness_tags: list[str] = Field(default_factory=list)
+    scores: list[dict[str, object]] = Field(default_factory=list)
+    top_techniques: list[str] = Field(default_factory=list)
+    confidence: Optional[Literal["alta", "media", "baja"]] = None
+    observations: list[str] = Field(default_factory=list)
+    persisted_profile_id: Optional[int] = None
+    persistence_error: Optional[str] = None
     method: Optional[str] = None
     how_to: Optional[str] = None
 

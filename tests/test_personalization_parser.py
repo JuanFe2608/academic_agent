@@ -1,0 +1,45 @@
+"""Pruebas del parser determinista del cuestionario de personalizacion."""
+
+from __future__ import annotations
+
+from agents.support.personalization.parser import likert_label, parse_likert_answer
+
+
+def test_parse_likert_answer_accepts_plain_numeric_value() -> None:
+    result = parse_likert_answer("2")
+
+    assert result.is_valid is True
+    assert result.value == 2
+
+
+def test_parse_likert_answer_accepts_numeric_value_with_label() -> None:
+    result = parse_likert_answer("3. Casi siempre")
+
+    assert result.is_valid is True
+    assert result.value == 3
+
+
+def test_parse_likert_answer_rejects_empty_value() -> None:
+    result = parse_likert_answer("   ")
+
+    assert result.is_valid is False
+    assert result.error == "empty_answer"
+
+
+def test_parse_likert_answer_rejects_non_numeric_value() -> None:
+    result = parse_likert_answer("frecuentemente")
+
+    assert result.is_valid is False
+    assert result.error == "invalid_answer"
+
+
+def test_parse_likert_answer_rejects_out_of_range_value() -> None:
+    result = parse_likert_answer("4")
+
+    assert result.is_valid is False
+    assert result.error == "invalid_answer"
+
+
+def test_likert_label_returns_human_readable_label() -> None:
+    assert likert_label(1) == "A veces"
+

@@ -61,6 +61,32 @@ def test_collect_extracurricular_details_adds_item_and_moves_to_more() -> None:
     assert any(block.block_type == "extracurricular" for block in update["schedule"]["blocks"])
 
 
+def test_collect_extracurricular_details_splits_midnight_ranges_before_draft_preview() -> None:
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_details",
+        extras_pending_is_variable=False,
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[
+            HumanMessage(
+                content="Voy al gimnasio los lunes martes domingos y sabados de 10 pm a 12 am"
+            )
+        ],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    assert update["extras_collect_stage"] == "awaiting_more"
+    blocks = [block for block in update["schedule"]["blocks"] if block.block_type == "extracurricular"]
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in blocks] == [
+        ("Gimnasio", "monday", "22:00", "23:59"),
+        ("Gimnasio", "tuesday", "22:00", "23:59"),
+        ("Gimnasio", "sunday", "22:00", "23:59"),
+        ("Gimnasio", "saturday", "22:00", "23:59"),
+    ]
+
+
 def test_collect_extracurricular_awaiting_more_no_uses_preview_message() -> None:
     state = AgentState(
         phase="extras",

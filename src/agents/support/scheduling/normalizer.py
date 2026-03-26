@@ -338,27 +338,86 @@ def _blocks_from_extracurricular_items(
     for item in items:
         if not item.dias or not item.hora_inicio or not item.hora_fin:
             continue
+        start_time = normalize_time(item.hora_inicio)
+        end_time = normalize_time(item.hora_fin)
         original_title, normalized_title = normalize_schedule_title(
             item.nombre.strip() or "Actividad extracurricular",
             "extracurricular",
             item.detalle or source_text,
         )
-        blocks.extend(
+        for day in item.dias:
+            blocks.extend(
+                _build_extracurricular_blocks_for_day(
+                    title=normalized_title,
+                    original_title=original_title,
+                    normalized_title=normalized_title,
+                    day_of_week=_to_day_key(day),
+                    start_time=start_time,
+                    end_time=end_time,
+                    timezone=timezone,
+                    source_text=item.detalle or source_text,
+                )
+            )
+    return _dedupe_blocks(blocks)
+
+
+def _build_extracurricular_blocks_for_day(
+    *,
+    title: str,
+    original_title: str | None,
+    normalized_title: str | None,
+    day_of_week: str,
+    start_time: str,
+    end_time: str,
+    timezone: str,
+    source_text: str,
+) -> list[WeeklyScheduleBlock]:
+    if end_time > start_time:
+        return [
             WeeklyScheduleBlock(
                 block_type="extracurricular",
-                title=normalized_title,
+                title=title,
                 original_title=original_title,
                 normalized_title=normalized_title,
-                day_of_week=_to_day_key(day),
-                start_time=normalize_time(item.hora_inicio),
-                end_time=normalize_time(item.hora_fin),
+                day_of_week=day_of_week,
+                start_time=start_time,
+                end_time=end_time,
                 timezone=timezone,
-                source_text=item.detalle or source_text,
+                source_text=source_text,
                 confidence=0.9,
             )
-            for day in item.dias
+        ]
+
+    blocks = [
+        WeeklyScheduleBlock(
+            block_type="extracurricular",
+            title=title,
+            original_title=original_title,
+            normalized_title=normalized_title,
+            day_of_week=day_of_week,
+            start_time=start_time,
+            end_time="23:59",
+            timezone=timezone,
+            source_text=source_text,
+            confidence=0.9,
         )
-    return _dedupe_blocks(blocks)
+    ]
+    if end_time != "00:00":
+        blocks.append(
+            WeeklyScheduleBlock(
+                block_type="extracurricular",
+                title=title,
+                original_title=original_title,
+                normalized_title=normalized_title,
+                day_of_week=_next_day(day_of_week),
+                start_time="00:00",
+                end_time=end_time,
+                timezone=timezone,
+                source_text=source_text,
+                confidence=0.9,
+            )
+        )
+    return blocks
 
 
 def _dedupe_blocks(blocks: list[WeeklyScheduleBlock]) -> list[WeeklyScheduleBlock]:
@@ -456,6 +515,11 @@ def _expand_day_range(start_day: str, end_day: str) -> list[str]:
     if start_index <= end_index:
         return DAY_ORDER[start_index : end_index + 1]
     return DAY_ORDER[start_index:] + DAY_ORDER[: end_index + 1]
+
+
+def _next_day(day: str) -> str:
+    day_index = DAY_ORDER.index(day)
+    return DAY_ORDER[(day_index + 1) % len(DAY_ORDER)]
 
 
 def _generic_clarifications(text: str, require_title: bool) -> list[str]:

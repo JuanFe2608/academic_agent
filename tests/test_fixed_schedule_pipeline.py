@@ -106,6 +106,21 @@ def test_parse_extracurricular_section_generates_clear_short_title() -> None:
     ]
 
 
+def test_parse_extracurricular_section_splits_overnight_midnight_ranges() -> None:
+    result = parse_extracurricular_section(
+        "Voy al gimnasio los lunes martes domingos y sabados de 10 pm a 12 am",
+    )
+
+    assert result.needs_clarification is False
+    assert [item.nombre for item in result.extracurricular_items] == ["Gimnasio"]
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in result.blocks] == [
+        ("Gimnasio", "monday", "22:00", "23:59"),
+        ("Gimnasio", "tuesday", "22:00", "23:59"),
+        ("Gimnasio", "sunday", "22:00", "23:59"),
+        ("Gimnasio", "saturday", "22:00", "23:59"),
+    ]
+
+
 def test_detect_schedule_conflicts_marks_internal_overlap() -> None:
     result = parse_fixed_schedule_section(
         "lunes matemáticas 7 a 9 y física 8 a 10",
