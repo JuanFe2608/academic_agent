@@ -1,13 +1,15 @@
-"""Render del bloque conversacional del Radar de estudio."""
+"""Render del subflujo de desempate del perfil."""
 
 from __future__ import annotations
 
 from typing import Any
 
-from agents.support.personalization.formatter import build_question_prompt as _build_question_prompt
+from agents.support.personalization.formatter import (
+    build_tiebreaker_prompt as _build_tiebreaker_prompt,
+)
 
 
-def build_question_prompt(
+def build_tiebreaker_prompt(
     question: Any,
     *,
     question_number: int,
@@ -18,7 +20,7 @@ def build_question_prompt(
 ) -> str:
     """Delegacion ligera hacia el render determinista del dominio."""
 
-    return _build_question_prompt(
+    return _build_tiebreaker_prompt(
         question,
         question_number=question_number,
         total_questions=total_questions,

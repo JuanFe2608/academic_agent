@@ -1,4 +1,4 @@
-"""Nodo para recolectar el cuestionario de caracterizacion academica."""
+"""Nodo para recolectar el Radar principal de caracterizacion academica."""
 
 from __future__ import annotations
 
@@ -6,9 +6,12 @@ from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.personalization import (
     get_question_by_index,
     get_question_count,
-    get_questions,
     load_personalization_config,
     parse_likert_answer,
+)
+from agents.support.personalization.runtime import (
+    coerce_int_answer_map,
+    current_timestamp,
 )
 from agents.support.state import AgentState
 from agents.support.tools.db import get_personalization_service
@@ -17,7 +20,7 @@ from .prompt import build_question_prompt
 
 
 def collect_study_profile(state: AgentState) -> dict:
-    """Pregunta una afirmacion a la vez y calcula el resultado al final."""
+    """Pregunta una afirmacion a la vez y deriva a desempate si hace falta."""
 
     messages = state.get("messages", [])
     has_new_input, last_text, current_count = detect_new_input(
@@ -29,20 +32,16 @@ def collect_study_profile(state: AgentState) -> dict:
     study_profile = _study_profile_dict(state)
     config = load_personalization_config()
     total_questions = get_question_count()
-    answers = _coerce_answers(study_profile.get("answers", {}))
+    answers = coerce_int_answer_map(study_profile.get("answers", {}))
     current_index = int(study_profile.get("current_question_index") or 0)
 
     if current_index >= total_questions and len(answers) == total_questions:
         result = get_personalization_service().evaluate_answers(answers)
-        study_profile.update(result.model_dump(mode="json"))
-        study_profile["status"] = "completed"
-        study_profile["current_question_index"] = total_questions
-        study_profile["persistence_error"] = None
-        return {
-            "study_profile": study_profile,
-            "phase": "study_profile_persist",
-            "awaiting_user_input": False,
-        }
+        return _apply_main_result(
+            state,
+            study_profile,
+            result.model_dump(mode="json"),
+        )
 
     if not has_new_input:
         question = get_question_by_index(current_index)
@@ -59,10 +58,11 @@ def collect_study_profile(state: AgentState) -> dict:
                 messages,
                 "assistant",
                 build_question_prompt(
-                    current_index + 1,
-                    total_questions,
-                    question.prompt,
+                    question,
+                    question_number=current_index + 1,
+                    total_questions=total_questions,
                     include_intro=current_index == 0 and not answers,
+                    answered_count=len(answers),
                 ),
             ),
         }
@@ -85,10 +85,11 @@ def collect_study_profile(state: AgentState) -> dict:
                 messages,
                 "assistant",
                 build_question_prompt(
-                    current_index + 1,
-                    total_questions,
-                    question.prompt,
+                    question,
+                    question_number=current_index + 1,
+                    total_questions=total_questions,
                     invalid_answer=True,
+                    answered_count=len(answers),
                 ),
             ),
         }
@@ -114,45 +115,77 @@ def collect_study_profile(state: AgentState) -> dict:
                 messages,
                 "assistant",
                 build_question_prompt(
-                    next_index + 1,
-                    total_questions,
-                    next_question.prompt,
+                    next_question,
+                    question_number=next_index + 1,
+                    total_questions=total_questions,
+                    answered_count=len(answers),
                 ),
             ),
         }
 
     result = get_personalization_service().evaluate_answers(answers)
-    study_profile.update(result.model_dump(mode="json"))
-    study_profile["status"] = "completed"
-    study_profile["current_question_index"] = len(get_questions())
+    return _apply_main_result(
+        state,
+        study_profile,
+        result.model_dump(mode="json"),
+        current_count=current_count,
+        last_text=last_text,
+    )
+
+
+def _apply_main_result(
+    state: AgentState,
+    study_profile: dict,
+    result_payload: dict[str, object],
+    *,
+    current_count: int | None = None,
+    last_text: str | None = None,
+) -> dict:
+    messages = state.get("messages", [])
+    total_questions = get_question_count()
+    study_profile.update(result_payload)
+    study_profile["current_question_index"] = total_questions
     study_profile["persistence_error"] = None
-    return {
-        "study_profile": study_profile,
-        "phase": "study_profile_persist",
-        "user_message_count": current_count,
-        "last_user_text": last_text,
-        "awaiting_user_input": False,
-        "messages": append_message(
-            messages,
-            "assistant",
-            "Perfecto. Voy a consolidar tu caracterizacion academica.",
-        ),
-    }
+
+    tiebreaker = dict(study_profile.get("tiebreaker", {}))
+    assessment = dict(tiebreaker.get("assessment", {}))
+    if bool(assessment.get("needs_tiebreaker")):
+        tiebreaker["status"] = "needed"
+        tiebreaker["activated"] = False
+        tiebreaker["answers"] = coerce_int_answer_map(tiebreaker.get("answers", {}))
+        tiebreaker["current_question_index"] = int(
+            tiebreaker.get("current_question_index") or 0
+        )
+        tiebreaker["answer_timestamps"] = dict(tiebreaker.get("answer_timestamps") or {})
+        study_profile["tiebreaker"] = tiebreaker
+        study_profile["status"] = "tiebreaker_collecting"
+        study_profile["completed_at"] = None
+        update = {
+            "study_profile": study_profile,
+            "phase": "study_profile_tiebreaker",
+            "awaiting_user_input": False,
+        }
+    else:
+        study_profile["status"] = "completed"
+        study_profile["completed_at"] = current_timestamp(state.get("timezone"))
+        update = {
+            "study_profile": study_profile,
+            "phase": "study_profile_persist",
+            "awaiting_user_input": False,
+            "messages": append_message(
+                messages,
+                "assistant",
+                "Perfecto. Voy a consolidar tu Radar de estudio.",
+            ),
+        }
+
+    if current_count is not None:
+        update["user_message_count"] = current_count
+    if last_text is not None:
+        update["last_user_text"] = last_text
+    return update
 
 
 def _study_profile_dict(state: AgentState) -> dict:
     study_profile_state = state.get("study_profile", {})
     return dict(study_profile_state)
-
-
-def _coerce_answers(raw_answers: object) -> dict[str, int]:
-    answers: dict[str, int] = {}
-    if not isinstance(raw_answers, dict):
-        return answers
-    for question_id, value in raw_answers.items():
-        try:
-            answers[str(question_id)] = int(value)
-        except (TypeError, ValueError):
-            continue
-    return answers
-

@@ -17,7 +17,11 @@ from agents.support.personalization.models import (
     TechniqueScore,
 )
 from agents.support.personalization.parser import likert_label
-from agents.support.personalization.questionnaire import get_questions
+from agents.support.personalization.questionnaire import (
+    get_questions,
+    get_tiebreaker_question_by_id,
+    get_tiebreaker_questions,
+)
 from agents.support.personalization.repository import (
     InMemoryPersonalizationRepository,
     PersistedPersonalizationProfile,
@@ -25,7 +29,10 @@ from agents.support.personalization.repository import (
     PersonalizationRepositoryError,
     build_personalization_repository,
 )
-from agents.support.personalization.scoring import evaluate_questionnaire
+from agents.support.personalization.scoring import (
+    evaluate_questionnaire,
+    refine_questionnaire_with_tiebreaker,
+)
 from agents.support.tools.db_config import database_url_from_env
 
 
@@ -52,10 +59,24 @@ class PersonalizationService:
         self.repository = repository
 
     def evaluate_answers(self, answers: dict[str, int]) -> PersonalizationResult:
-        """Evalua el cuestionario y retorna el resultado estructurado."""
+        """Evalua el Radar principal y detecta si requiere desempate."""
 
         return evaluate_questionnaire(
             answers,
+            high_score_threshold=self.config.high_score_threshold,
+        )
+
+    def refine_with_tiebreaker(
+        self,
+        *,
+        answers: dict[str, int],
+        tiebreaker_answers: dict[str, int],
+    ) -> PersonalizationResult:
+        """Aplica el desempate y retorna el ranking refinado final."""
+
+        return refine_questionnaire_with_tiebreaker(
+            answers,
+            tiebreaker_answers,
             high_score_threshold=self.config.high_score_threshold,
         )
 
@@ -140,7 +161,10 @@ def _coerce_personalization_result(study_profile: Any) -> PersonalizationResult:
         "scores": list(data.get("scores") or []),
         "top_techniques": list(data.get("top_techniques") or []),
         "confidence": data.get("confidence"),
+        "signals": list(data.get("signals") or []),
         "observations": list(data.get("observations") or []),
+        "tiebreaker": dict(data.get("tiebreaker") or {}),
+        "completed_at": data.get("completed_at"),
         "method": data.get("method"),
         "how_to": data.get("how_to"),
     }
@@ -162,6 +186,52 @@ def _build_answer_records(result: PersonalizationResult) -> list[Personalization
                 label=likert_label(int(value)),
             )
         )
+    records.extend(_build_tiebreaker_answer_records(result))
+    return records
+
+
+def _build_tiebreaker_answer_records(
+    result: PersonalizationResult,
+) -> list[PersonalizationAnswer]:
+    if not result.tiebreaker.answers:
+        return []
+
+    details_by_id = {
+        detail.question_id: detail for detail in result.tiebreaker.answer_details
+    }
+    records: list[PersonalizationAnswer] = []
+    for question in get_tiebreaker_questions():
+        value = result.tiebreaker.answers.get(question.question_id)
+        if value is None:
+            continue
+
+        detail = details_by_id.get(question.question_id)
+        if detail is None:
+            # Fallback defensivo si el payload llega incompleto.
+            detail = _fallback_tiebreaker_detail(question.question_id, int(value))
+
+        favored_techniques = list(detail.favored_techniques)
+        primary_technique = favored_techniques[0] if favored_techniques else "tiebreaker"
+        records.append(
+            PersonalizationAnswer(
+                question_id=question.question_id,
+                question_text=detail.prompt,
+                technique_id=primary_technique,
+                value=int(detail.selected_option_id),
+                label=detail.selected_option_label,
+                answer_stage="tiebreaker",
+                option_id=str(detail.selected_option_id),
+                favored_techniques=favored_techniques,
+                metadata={
+                    "question_title": detail.question_title,
+                    "boosts": {
+                        boost.technique_id: int(boost.boost)
+                        for boost in detail.applied_boosts
+                    },
+                    "answered_at": detail.answered_at,
+                },
+            )
+        )
     return records
 
 
@@ -179,6 +249,26 @@ def _study_profile_dict(study_profile: Any) -> dict[str, Any]:
     if hasattr(study_profile, "dict"):
         return dict(study_profile.dict())
     return dict(study_profile or {})
+
+
+def _fallback_tiebreaker_detail(question_id: str, selected_option_id: int):
+    question = get_tiebreaker_question_by_id(question_id)
+    option = next(
+        option
+        for option in question.options
+        if int(option.option_id) == int(selected_option_id)
+    )
+    from agents.support.personalization.models import TiebreakerAnswer
+
+    return TiebreakerAnswer(
+        question_id=question.question_id,
+        question_title=question.challenge_title,
+        prompt=question.prompt,
+        selected_option_id=int(option.option_id),
+        selected_option_label=option.label,
+        favored_techniques=[boost.technique_id for boost in option.technique_boosts],
+        applied_boosts=list(option.technique_boosts),
+    )
 
 
 def _describe_persistence_exception(

@@ -5,6 +5,9 @@ from __future__ import annotations
 from langgraph.graph import END, StateGraph
 
 from agents.support.nodes.collect_study_profile import collect_study_profile
+from agents.support.nodes.collect_study_profile_tiebreaker import (
+    collect_study_profile_tiebreaker,
+)
 from agents.support.nodes.apply_schedule_correction import apply_schedule_correction
 from agents.support.nodes.ask_extracurricular import ask_extracurricular
 from agents.support.nodes.build_draft_schedule import build_draft_schedule
@@ -100,6 +103,8 @@ def _route_from_phase(state: AgentState) -> str:
         return "end"
     if phase == "study_profile":
         return "collect_study_profile"
+    if phase == "study_profile_tiebreaker":
+        return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
         return "persist_study_profile"
     return "welcome_consent"
@@ -283,6 +288,8 @@ def _route_collect_study_profile(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
+    if phase == "study_profile_tiebreaker":
+        return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
         return "persist_study_profile"
     if phase == "end":
@@ -290,9 +297,24 @@ def _route_collect_study_profile(state: AgentState) -> str:
     return "collect_study_profile"
 
 
+def _route_collect_study_profile_tiebreaker(state: AgentState) -> str:
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "study_profile":
+        return "collect_study_profile"
+    if phase == "study_profile_persist":
+        return "persist_study_profile"
+    if phase == "end":
+        return "end"
+    return "collect_study_profile_tiebreaker"
+
+
 def _route_persist_study_profile(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
+    if state.get("phase") == "study_profile_tiebreaker":
+        return "collect_study_profile_tiebreaker"
     if state.get("phase") == "study_profile":
         return "collect_study_profile"
     return "end"
@@ -326,6 +348,7 @@ def build_agent() -> StateGraph:
     graph.add_node("apply_schedule_correction", apply_schedule_correction)
     graph.add_node("persist_schedule", persist_schedule)
     graph.add_node("collect_study_profile", collect_study_profile)
+    graph.add_node("collect_study_profile_tiebreaker", collect_study_profile_tiebreaker)
     graph.add_node("persist_study_profile", persist_study_profile)
 
     graph.set_entry_point("welcome_consent")
@@ -349,6 +372,7 @@ def build_agent() -> StateGraph:
             "apply_schedule_correction": "apply_schedule_correction",
             "persist_schedule": "persist_schedule",
             "collect_study_profile": "collect_study_profile",
+            "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
             "end": END,
         },
@@ -467,6 +491,7 @@ def build_agent() -> StateGraph:
         _route_after_persist_schedule,
         {
             "collect_study_profile": "collect_study_profile",
+            "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
             "end": END,
         },
@@ -476,6 +501,17 @@ def build_agent() -> StateGraph:
         _route_collect_study_profile,
         {
             "collect_study_profile": "collect_study_profile",
+            "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
+            "persist_study_profile": "persist_study_profile",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "collect_study_profile_tiebreaker",
+        _route_collect_study_profile_tiebreaker,
+        {
+            "collect_study_profile": "collect_study_profile",
+            "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
             "end": END,
         },
@@ -485,6 +521,7 @@ def build_agent() -> StateGraph:
         _route_persist_study_profile,
         {
             "collect_study_profile": "collect_study_profile",
+            "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "end": END,
         },
     )

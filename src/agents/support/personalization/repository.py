@@ -181,7 +181,7 @@ class PostgresPersonalizationRepository:
                     (
                         profile_id,
                         answer.question_id,
-                        str(answer.value),
+                        answer.option_id,
                         json.dumps(answer.answer_value),
                     ),
                 )
@@ -194,15 +194,19 @@ class PostgresPersonalizationRepository:
                         technique_id,
                         technique_name,
                         score,
+                        max_score,
+                        normalized_score,
                         rank,
                         rationale_tags
-                    ) VALUES (%s, %s, %s, %s, %s, %s::jsonb)
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s::jsonb)
                     """,
                     (
                         profile_id,
                         score.technique_id,
                         score.technique_name,
                         score.raw_score,
+                        score.max_score,
+                        score.normalized_score,
                         score.rank,
                         json.dumps(score.rationale_tags),
                     ),

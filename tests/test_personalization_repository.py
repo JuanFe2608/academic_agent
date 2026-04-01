@@ -21,15 +21,40 @@ def _answer(question_id: str, technique_id: str, value: int) -> PersonalizationA
     )
 
 
-def _score(technique_id: str, name: str, raw_score: int, rank: int) -> TechniqueScore:
+def _tiebreaker_answer(
+    question_id: str,
+    technique_id: str,
+    value: int,
+    option_id: str,
+) -> PersonalizationAnswer:
+    return PersonalizationAnswer(
+        question_id=question_id,
+        question_text=f"Pregunta {question_id}",
+        technique_id=technique_id,
+        value=value,
+        label=f"Opcion {option_id}",
+        answer_stage="tiebreaker",
+        option_id=option_id,
+    )
+
+
+def _score(
+    technique_id: str,
+    name: str,
+    raw_score: int,
+    rank: int,
+    *,
+    max_score: int = 3,
+    normalized_score: float = 1.0,
+) -> TechniqueScore:
     return TechniqueScore(
         technique_id=technique_id,
         technique_name=name,
         priority_order=rank,
         raw_score=raw_score,
-        max_score=3,
-        normalized_score=1.0,
-        percentage_score=100.0,
+        max_score=max_score,
+        normalized_score=normalized_score,
+        percentage_score=round(normalized_score * 100, 2),
         rank=rank,
         rationale_tags=[technique_id],
     )
@@ -120,8 +145,8 @@ def test_postgres_personalization_repository_persists_profile_answers_and_scores
             _answer("Q02", "pomodoro", 2),
         ],
         scores=[
-            _score("pomodoro", "Pomodoro", 5, 1),
-            _score("feynman", "Feynman", 3, 2),
+            _score("pomodoro", "Pomodoro", 5, 1, max_score=6, normalized_score=0.8333),
+            _score("feynman", "Feynman", 3, 2, max_score=3, normalized_score=1.0),
         ],
     )
 
@@ -142,4 +167,67 @@ def test_postgres_personalization_repository_persists_profile_answers_and_scores
         for query, _ in connection.executed
         if "INSERT INTO study_personalization_scores" in query
     ) == 2
+    score_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_personalization_scores" in query
+    ]
+    answer_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_personalization_answers" in query
+    ]
+    assert score_params == [
+        (11, "pomodoro", "Pomodoro", 5, 6, 0.8333, 1, '["pomodoro"]'),
+        (11, "feynman", "Feynman", 3, 3, 1.0, 2, '["feynman"]'),
+    ]
+    assert answer_params == [
+        (11, "Q01", None, '{"value": 3, "label": "Frecuentemente", "answer_stage": "radar"}'),
+        (11, "Q02", None, '{"value": 2, "label": "Frecuentemente", "answer_stage": "radar"}'),
+    ]
 
+
+def test_postgres_personalization_repository_preserves_tiebreaker_option_id() -> None:
+    connection = _FakeConnection()
+    repository = PostgresPersonalizationRepository("postgresql://ignored")
+    repository._connect = lambda: _fake_connect(connection)
+
+    repository.replace_student_personalization(
+        student_id=5,
+        schedule_profile_id=9,
+        questionnaire_version="v3",
+        scoring_version="v3",
+        status="completed",
+        top_techniques=["pomodoro", "feynman", "active_recall"],
+        weakness_tags=["procrastination"],
+        result_payload={"status": "completed"},
+        answers=[
+            _answer("Q01", "pomodoro", 3),
+            _tiebreaker_answer("TB01", "pomodoro", 4, "4"),
+        ],
+        scores=[_score("pomodoro", "Pomodoro", 5, 1, max_score=6, normalized_score=0.8333)],
+    )
+
+    answer_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_personalization_answers" in query
+    ]
+    score_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_personalization_scores" in query
+    ]
+
+    assert score_params == [
+        (11, "pomodoro", "Pomodoro", 5, 6, 0.8333, 1, '["pomodoro"]'),
+    ]
+    assert answer_params == [
+        (11, "Q01", None, '{"value": 3, "label": "Frecuentemente", "answer_stage": "radar"}'),
+        (
+            11,
+            "TB01",
+            "4",
+            '{"value": 4, "label": "Opcion 4", "answer_stage": "tiebreaker", "option_id": "4"}',
+        ),
+    ]
