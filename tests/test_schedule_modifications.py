@@ -6,7 +6,6 @@ from langchain_core.messages import HumanMessage
 
 from agents.support.nodes.apply_schedule_correction.node import apply_schedule_correction
 from agents.support.nodes.validate_schedule.node import validate_schedule
-from agents.support.scheduling.formatter import build_schedule_summary
 from agents.support.scheduling.models import ScheduleConflict, WeeklyScheduleBlock
 from agents.support.state import AgentState, StudentProfile
 

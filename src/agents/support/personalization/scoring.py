@@ -24,7 +24,6 @@ from agents.support.personalization.questionnaire import (
     get_techniques,
     get_tiebreaker_max_boost_for_technique,
     get_tiebreaker_question_count,
-    get_tiebreaker_question_by_id,
     get_tiebreaker_questions,
 )
 

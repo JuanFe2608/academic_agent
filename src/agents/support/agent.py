@@ -36,6 +36,8 @@ from agents.support.state import AgentState
 
 
 def _should_wait(state: AgentState) -> bool:
+    """Indica si el grafo debe detenerse hasta recibir nueva entrada."""
+
     messages = state.get("messages", [])
     last_images = state.get("last_user_images", []) if state.get("phase") == "schedules" else None
     has_new_input, _, _ = detect_new_input(
@@ -49,6 +51,8 @@ def _should_wait(state: AgentState) -> bool:
 
 
 def _route_welcome(state: AgentState) -> str:
+    """Resuelve el siguiente nodo cuando el flujo parte desde bienvenida."""
+
     if state.get("user_status") == "out_of_scope":
         has_new_input, _, _ = detect_new_input(
             state.get("messages", []),
@@ -69,6 +73,8 @@ def _route_welcome(state: AgentState) -> str:
 
 
 def _route_from_phase(state: AgentState) -> str:
+    """Mapea la `phase` persistida al nodo operativo correspondiente."""
+
     phase = state.get("phase")
     if phase == "profile":
         return "collect_profile"
@@ -111,6 +117,8 @@ def _route_from_phase(state: AgentState) -> str:
 
 
 def _route_collect_profile(state: AgentState) -> str:
+    """Decide si el onboarding continúa, verifica correo o confirma perfil."""
+
     if state.get("user_status") == "out_of_scope" or state.get("phase") == "end":
         return "end"
     if _should_wait(state):
@@ -124,6 +132,8 @@ def _route_collect_profile(state: AgentState) -> str:
 
 
 def _route_send_email_verification(state: AgentState) -> str:
+    """Mantiene o avanza el subflujo de envío del código de correo."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -133,6 +143,8 @@ def _route_send_email_verification(state: AgentState) -> str:
 
 
 def _route_verify_email_code(state: AgentState) -> str:
+    """Mantiene o reencamina la validación del código institucional."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -144,6 +156,8 @@ def _route_verify_email_code(state: AgentState) -> str:
 
 
 def _route_confirm_profile(state: AgentState) -> str:
+    """Controla la confirmación final del perfil antes de persistirlo."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -157,6 +171,8 @@ def _route_confirm_profile(state: AgentState) -> str:
 
 
 def _route_persist_profile(state: AgentState) -> str:
+    """Encadena persistencia de perfil con captura de horarios o correcciones."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -172,6 +188,8 @@ def _route_persist_profile(state: AgentState) -> str:
 
 
 def _route_request_schedules(state: AgentState) -> str:
+    """Determina si aún falta captura o si ya puede parsearse el horario."""
+
     if _should_wait(state):
         return "end"
     occupation = state.get("student_profile", {}).get("occupation")
@@ -223,6 +241,8 @@ def _route_request_schedules(state: AgentState) -> str:
 
 
 def _route_extras(state: AgentState) -> str:
+    """Resuelve el paso siguiente para actividades extracurriculares."""
+
     if _should_wait(state):
         return "end"
     extras_has_any = state.get("extras_has_any")
@@ -234,6 +254,8 @@ def _route_extras(state: AgentState) -> str:
 
 
 def _route_collect_extracurricular(state: AgentState) -> str:
+    """Mantiene la recolección de extras hasta completar pendientes."""
+
     if _should_wait(state):
         return "end"
     stage = state.get("extras_collect_stage")
@@ -243,6 +265,8 @@ def _route_collect_extracurricular(state: AgentState) -> str:
 
 
 def _route_after_parse_schedules(state: AgentState) -> str:
+    """Encadena el parseo exitoso hacia el bloque de extras o finaliza."""
+
     if _should_wait(state):
         return "end"
     if state.get("phase") == "extras":
@@ -251,6 +275,8 @@ def _route_after_parse_schedules(state: AgentState) -> str:
 
 
 def _route_validate(state: AgentState) -> str:
+    """Decide si el usuario acepta, corrige o persiste el horario."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -262,6 +288,8 @@ def _route_validate(state: AgentState) -> str:
 
 
 def _route_after_schedule_edit(state: AgentState) -> str:
+    """Devuelve al borrador o a validación tras aplicar una corrección."""
+
     if _should_wait(state):
         return "end"
     if state.get("phase") == "validate":
@@ -270,6 +298,8 @@ def _route_after_schedule_edit(state: AgentState) -> str:
 
 
 def _route_after_persist_schedule(state: AgentState) -> str:
+    """Activa personalización opcional después de guardar el horario."""
+
     if _should_wait(state):
         return "end"
     if not is_personalization_enabled():
@@ -285,6 +315,8 @@ def _route_after_persist_schedule(state: AgentState) -> str:
 
 
 def _route_collect_study_profile(state: AgentState) -> str:
+    """Controla la transición entre radar principal, desempate y persistencia."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -298,6 +330,8 @@ def _route_collect_study_profile(state: AgentState) -> str:
 
 
 def _route_collect_study_profile_tiebreaker(state: AgentState) -> str:
+    """Gestiona el subflujo de desempate del perfil de estudio."""
+
     if _should_wait(state):
         return "end"
     phase = state.get("phase")
@@ -311,6 +345,8 @@ def _route_collect_study_profile_tiebreaker(state: AgentState) -> str:
 
 
 def _route_persist_study_profile(state: AgentState) -> str:
+    """Finaliza o reintenta la persistencia del perfil de personalización."""
+
     if _should_wait(state):
         return "end"
     if state.get("phase") == "study_profile_tiebreaker":
@@ -321,6 +357,8 @@ def _route_persist_study_profile(state: AgentState) -> str:
 
 
 def _has_block_type(blocks: list, block_type: str) -> bool:
+    """Comprueba si una colección de bloques contiene un tipo específico."""
+
     for block in blocks or []:
         current_type = block.get("block_type") if isinstance(block, dict) else getattr(block, "block_type", None)
         if str(current_type) == block_type:

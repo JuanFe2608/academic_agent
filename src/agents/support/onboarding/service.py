@@ -19,7 +19,6 @@ from agents.support.onboarding.repository import (
     OnboardingRepository,
     OnboardingRepositoryError,
     RepositoryConfigurationError,
-    VerificationChallengeRecord,
     build_postgres_repository,
 )
 from agents.support.tools.db_config import database_url_from_env

@@ -255,7 +255,6 @@ def _draw_event(
     )
     content_padding_x = 14
     content_padding_y = 8
-    content_x = block[0] + content_padding_x
     max_width = int(block[2] - block[0] - (content_padding_x * 2))
     max_height = int(block[3] - block[1] - (content_padding_y * 2))
 

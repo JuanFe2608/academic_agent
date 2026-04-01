@@ -11,7 +11,6 @@ from agents.support.tools.db_config import database_url_from_env
 from .models import ScheduleConflict, WeeklyScheduleBlock
 from .repository import (
     InMemoryScheduleRepository,
-    PersistedScheduleProfile,
     ScheduleRepository,
     ScheduleRepositoryError,
     build_schedule_repository,

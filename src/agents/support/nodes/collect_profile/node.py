@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import append_message, detect_new_input
+from agents.support.nodes.utils import (
+    append_message,
+    copy_onboarding_state,
+    detect_new_input,
+)
 from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_field_prompt,
@@ -31,7 +35,7 @@ def collect_profile(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     profile = dict(state.get("student_profile", {}))
-    onboarding = _onboarding_dict(state)
+    onboarding = copy_onboarding_state(state)
 
     missing_before = get_missing_profile_fields(profile)
     target_field = missing_before[0] if missing_before else None
@@ -179,11 +183,3 @@ def collect_profile(state: AgentState) -> dict:
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),
         "awaiting_user_input": False,
     }
-
-
-def _onboarding_dict(state: AgentState) -> dict:
-    onboarding_state = state.get("onboarding", {})
-    onboarding = dict(onboarding_state)
-    email_verification = dict(onboarding_state.get("email_verification", {}))
-    onboarding["email_verification"] = email_verification
-    return onboarding

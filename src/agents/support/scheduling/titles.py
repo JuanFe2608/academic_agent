@@ -52,7 +52,6 @@ def normalize_schedule_title(
     """Retorna `(original_title, normalized_title)` para el bloque."""
 
     original_title = _clean_title(raw_title)
-    normalized_text = _normalize_text(raw_text or original_title)
     if schedule_type == "work":
         return original_title or "Trabajo", "Trabajo"
     if schedule_type == "academic":

@@ -1007,7 +1007,6 @@ def _apply_laboral_change(
     has_new_input: bool,
     last_user_text_value: str | None,
 ) -> dict:
-    messages = state.get("messages", [])
     if not details or not has_time_range(details):
         replan["pending_prompt"] = PROMPT_HORARIO
         return {
@@ -1074,7 +1073,6 @@ def _apply_academic_change(
     has_new_input: bool,
     last_user_text_value: str | None,
 ) -> dict:
-    messages = state.get("messages", [])
     if not details or not has_time_range(details):
         replan["pending_prompt"] = PROMPT_HORARIO_ACADEMICO
         return {

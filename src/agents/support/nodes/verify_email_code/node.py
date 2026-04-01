@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import append_message, detect_new_input
+from agents.support.nodes.utils import (
+    append_message,
+    copy_onboarding_state,
+    detect_new_input,
+)
 from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_verification_error_prompt,
@@ -36,7 +40,7 @@ def verify_email_code(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     profile = dict(state.get("student_profile", {}))
-    onboarding = _onboarding_dict(state)
+    onboarding = copy_onboarding_state(state)
     institutional_email = str(profile.get("institutional_email") or "").strip().lower()
     config = load_onboarding_config()
 
@@ -170,12 +174,3 @@ def _verification_detail(
 def _is_resend_request(raw: str) -> bool:
     normalized = normalize_text(raw)
     return normalized in _RESEND_TOKENS
-
-
-def _onboarding_dict(state: AgentState) -> dict:
-    onboarding_state = state.get("onboarding", {})
-    onboarding = dict(onboarding_state)
-    onboarding["email_verification"] = dict(
-        onboarding_state.get("email_verification", {})
-    )
-    return onboarding

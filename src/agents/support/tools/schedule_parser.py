@@ -10,7 +10,6 @@ from __future__ import annotations
 import re
 import unicodedata
 from dataclasses import dataclass
-from typing import Iterable
 
 from agents.support.state import DAY_ORDER, Event, new_event_id, normalize_day, normalize_time
 

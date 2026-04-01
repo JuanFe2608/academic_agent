@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import append_message, detect_new_input
+from agents.support.nodes.utils import (
+    append_message,
+    copy_onboarding_state,
+    detect_new_input,
+)
 from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import build_field_prompt
 from agents.support.onboarding.validators import normalize_text, parse_yes_no
@@ -36,7 +40,7 @@ def confirm_profile(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     profile = dict(state.get("student_profile", {}))
-    onboarding = _onboarding_dict(state)
+    onboarding = copy_onboarding_state(state)
     edit_target = state.get("profile_edit_target")
 
     if not has_new_input:
@@ -186,12 +190,3 @@ def _prompt_for_field(field: str, config) -> str:
         "¿Como te llamas? Puedes escribirme tu nombre y apellido, por ejemplo: "
         "Juan Perez"
     )
-
-
-def _onboarding_dict(state: AgentState) -> dict:
-    onboarding_state = state.get("onboarding", {})
-    onboarding = dict(onboarding_state)
-    onboarding["email_verification"] = dict(
-        onboarding_state.get("email_verification", {})
-    )
-    return onboarding

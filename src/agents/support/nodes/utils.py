@@ -222,6 +222,23 @@ def append_message(
     return [AIMessage(content=content)]
 
 
+def copy_onboarding_state(state: Any) -> dict[str, Any]:
+    """Copia el bloque `onboarding` preservando el dict anidado de verificación.
+
+    Los nodos de onboarding mutan una copia temporal del estado antes de devolver
+    el `update` parcial al grafo. Este helper evita compartir referencias del
+    sub-objeto `email_verification` entre turnos y centraliza una lógica que se
+    repetía en varios nodos.
+    """
+
+    onboarding_state = state.get("onboarding", {}) if hasattr(state, "get") else {}
+    onboarding = dict(onboarding_state)
+    onboarding["email_verification"] = dict(
+        onboarding_state.get("email_verification", {})
+    )
+    return onboarding
+
+
 def parse_yes_no(text: str) -> Optional[bool]:
     """Interpreta respuestas simples de si/no."""
     if not text:

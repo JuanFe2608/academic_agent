@@ -14,7 +14,7 @@ from typing import Any, Annotated, Literal, Optional
 
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 from agents.support.scheduling.models import ScheduleFlowState
 
@@ -56,8 +56,7 @@ ScheduleContextType = Literal["academic", "work"]
 class BaseStateModel(BaseModel):
     """Base de modelos con acceso tipo dict para compatibilidad."""
 
-    class Config:
-        arbitrary_types_allowed = True
+    model_config = ConfigDict(arbitrary_types_allowed=True)
 
     def get(self, key: str, default: Any = None) -> Any:
         return getattr(self, key, default)

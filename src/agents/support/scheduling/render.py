@@ -7,7 +7,7 @@ from datetime import datetime
 from agents.support.state import Event, new_event_id
 from agents.support.tools.schedule_renderer import render_week_schedule
 
-from .constants import BLOCK_TYPE_TO_EVENT_CATEGORY, DAY_LABELS, SPANISH_TO_ENGLISH
+from .constants import BLOCK_TYPE_TO_EVENT_CATEGORY, DAY_LABELS
 from .models import WeeklyScheduleBlock, ensure_weekly_block
 
 

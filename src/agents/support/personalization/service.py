@@ -24,7 +24,6 @@ from agents.support.personalization.questionnaire import (
 )
 from agents.support.personalization.repository import (
     InMemoryPersonalizationRepository,
-    PersistedPersonalizationProfile,
     PersonalizationRepository,
     PersonalizationRepositoryError,
     build_personalization_repository,

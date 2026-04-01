@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from types import SimpleNamespace
 
-from agents.support.nodes.utils import append_message
+from agents.support.nodes.utils import append_message, copy_onboarding_state
 from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import build_field_prompt
 from agents.support.state import AgentState
@@ -16,7 +16,7 @@ def persist_profile(state: AgentState) -> dict:
 
     messages = state.get("messages", [])
     profile = dict(state.get("student_profile", {}))
-    onboarding = _onboarding_dict(state)
+    onboarding = copy_onboarding_state(state)
     config = load_onboarding_config()
 
     try:
@@ -103,12 +103,3 @@ def persist_profile(state: AgentState) -> dict:
             ),
         ),
     }
-
-
-def _onboarding_dict(state: AgentState) -> dict:
-    onboarding_state = state.get("onboarding", {})
-    onboarding = dict(onboarding_state)
-    onboarding["email_verification"] = dict(
-        onboarding_state.get("email_verification", {})
-    )
-    return onboarding
