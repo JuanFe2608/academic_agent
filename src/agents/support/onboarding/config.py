@@ -14,6 +14,7 @@ class OnboardingConfig:
     """Parametros deterministas del flujo de onboarding."""
 
     institutional_email_domain: str = "ucatolica.edu.co"
+    allowed_email_domains: tuple[str, ...] = ("ucatolica.edu.co",)
     supported_program_name: str = "Ingenieria de Sistemas y Computacion"
     student_code_length: int = 8
     full_name_max_length: int = 100
@@ -34,12 +35,18 @@ def load_onboarding_config() -> OnboardingConfig:
     ).lower()
     if verification_mode not in {"strict", "fixed", "disabled"}:
         verification_mode = "strict"
+    institutional_email_domain = _env(
+        "ACADEMIC_AGENT_INSTITUTIONAL_EMAIL_DOMAIN",
+        "ucatolica.edu.co",
+    ).lower()
+    allowed_email_domains = _resolve_allowed_email_domains(
+        institutional_email_domain=institutional_email_domain,
+        verification_mode=verification_mode,
+    )
 
     return OnboardingConfig(
-        institutional_email_domain=_env(
-            "ACADEMIC_AGENT_INSTITUTIONAL_EMAIL_DOMAIN",
-            "ucatolica.edu.co",
-        ).lower(),
+        institutional_email_domain=institutional_email_domain,
+        allowed_email_domains=allowed_email_domains,
         supported_program_name=_env(
             "ACADEMIC_AGENT_SUPPORTED_PROGRAM_NAME",
             "Ingenieria de Sistemas y Computacion",
@@ -68,6 +75,26 @@ def load_onboarding_config() -> OnboardingConfig:
             "123456",
         ),
     )
+
+
+def _resolve_allowed_email_domains(
+    *,
+    institutional_email_domain: str,
+    verification_mode: VerificationMode,
+) -> tuple[str, ...]:
+    raw_domains = os.getenv("ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS", "").strip()
+    if raw_domains:
+        candidates = [item.strip().lower() for item in raw_domains.split(",")]
+    elif verification_mode in {"disabled", "fixed"}:
+        candidates = [institutional_email_domain, "outlook.com"]
+    else:
+        candidates = [institutional_email_domain]
+
+    normalized: list[str] = []
+    for candidate in candidates:
+        if candidate and candidate not in normalized:
+            normalized.append(candidate)
+    return tuple(normalized or [institutional_email_domain])
 
 
 def _env(name: str, default: str) -> str:

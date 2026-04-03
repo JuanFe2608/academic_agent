@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from langgraph.graph import END, StateGraph
 
+from agents.support.nodes.build_study_plan import build_study_plan
+from agents.support.nodes.collect_priorities import collect_priorities
 from agents.support.nodes.collect_study_profile import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker import (
     collect_study_profile_tiebreaker,
@@ -113,6 +115,10 @@ def _route_from_phase(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
         return "persist_study_profile"
+    if phase == "priorities":
+        return "collect_priorities"
+    if phase == "study_plan":
+        return "build_study_plan"
     return "welcome_consent"
 
 
@@ -353,6 +359,33 @@ def _route_persist_study_profile(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if state.get("phase") == "study_profile":
         return "collect_study_profile"
+    if state.get("phase") == "priorities":
+        return "collect_priorities"
+    if state.get("phase") == "study_plan":
+        return "build_study_plan"
+    return "end"
+
+
+def _route_collect_priorities(state: AgentState) -> str:
+    """Coordina la captura de prioridades y el recálculo del plan."""
+
+    if _should_wait(state):
+        return "end"
+    phase = state.get("phase")
+    if phase == "study_plan":
+        return "build_study_plan"
+    if phase == "end":
+        return "end"
+    return "collect_priorities"
+
+
+def _route_build_study_plan(state: AgentState) -> str:
+    """Finaliza el subflujo de plan semanal o vuelve a prioridades si aplica."""
+
+    if _should_wait(state):
+        return "end"
+    if state.get("phase") == "priorities":
+        return "collect_priorities"
     return "end"
 
 
@@ -388,6 +421,8 @@ def build_agent() -> StateGraph:
     graph.add_node("collect_study_profile", collect_study_profile)
     graph.add_node("collect_study_profile_tiebreaker", collect_study_profile_tiebreaker)
     graph.add_node("persist_study_profile", persist_study_profile)
+    graph.add_node("collect_priorities", collect_priorities)
+    graph.add_node("build_study_plan", build_study_plan)
 
     graph.set_entry_point("welcome_consent")
 
@@ -412,6 +447,8 @@ def build_agent() -> StateGraph:
             "collect_study_profile": "collect_study_profile",
             "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
+            "collect_priorities": "collect_priorities",
+            "build_study_plan": "build_study_plan",
             "end": END,
         },
     )
@@ -560,6 +597,25 @@ def build_agent() -> StateGraph:
         {
             "collect_study_profile": "collect_study_profile",
             "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
+            "collect_priorities": "collect_priorities",
+            "build_study_plan": "build_study_plan",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "collect_priorities",
+        _route_collect_priorities,
+        {
+            "collect_priorities": "collect_priorities",
+            "build_study_plan": "build_study_plan",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "build_study_plan",
+        _route_build_study_plan,
+        {
+            "collect_priorities": "collect_priorities",
             "end": END,
         },
     )

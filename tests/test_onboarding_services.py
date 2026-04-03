@@ -21,6 +21,17 @@ def test_validate_institutional_email_normalizes_to_lowercase() -> None:
     assert result.value == "estudiante@ucatolica.edu.co"
 
 
+def test_validate_institutional_email_accepts_outlook_when_allowed() -> None:
+    config = OnboardingConfig(
+        allowed_email_domains=("ucatolica.edu.co", "outlook.com")
+    )
+
+    result = validate_institutional_email("Prueba@Outlook.com", config)
+
+    assert result.is_valid is True
+    assert result.value == "prueba@outlook.com"
+
+
 def test_validate_average_grade_rejects_comma_separator() -> None:
     config = OnboardingConfig()
 

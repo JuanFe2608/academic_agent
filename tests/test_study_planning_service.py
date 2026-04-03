@@ -1,0 +1,206 @@
+"""Pruebas del primer servicio determinista de planificación semanal."""
+
+from __future__ import annotations
+
+from agents.support.nodes.persist_study_profile.node import persist_study_profile
+from agents.support.personalization import get_questions
+from agents.support.personalization.config import PersonalizationConfig
+from agents.support.personalization.repository import InMemoryPersonalizationRepository
+from agents.support.personalization.service import PersonalizationService
+from agents.support.planning import build_initial_study_plan
+from agents.support.scheduling.constants import DAY_LABELS, DAY_ORDER
+from agents.support.scheduling.models import WeeklyScheduleBlock
+from agents.support.state import AgentState, SubjectItem, validate_event
+from agents.support.tools.db import set_personalization_service
+
+
+def _academic_block(
+    day_of_week: str,
+    start_time: str,
+    end_time: str,
+    title: str,
+) -> WeeklyScheduleBlock:
+    return WeeklyScheduleBlock(
+        block_type="academic",
+        title=title,
+        day_of_week=day_of_week,
+        start_time=start_time,
+        end_time=end_time,
+        source_text=f"{title} {day_of_week} {start_time}-{end_time}",
+    )
+
+
+def _work_block(
+    day_of_week: str,
+    start_time: str = "09:00",
+    end_time: str = "17:00",
+) -> WeeklyScheduleBlock:
+    return WeeklyScheduleBlock(
+        block_type="work",
+        title="Trabajo",
+        day_of_week=day_of_week,
+        start_time=start_time,
+        end_time=end_time,
+        source_text=f"Trabajo {day_of_week} {start_time}-{end_time}",
+    )
+
+
+def _event_day_label(day_of_week: str) -> str:
+    return DAY_LABELS[day_of_week].replace("é", "e").replace("á", "a")
+
+
+def _to_minutes(value: str) -> int:
+    hours, minutes = value.split(":", maxsplit=1)
+    return int(hours) * 60 + int(minutes)
+
+
+def _daily_minutes(events) -> dict[str, int]:
+    minutes_by_day = {day: 0 for day in DAY_ORDER}
+    spanish_to_english = {_event_day_label(day): day for day in DAY_ORDER}
+    for event in events:
+        day = spanish_to_english[event.dia]
+        minutes_by_day[day] += _to_minutes(event.fin) - _to_minutes(event.inicio)
+    return minutes_by_day
+
+
+def _assert_no_overlap_with_fixed_blocks(plan_events, blocks) -> None:
+    fixed_windows = {}
+    for block in blocks:
+        day_label = _event_day_label(block.day_of_week)
+        fixed_windows.setdefault(day_label, []).append(
+            (_to_minutes(block.start_time), _to_minutes(block.end_time))
+        )
+
+    for event in plan_events:
+        event_start = _to_minutes(event.inicio)
+        event_end = _to_minutes(event.fin)
+        for block_start, block_end in fixed_windows.get(event.dia, []):
+            assert event_end <= block_start or event_start >= block_end
+
+
+def _completed_profile_payload() -> dict[str, object]:
+    repository = InMemoryPersonalizationRepository()
+    service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=repository,
+    )
+    answers = {
+        question.question_id: answer
+        for question, answer in zip(
+            get_questions(),
+            [3, 3, 2, 2, 1, 1, 0, 3, 1, 1],
+            strict=True,
+        )
+    }
+    payload = service.evaluate_answers(answers).model_dump(mode="python")
+    payload["completed_at"] = "2026-01-01T08:00:00-05:00"
+    return payload
+
+
+def test_build_initial_study_plan_derives_subjects_from_schedule() -> None:
+    blocks = [
+        _academic_block("monday", "08:00", "10:00", "Calculo"),
+        _academic_block("wednesday", "10:00", "12:00", "Programacion"),
+        _work_block("friday", "14:00", "18:00"),
+    ]
+
+    plan = build_initial_study_plan(
+        schedule_blocks=blocks,
+        subjects=[],
+        study_profile={"top_techniques": ["pomodoro", "feynman"]},
+        constraints={},
+        timezone="America/Bogota",
+    )
+
+    assert plan.rules["status"] == "generated"
+    assert plan.rules["subjects_source"] == "derived_from_schedule"
+    assert plan.rules["session_minutes"] == 25
+    assert any("Calculo" in event.titulo for event in plan.plan_events)
+    assert any("Programacion" in event.titulo for event in plan.plan_events)
+    _assert_no_overlap_with_fixed_blocks(plan.plan_events, blocks)
+    for event in plan.plan_events:
+        validate_event(event)
+        assert event.categoria == "estudio"
+        assert event.tipo == "tentativo"
+
+
+def test_build_initial_study_plan_respects_daily_maximum() -> None:
+    blocks = [_work_block("monday")]
+    subjects = [
+        SubjectItem(nombre="Algebra", prioridad="alta", dificultad=4),
+        SubjectItem(nombre="Fisica", prioridad="media", dificultad=3),
+    ]
+
+    plan = build_initial_study_plan(
+        schedule_blocks=blocks,
+        subjects=subjects,
+        study_profile={"top_techniques": ["feynman"]},
+        constraints={
+            "study_session_min": 25,
+            "study_session_max": 50,
+            "max_study_per_day_min": 50,
+        },
+        timezone="America/Bogota",
+    )
+
+    assert plan.rules["subjects_source"] == "state.subjects"
+    assert plan.rules["session_minutes"] == 50
+    assert all(total <= 50 for total in _daily_minutes(plan.plan_events).values())
+    assert any("Algebra" in event.titulo for event in plan.plan_events)
+    assert any("Fisica" in event.titulo for event in plan.plan_events)
+
+
+def test_build_initial_study_plan_spreads_sessions_for_spaced_repetition() -> None:
+    blocks = [_academic_block("monday", "08:00", "10:00", "Calculo")]
+    subjects = [SubjectItem(nombre="Calculo", prioridad="alta", dificultad=3)]
+
+    plan = build_initial_study_plan(
+        schedule_blocks=blocks,
+        subjects=subjects,
+        study_profile={"top_techniques": ["repeticion_espaciada"]},
+        constraints={},
+        timezone="America/Bogota",
+    )
+
+    calculo_days = [
+        DAY_ORDER.index(day)
+        for day in DAY_ORDER
+        for event in plan.plan_events
+        if event.titulo == "Estudio · Calculo" and event.dia == _event_day_label(day)
+    ]
+
+    assert len(calculo_days) >= 2
+    assert calculo_days[1] - calculo_days[0] >= 2
+    assert plan.rules["spacing_days"] == 2
+
+
+def test_persist_study_profile_generates_study_plan_without_breaking_flow() -> None:
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    set_personalization_service(personalization_service)
+    try:
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=_completed_profile_payload(),
+        )
+
+        update = persist_study_profile(state)
+
+        assert update["phase"] == "end"
+        assert "subjects" in update
+        assert "study_plan" in update
+        assert update["subjects"][0].nombre == "Calculo"
+        assert update["study_plan"]["rules"]["primary_technique_id"] == "pomodoro"
+        assert len(update["study_plan"]["plan_events"]) >= 1
+        assert "Radar de estudio completado" in update["messages"][0].content
+    finally:
+        set_personalization_service(None)

@@ -13,6 +13,13 @@ from agents.support.nodes.utils import (
     parse_yes_no,
 )
 from agents.support.scheduling import merge_section_blocks, normalize_schedule_section
+from agents.support.scheduling.extracurricular_support import (
+    build_extracurricular_item_source_text as shared_build_extracurricular_item_source_text,
+    build_extracurricular_reply_hint as shared_build_extracurricular_reply_hint,
+    coerce_extracurricular_pending_items as shared_coerce_extracurricular_pending_items,
+    merge_extracurricular_items as shared_merge_extracurricular_items,
+)
+from agents.support.scheduling.state_helpers import reset_schedule_review_state
 from agents.support.state import AgentState, ExtracurricularItem, PendingExtracurricularItem
 
 from .prompt import (
@@ -185,13 +192,7 @@ def collect_extracurricular_details(state: AgentState) -> dict:
         )
         return {
             "extracurricular": extracurricular,
-            "schedule": {
-                **schedule_state,
-                "blocks": schedule_blocks,
-                "summary_text": None,
-                "review_stage": "idle",
-                "conflicts": [],
-            },
+            "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
             "extras_collect_stage": "awaiting_details",
             "extras_pending_is_variable": pending_is_variable,
             "extras_pending_items": parsed_pending_items,
@@ -204,13 +205,7 @@ def collect_extracurricular_details(state: AgentState) -> dict:
 
     return {
         "extracurricular": extracurricular,
-        "schedule": {
-            **schedule_state,
-            "blocks": schedule_blocks,
-            "summary_text": None,
-            "review_stage": "idle",
-            "conflicts": [],
-        },
+        "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
         "extras_collect_stage": "awaiting_more",
         "extras_pending_is_variable": None,
         "extras_pending_items": [],
@@ -239,31 +234,13 @@ def _merge_extracurricular_items(
     existing: list[ExtracurricularItem] | list[dict],
     new_items: list[ExtracurricularItem],
 ) -> list[ExtracurricularItem]:
-    merged: list[ExtracurricularItem] = []
-    seen: set[tuple[str, tuple[str, ...], str, str, bool]] = set()
-    for raw_item in list(existing) + list(new_items):
-        item = raw_item if isinstance(raw_item, ExtracurricularItem) else ExtracurricularItem(**raw_item)
-        key = (
-            normalize_text(item.nombre),
-            tuple(item.dias),
-            str(item.hora_inicio or ""),
-            str(item.hora_fin or ""),
-            bool(item.es_variable),
-        )
-        if key in seen:
-            continue
-        seen.add(key)
-        merged.append(item)
-    return merged
+    return shared_merge_extracurricular_items(existing, new_items)
 
 
 def _coerce_pending_items(
     raw_items: list[PendingExtracurricularItem] | list[dict],
 ) -> list[PendingExtracurricularItem]:
-    return [
-        item if isinstance(item, PendingExtracurricularItem) else PendingExtracurricularItem(**item)
-        for item in raw_items
-    ]
+    return shared_coerce_extracurricular_pending_items(raw_items)
 
 
 def _complete_pending_item_reply(
@@ -305,13 +282,7 @@ def _complete_pending_item_reply(
     if remaining_pending:
         return {
             "extracurricular": merged_items,
-            "schedule": {
-                **schedule_state,
-                "blocks": schedule_blocks,
-                "summary_text": None,
-                "review_stage": "idle",
-                "conflicts": [],
-            },
+            "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
             "extras_collect_stage": "awaiting_details",
             "extras_pending_is_variable": pending_is_variable,
             "extras_pending_items": remaining_pending,
@@ -328,13 +299,7 @@ def _complete_pending_item_reply(
 
     return {
         "extracurricular": merged_items,
-        "schedule": {
-            **schedule_state,
-            "blocks": schedule_blocks,
-            "summary_text": None,
-            "review_stage": "idle",
-            "conflicts": [],
-        },
+        "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
         "extras_collect_stage": "awaiting_more",
         "extras_pending_is_variable": None,
         "extras_pending_items": [],
@@ -347,11 +312,7 @@ def _complete_pending_item_reply(
 
 
 def _build_item_source_text(item: ExtracurricularItem) -> str:
-    days = ", ".join(item.dias) if item.dias else ""
-    hours = ""
-    if item.hora_inicio and item.hora_fin:
-        hours = f"{item.hora_inicio}-{item.hora_fin}"
-    return " ".join(part for part in [item.nombre.strip(), days, hours] if part).strip()
+    return shared_build_extracurricular_item_source_text(item)
 
 
 def _build_clarification_prompt(
@@ -394,7 +355,4 @@ def _build_pending_prompt(
 
 
 def _build_pending_reply_hint(item: PendingExtracurricularItem) -> str:
-    missing_text = ", ".join(item.missing_fields) if item.missing_fields else ""
-    if missing_text == "hora de inicio y fin":
-        return "Puedes responder solo con lo que falta. Ejemplo: de 7 am a 8 am."
-    return "Si prefieres, envíala completa en formato: Actividad dia(s) de HH:MM a HH:MM."
+    return shared_build_extracurricular_reply_hint(item)

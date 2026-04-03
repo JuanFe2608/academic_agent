@@ -94,7 +94,7 @@ def validate_institutional_email(
     raw: str,
     config: OnboardingConfig,
 ) -> ValidationResult:
-    """Valida correo institucional y lo normaliza a minusculas."""
+    """Valida correo permitido por onboarding y lo normaliza a minusculas."""
 
     normalized = str(raw or "").strip().lower()
     if not normalized or " " in normalized:
@@ -102,7 +102,10 @@ def validate_institutional_email(
     if not _EMAIL_PATTERN.fullmatch(normalized):
         return ValidationResult(error="invalid_institutional_email")
     domain = normalized.rsplit("@", 1)[-1]
-    if domain != config.institutional_email_domain:
+    allowed_domains = tuple(
+        domain_name.lower() for domain_name in getattr(config, "allowed_email_domains", ())
+    ) or (config.institutional_email_domain,)
+    if domain not in allowed_domains:
         return ValidationResult(error="invalid_institutional_email")
     return ValidationResult(value=normalized)
 

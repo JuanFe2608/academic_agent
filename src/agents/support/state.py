@@ -186,11 +186,14 @@ class CalendarState(BaseStateModel):
 
 
 class SubjectItem(BaseStateModel):
-    """Metadatos de materias para priorizacion."""
+    """Metadatos de materias para priorización y planificación."""
 
     nombre: str
     prioridad: Prioridad
     dificultad: int
+    urgencia: Optional[Prioridad] = None
+    carga_semanal_min: Optional[int] = None
+    origen: Optional[str] = None
 
 
 class StudyProfile(BaseStateModel):
@@ -215,11 +218,31 @@ class StudyProfile(BaseStateModel):
     how_to: Optional[str] = None
 
 
+class PrioritiesState(BaseStateModel):
+    """Estado operativo de captura de prioridades académicas."""
+
+    status: Literal["idle", "collecting", "completed", "skipped"] = "idle"
+    prompt_version: str = "v1"
+    source: Optional[str] = None
+    last_error: Optional[str] = None
+    persisted_profile_id: Optional[int] = None
+    version_number: Optional[int] = None
+    persistence_error: Optional[str] = None
+
+
 class StudyPlanState(BaseStateModel):
     """Plan de estudio generado y reglas de planificacion."""
 
     plan_events: list[Event] = Field(default_factory=list)
     rules: dict[str, object] = Field(default_factory=dict)
+    persisted_profile_id: Optional[int] = None
+    version_number: Optional[int] = None
+    persistence_error: Optional[str] = None
+    materialized_instance_count: Optional[int] = None
+    superseded_instance_count: Optional[int] = None
+    materialized_horizon_days: Optional[int] = None
+    materialized_through_date: Optional[str] = None
+    materialization_error: Optional[str] = None
 
 
 class ReplanState(BaseStateModel):
@@ -236,8 +259,11 @@ class ReplanState(BaseStateModel):
 class RemindersState(BaseStateModel):
     """Configuracion de recordatorios y politicas."""
 
-    enabled: bool = False
+    enabled: bool = True
     policy: dict[str, object] = Field(default_factory=dict)
+    persisted_policy_ids: list[int] = Field(default_factory=list)
+    last_dispatch_error: Optional[str] = None
+    last_sync_at: Optional[str] = None
 
 
 class Constraints(BaseStateModel):
@@ -282,6 +308,7 @@ class AgentState(BaseStateModel):
     calendar: CalendarState = Field(default_factory=CalendarState)
     subjects: list[SubjectItem] = Field(default_factory=list)
     study_profile: StudyProfile = Field(default_factory=StudyProfile)
+    priorities: PrioritiesState = Field(default_factory=PrioritiesState)
     study_plan: StudyPlanState = Field(default_factory=StudyPlanState)
     replan: ReplanState = Field(default_factory=ReplanState)
     reminders: RemindersState = Field(default_factory=RemindersState)

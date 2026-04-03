@@ -98,6 +98,33 @@ def test_collect_profile_moves_to_email_verification_after_valid_institutional_e
     assert _route_collect_profile(next_state) == "send_email_verification"
 
 
+def test_collect_profile_accepts_outlook_email_in_development_mode(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE", "disabled")
+    monkeypatch.delenv("ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS", raising=False)
+
+    state = AgentState(
+        phase="profile",
+        student_profile={
+            "full_name": "Ana Maria Perez",
+            "student_code": "67000912",
+            "age": 20,
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="prueba@outlook.com")],
+    )
+
+    update = collect_profile(state)
+    payload = state.model_dump()
+    payload.update(update)
+    next_state = AgentState(**payload)
+
+    assert update["student_profile"]["institutional_email"] == "prueba@outlook.com"
+    assert update["student_profile"]["email_verified"] is False
+    assert update["awaiting_user_input"] is False
+    assert _route_collect_profile(next_state) == "send_email_verification"
+
+
 def test_collect_profile_prompts_scope_confirmation_for_wrong_prefix_code() -> None:
     state = AgentState(
         phase="profile",

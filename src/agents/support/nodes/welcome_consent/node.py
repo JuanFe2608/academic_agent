@@ -156,6 +156,7 @@ def _restart_after_out_of_scope(
         "calendar": fresh.calendar.model_dump(),
         "subjects": [],
         "study_profile": fresh.study_profile.model_dump(),
+        "priorities": fresh.priorities.model_dump(),
         "study_plan": fresh.study_plan.model_dump(),
         "replan": fresh.replan.model_dump(),
         "reminders": fresh.reminders.model_dump(),

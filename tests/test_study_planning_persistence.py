@@ -1,0 +1,371 @@
+"""Pruebas de persistencia de materias, prioridades y plan semanal."""
+
+from __future__ import annotations
+
+import json
+from contextlib import contextmanager
+
+from langchain_core.messages import HumanMessage
+
+from agents.support.nodes.build_study_plan.node import build_study_plan
+from agents.support.nodes.collect_priorities.node import collect_priorities
+from agents.support.nodes.persist_study_profile.node import persist_study_profile
+from agents.support.personalization import get_questions
+from agents.support.personalization.config import PersonalizationConfig
+from agents.support.personalization.repository import InMemoryPersonalizationRepository
+from agents.support.personalization.service import PersonalizationService
+from agents.support.planning.persistence_service import StudyPlanningPersistenceService
+from agents.support.planning.repository import (
+    InMemoryStudyPlanningRepository,
+    PostgresStudyPlanningRepository,
+)
+from agents.support.scheduling.models import WeeklyScheduleBlock
+from agents.support.state import AgentState, Event, SubjectItem
+from agents.support.tools.db import (
+    set_personalization_service,
+    set_study_planning_persistence_service,
+)
+
+
+
+def _academic_block(day_of_week: str, title: str) -> WeeklyScheduleBlock:
+    return WeeklyScheduleBlock(
+        block_type="academic",
+        title=title,
+        day_of_week=day_of_week,
+        start_time="08:00",
+        end_time="10:00",
+        source_text=f"{title} {day_of_week} 08:00-10:00",
+    )
+
+
+
+def _study_event(title: str) -> Event:
+    return Event(
+        id=f"evt-{title.lower()}",
+        dia="Lunes",
+        inicio="18:00",
+        fin="18:25",
+        titulo=title,
+        tipo="tentativo",
+        categoria="estudio",
+        origen="study_planner_v1",
+        prioridad="alta",
+        dificultad=4,
+        timezone="America/Bogota",
+    )
+
+
+
+def _completed_profile_payload() -> dict[str, object]:
+    repository = InMemoryPersonalizationRepository()
+    service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=repository,
+    )
+    answers = {
+        question.question_id: answer
+        for question, answer in zip(
+            get_questions(),
+            [3, 3, 2, 2, 1, 1, 0, 3, 1, 1],
+            strict=True,
+        )
+    }
+    payload = service.evaluate_answers(answers).model_dump(mode="python")
+    payload["completed_at"] = "2026-01-01T08:00:00-05:00"
+    return payload
+
+
+
+def test_in_memory_study_planning_repository_versions_priority_and_plan_profiles() -> None:
+    repository = InMemoryStudyPlanningRepository()
+
+    first = repository.replace_student_planning_snapshot(
+        student_id=7,
+        schedule_profile_id=11,
+        personalization_profile_id=21,
+        priorities_state={"status": "collecting", "source": "derived_from_schedule"},
+        subjects=[
+            SubjectItem(
+                nombre="Calculo",
+                prioridad="alta",
+                dificultad=4,
+                urgencia=None,
+                carga_semanal_min=240,
+                origen="derived_from_schedule",
+            )
+        ],
+        study_plan={
+            "plan_events": [_study_event("Estudio Calculo")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+    second = repository.replace_student_planning_snapshot(
+        student_id=7,
+        schedule_profile_id=12,
+        personalization_profile_id=22,
+        priorities_state={"status": "completed", "source": "manual"},
+        subjects=[
+            SubjectItem(
+                nombre="Programacion",
+                prioridad="media",
+                dificultad=3,
+                urgencia="alta",
+                carga_semanal_min=180,
+                origen="manual",
+            )
+        ],
+        study_plan={
+            "plan_events": [_study_event("Estudio Programacion")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+
+    assert first.priority_profile_id == 1
+    assert first.study_plan_profile_id == 1
+    assert second.priority_profile_id == 2
+    assert second.study_plan_profile_id == 2
+    assert repository._priority_history[7][0]["status"] == "superseded"
+    assert repository._study_plan_history[7][0]["status"] == "superseded"
+    assert repository._priority_profiles[7]["status"] == "completed"
+    assert repository._study_plan_profiles[7]["is_current"] is True
+    assert repository._priority_profiles[7]["result_payload"]["persisted_profile_id"] == 2
+    assert repository._priority_profiles[7]["result_payload"]["version_number"] == 2
+    assert repository._study_plan_profiles[7]["result_payload"]["persisted_profile_id"] == 2
+    assert repository._study_plan_profiles[7]["result_payload"]["version_number"] == 2
+
+
+class _FakeResult:
+    def __init__(self, row):
+        self._row = row
+
+    def fetchone(self):
+        return self._row
+
+
+class _FakeConnection:
+    def __init__(self) -> None:
+        self.executed: list[tuple[str, tuple | None]] = []
+        self.commit_called = False
+
+    def execute(self, query, params=None):
+        self.executed.append((query, params))
+        if "FROM study_priority_profiles" in query and "SELECT COALESCE(MAX(version_number)" in query:
+            return _FakeResult({"current_version": 0})
+        if "FROM study_plan_profiles" in query and "SELECT COALESCE(MAX(version_number)" in query:
+            return _FakeResult({"current_version": 0})
+        if "INSERT INTO study_priority_profiles" in query:
+            return _FakeResult({"id": 31, "version_number": 1})
+        if "INSERT INTO study_plan_profiles" in query:
+            return _FakeResult({"id": 41, "version_number": 1})
+        return _FakeResult(None)
+
+    def commit(self) -> None:
+        self.commit_called = True
+
+
+@contextmanager
+def _fake_connect(connection: _FakeConnection):
+    yield connection
+
+
+
+def test_postgres_study_planning_repository_persists_profiles_subjects_and_events() -> None:
+    connection = _FakeConnection()
+    repository = PostgresStudyPlanningRepository("postgresql://ignored")
+    repository._connect = lambda: _fake_connect(connection)
+
+    record = repository.replace_student_planning_snapshot(
+        student_id=9,
+        schedule_profile_id=11,
+        personalization_profile_id=19,
+        priorities_state={"status": "completed", "source": "manual", "prompt_version": "v1"},
+        subjects=[
+            SubjectItem(
+                nombre="Calculo",
+                prioridad="alta",
+                dificultad=4,
+                urgencia="alta",
+                carga_semanal_min=240,
+                origen="manual",
+            ),
+            SubjectItem(
+                nombre="Programacion",
+                prioridad="media",
+                dificultad=3,
+                urgencia="media",
+                carga_semanal_min=180,
+                origen="manual",
+            ),
+        ],
+        study_plan={
+            "plan_events": [_study_event("Estudio Calculo")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+
+    assert record.priority_profile_id == 31
+    assert record.study_plan_profile_id == 41
+    assert connection.commit_called is True
+
+    priority_subject_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_priority_subjects" in query
+    ]
+    plan_event_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_plan_events" in query
+    ]
+    plan_profile_params = [
+        params
+        for query, params in connection.executed
+        if "INSERT INTO study_plan_profiles" in query
+    ]
+    priority_payload_update_params = [
+        params
+        for query, params in connection.executed
+        if "UPDATE study_priority_profiles" in query and "SET result_payload = %s::jsonb" in query
+    ]
+    plan_payload_update_params = [
+        params
+        for query, params in connection.executed
+        if "UPDATE study_plan_profiles" in query and "SET result_payload = %s::jsonb" in query
+    ]
+
+    assert len(priority_subject_params) == 2
+    assert len(plan_event_params) == 1
+    assert plan_profile_params[0][3] == 31
+    assert len(priority_payload_update_params) == 1
+    assert len(plan_payload_update_params) == 1
+    assert priority_payload_update_params[0][1] == 31
+    assert plan_payload_update_params[0][1] == 41
+    assert json.loads(priority_payload_update_params[0][0])["persisted_profile_id"] == 31
+    assert json.loads(priority_payload_update_params[0][0])["version_number"] == 1
+    assert json.loads(plan_payload_update_params[0][0])["persisted_profile_id"] == 41
+    assert json.loads(plan_payload_update_params[0][0])["version_number"] == 1
+
+
+
+def test_persist_study_profile_persists_initial_priorities_and_plan(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    set_personalization_service(personalization_service)
+    set_study_planning_persistence_service(planning_service)
+    try:
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=_completed_profile_payload(),
+        )
+
+        update = persist_study_profile(state)
+
+        assert update["phase"] == "priorities"
+        assert update["priorities"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["version_number"] == 1
+        assert planning_repository._priority_profiles[15]["status"] == "collecting"
+        assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 1
+    finally:
+        set_personalization_service(None)
+        set_study_planning_persistence_service(None)
+
+
+
+def test_collect_priorities_skip_persists_skipped_snapshot() -> None:
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    set_study_planning_persistence_service(planning_service)
+    try:
+        state = AgentState(
+            phase="priorities",
+            awaiting_user_input=True,
+            user_message_count=0,
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "collecting", "source": "derived_from_schedule"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+            },
+            study_plan={
+                "plan_events": [_study_event("Estudio Calculo")],
+                "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+            },
+            messages=[HumanMessage(content="omitir")],
+        )
+
+        update = collect_priorities(state)
+
+        assert update["phase"] == "end"
+        assert update["priorities"]["status"] == "skipped"
+        assert update["priorities"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert planning_repository._priority_profiles[15]["status"] == "skipped"
+    finally:
+        set_study_planning_persistence_service(None)
+
+
+
+def test_build_study_plan_persists_recalculated_snapshot() -> None:
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    set_study_planning_persistence_service(planning_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "completed", "source": "manual"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [
+                    _academic_block("monday", "Calculo"),
+                    _academic_block("wednesday", "Programacion"),
+                ],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=5,
+                    urgencia="alta",
+                    carga_semanal_min=240,
+                    origen="manual",
+                ),
+                SubjectItem(
+                    nombre="Programacion",
+                    prioridad="media",
+                    dificultad=3,
+                    urgencia="media",
+                    carga_semanal_min=180,
+                    origen="manual",
+                ),
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        assert update["phase"] == "end"
+        assert update["priorities"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["version_number"] == 1
+        assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 2
+    finally:
+        set_study_planning_persistence_service(None)

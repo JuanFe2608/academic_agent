@@ -5,10 +5,13 @@ from __future__ import annotations
 import os
 from urllib.parse import quote
 
+from project_env import load_project_env
+
 
 def database_url_from_env() -> str:
     """Construye la URL de PostgreSQL desde variables de entorno."""
 
+    load_project_env()
     explicit_url = os.getenv("ACADEMIC_AGENT_DATABASE_URL", "").strip()
     if explicit_url:
         return explicit_url

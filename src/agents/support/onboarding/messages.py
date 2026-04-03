@@ -36,8 +36,8 @@ VALIDATION_ERROR_MESSAGES = {
     ),
     "age": "Necesito tu edad en numero 😊 Por ejemplo: 18 o 21",
     "institutional_email": (
-        "Ese correo no parece institucional 😕 Por favor ingresa tu correo "
-        "universitario, por ejemplo: usuario@ucatolica.edu.co"
+        "Ese correo no parece valido para este entorno 😕 Por favor ingresa "
+        "un correo permitido, por ejemplo: {email_examples}"
     ),
     "verification_code": (
         "Ese codigo no coincide o ya vencio 😕 Revisalo de nuevo o pide que "
@@ -81,9 +81,9 @@ def build_field_prompt(
 
     if field == "institutional_email":
         return (
-            "Ahora necesito tu correo institucional 📧 Por favor escribelo "
-            "completo. Ejemplo: "
-            f"tuusuario@{config.institutional_email_domain}"
+            "Ahora necesito tu correo institucional o de pruebas 📧 "
+            "Por favor escribelo completo. Ejemplo: "
+            f"{_email_examples(config)}"
         )
 
     if field == "supported_program":
@@ -117,6 +117,10 @@ def build_prompt_with_error(
     """Agrega el mensaje de error al prompt del campo."""
 
     parts = [VALIDATION_ERROR_MESSAGES[field], build_field_prompt(field, config, first_name)]
+    if field == "institutional_email":
+        parts[0] = VALIDATION_ERROR_MESSAGES[field].format(
+            email_examples=_email_examples(config)
+        )
     if extra_note:
         parts.append(extra_note)
     return "\n".join(part for part in parts if part)
@@ -187,3 +191,13 @@ def build_verification_error_prompt(
         parts.append(detail)
     parts.append(build_verification_prompt(config))
     return "\n".join(parts)
+
+
+def _email_examples(config: OnboardingConfig) -> str:
+    domains = tuple(config.allowed_email_domains or (config.institutional_email_domain,))
+    examples = [f"usuario@{domain}" for domain in domains if domain]
+    if not examples:
+        return f"usuario@{config.institutional_email_domain}"
+    if len(examples) == 1:
+        return examples[0]
+    return " o ".join(examples[:2])
