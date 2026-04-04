@@ -21,10 +21,10 @@ __all__ = [
 ]
 
 _MODULE_BY_NAME = {
-    "NormalizedScheduleResult": "agents.support.scheduling.models",
-    "ScheduleConflict": "agents.support.scheduling.models",
-    "ScheduleFlowState": "agents.support.scheduling.models",
-    "WeeklyScheduleBlock": "agents.support.scheduling.models",
+    "NormalizedScheduleResult": "services.scheduling.models",
+    "ScheduleConflict": "services.scheduling.models",
+    "ScheduleFlowState": "services.scheduling.models",
+    "WeeklyScheduleBlock": "services.scheduling.models",
     "build_conflict_message": "agents.support.scheduling.formatter",
     "build_section_summary": "agents.support.scheduling.formatter",
     "build_schedule_summary": "agents.support.scheduling.formatter",

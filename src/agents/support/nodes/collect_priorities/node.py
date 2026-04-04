@@ -2,8 +2,12 @@
 
 from __future__ import annotations
 
-from agents.support.planning.persistence_support import persist_planning_snapshot_for_update
-from agents.support.priorities.priority_capture_service import handle_priorities_turn
+from agents.support.flows.planning.persistence_support import (
+    persist_planning_snapshot_for_update,
+)
+from agents.support.flows.priorities.priority_capture_service import (
+    handle_priorities_turn,
+)
 from agents.support.state import AgentState
 
 

@@ -1,7 +1,7 @@
 """Compatibilidad de prompts del perfil."""
 
-from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import build_field_prompt
+from services.onboarding import load_onboarding_config
 
 _CONFIG = load_onboarding_config()
 

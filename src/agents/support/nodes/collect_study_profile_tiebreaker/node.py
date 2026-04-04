@@ -2,18 +2,15 @@
 
 from __future__ import annotations
 
+from agents.support.dependencies import get_personalization_service
 from agents.support.nodes.utils import append_message, detect_new_input
-from agents.support.personalization import (
+from agents.support.state import AgentState
+from services.personalization import (
     get_tiebreaker_question_by_index,
     get_tiebreaker_question_count,
     parse_choice_answer,
 )
-from agents.support.personalization.runtime import (
-    coerce_int_answer_map,
-    current_timestamp,
-)
-from agents.support.state import AgentState
-from agents.support.tools.db import get_personalization_service
+from services.personalization.runtime import coerce_int_answer_map, current_timestamp
 
 from .prompt import build_tiebreaker_prompt
 

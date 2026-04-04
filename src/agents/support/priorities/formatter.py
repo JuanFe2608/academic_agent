@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.state import SubjectItem
+from schemas.planning import SubjectItem
 
 
 def build_priorities_prompt(subjects: list[SubjectItem], *, source: str) -> str:

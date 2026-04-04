@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from agents.support.scheduling.schedule_draft_service import build_schedule_draft_turn
-from agents.support.scheduling.models import WeeklyScheduleBlock
+from agents.support.flows.scheduling.schedule_draft_service import build_schedule_draft_turn
 from agents.support.state import AgentState
+from services.scheduling import WeeklyScheduleBlock
 
 
 def _academic_block() -> WeeklyScheduleBlock:

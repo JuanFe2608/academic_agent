@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from agents.support.scheduling.models import ScheduleConflict, WeeklyScheduleBlock
 from agents.support.scheduling.state_helpers import (
     append_schedule_input_text,
     replace_schedule_input_text,
@@ -10,6 +9,7 @@ from agents.support.scheduling.state_helpers import (
     serialize_schedule_blocks_to_raw_inputs,
     update_schedule_flow_state,
 )
+from services.scheduling import ScheduleConflict, WeeklyScheduleBlock
 
 
 def _academic_block() -> WeeklyScheduleBlock:

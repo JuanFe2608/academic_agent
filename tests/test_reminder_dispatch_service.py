@@ -4,17 +4,16 @@ from __future__ import annotations
 
 from datetime import datetime as real_datetime
 
-import agents.support.planning.materialization_service as materialization_module
-import agents.support.reminders_service as reminders_module
-from agents.support.planning.instances_repository import InMemoryStudyPlanInstancesRepository
-from agents.support.planning.materialization_service import StudyPlanMaterializationService
-from agents.support.reminders_dispatcher import ReminderDispatchRunner
-from agents.support.reminders_repository import (
+import services.planning.materialization_service as materialization_module
+import services.reminders.service as reminders_module
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from repositories.reminders.repository import (
     InMemoryRemindersRepository,
     ReminderDispatchSeed,
 )
-from agents.support.reminders_service import StudyPlanRemindersService
-from agents.support.state import Event
+from schemas.scheduling import Event
+from services.planning import StudyPlanMaterializationService
+from services.reminders import ReminderDispatchRunner, StudyPlanRemindersService
 
 
 class _FrozenDateTime(real_datetime):

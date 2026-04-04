@@ -4,17 +4,19 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
+from agents.support.dependencies import set_personalization_service
 from agents.support.agent import _route_collect_priorities, _route_persist_study_profile
 from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.collect_priorities.node import collect_priorities
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
-from agents.support.personalization import get_questions
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import InMemoryPersonalizationRepository
-from agents.support.personalization.service import PersonalizationService
-from agents.support.scheduling.models import WeeklyScheduleBlock
 from agents.support.state import AgentState
-from agents.support.tools.db import set_personalization_service
+from repositories.personalization.repository import InMemoryPersonalizationRepository
+from services.personalization import (
+    PersonalizationConfig,
+    PersonalizationService,
+    get_questions,
+)
+from services.scheduling import WeeklyScheduleBlock
 
 
 def _academic_block(day_of_week: str, title: str) -> WeeklyScheduleBlock:

@@ -7,24 +7,28 @@ from contextlib import contextmanager
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.nodes.build_study_plan.node import build_study_plan
-from agents.support.nodes.collect_priorities.node import collect_priorities
-from agents.support.nodes.persist_study_profile.node import persist_study_profile
-from agents.support.personalization import get_questions
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import InMemoryPersonalizationRepository
-from agents.support.personalization.service import PersonalizationService
-from agents.support.planning.persistence_service import StudyPlanningPersistenceService
-from agents.support.planning.repository import (
-    InMemoryStudyPlanningRepository,
-    PostgresStudyPlanningRepository,
-)
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.state import AgentState, Event, SubjectItem
-from agents.support.tools.db import (
+from agents.support.dependencies import (
     set_personalization_service,
     set_study_planning_persistence_service,
 )
+from agents.support.nodes.build_study_plan.node import build_study_plan
+from agents.support.nodes.collect_priorities.node import collect_priorities
+from agents.support.nodes.persist_study_profile.node import persist_study_profile
+from repositories.personalization.repository import InMemoryPersonalizationRepository
+from repositories.planning.repository import (
+    InMemoryStudyPlanningRepository,
+    PostgresStudyPlanningRepository,
+)
+from schemas.planning import SubjectItem
+from schemas.scheduling import Event
+from services.personalization import (
+    PersonalizationConfig,
+    PersonalizationService,
+    get_questions,
+)
+from agents.support.state import AgentState
+from services.planning import StudyPlanningPersistenceService
+from services.scheduling import WeeklyScheduleBlock
 
 
 

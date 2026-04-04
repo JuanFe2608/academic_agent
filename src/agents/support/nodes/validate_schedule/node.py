@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from agents.support.nodes.utils import detect_new_input
-from agents.support.scheduling.schedule_review_service import (
+from agents.support.flows.scheduling.schedule_review_service import (
     handle_schedule_review_turn,
 )
 from agents.support.state import AgentState

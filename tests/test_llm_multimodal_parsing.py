@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import agents.support.tools.llm as llm_tool
+import integrations.ai._llm_impl as llm_tool
 
 
 class _DummyResponse:

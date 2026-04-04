@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from .constants import DAY_LABELS, DAY_ORDER, ScheduleBlockType
-from .models import (
+from services.scheduling.constants import DAY_LABELS, DAY_ORDER, ScheduleBlockType
+from services.scheduling.models import (
     ScheduleConflict,
     WeeklyScheduleBlock,
     ensure_schedule_conflict,

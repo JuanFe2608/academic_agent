@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.scheduling.schedule_parsing_service import (
+from agents.support.flows.scheduling.schedule_parsing_service import (
     ScheduleParsingPrompts,
     handle_schedule_parsing_turn,
 )

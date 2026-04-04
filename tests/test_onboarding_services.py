@@ -2,14 +2,12 @@
 
 from __future__ import annotations
 
-from agents.support.onboarding.config import OnboardingConfig
-from agents.support.onboarding.email_sender import InMemoryEmailSender
-from agents.support.onboarding.repository import InMemoryOnboardingRepository
-from agents.support.onboarding.service import OnboardingService
 from agents.support.onboarding.validators import (
     validate_average_grade,
     validate_institutional_email,
 )
+from repositories.onboarding.repository import InMemoryOnboardingRepository
+from services.onboarding import InMemoryEmailSender, OnboardingConfig, OnboardingService
 
 
 def test_validate_institutional_email_normalizes_to_lowercase() -> None:

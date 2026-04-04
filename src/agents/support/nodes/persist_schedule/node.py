@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from agents.support.dependencies import get_schedule_service
 from agents.support.nodes.utils import append_message
-from agents.support.tools.db import get_schedule_service
 from agents.support.state import AgentState
 
 

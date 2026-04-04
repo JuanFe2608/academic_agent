@@ -6,7 +6,7 @@ import re
 import unicodedata
 from dataclasses import dataclass
 
-from agents.support.state import SubjectItem
+from schemas.planning import SubjectItem
 
 
 @dataclass(frozen=True)

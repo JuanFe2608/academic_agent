@@ -4,16 +4,18 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.scheduling.schedule_capture_service import (
+from agents.support.flows.scheduling.schedule_capture_service import (
     ScheduleCapturePrompts,
     handle_schedule_capture_turn,
 )
-from agents.support.scheduling.schedule_review_service import (
+from agents.support.flows.scheduling.schedule_review_service import (
     apply_schedule_correction_turn,
     handle_schedule_review_turn,
 )
-from agents.support.state import AgentState, PendingScheduleItem, StudentProfile
+from agents.support.state import AgentState
+from schemas.onboarding import StudentProfile
+from schemas.scheduling import PendingScheduleItem
+from services.scheduling import WeeklyScheduleBlock
 
 
 def _capture_prompts() -> ScheduleCapturePrompts:

@@ -4,8 +4,8 @@ from __future__ import annotations
 
 from agents.support.nodes.render_schedule_preview.node import render_schedule_preview
 from agents.support.scheduling.formatter import build_schedule_summary
-from agents.support.scheduling.models import ScheduleConflict, WeeklyScheduleBlock
 from agents.support.state import AgentState
+from services.scheduling import ScheduleConflict, WeeklyScheduleBlock
 
 
 def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp_path) -> None:

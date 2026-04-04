@@ -6,17 +6,13 @@ import re
 
 from agents.support.nodes.utils import normalize_text
 from agents.support.scheduling.titles import normalize_schedule_title
-from agents.support.state import (
-    DAY_ORDER,
-    ExtracurricularItem,
-    PendingExtracurricularItem,
-    normalize_day,
-)
-from agents.support.tools.llm import llm_normalize_extracurricular_items
-from agents.support.tools.schedule_parser import (
+from services.scheduling.ai_support import llm_normalize_extracurricular_items
+from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     is_ambiguous_time_range,
 )
+from schemas.scheduling import ExtracurricularItem, PendingExtracurricularItem
+from services.scheduling.validation import DAY_ORDER, normalize_day
 
 _DAY_MARKER_PATTERN = re.compile(
     r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabados|sabado|sábado|domingos|domingo|lun|mar|mie|jue|vie|sab|dom|todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"

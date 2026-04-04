@@ -2,12 +2,12 @@
 
 import pytest
 
-from agents.support.tools.schedule_parser import (
+from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
-from agents.support.state import normalize_day
+from services.scheduling.validation import normalize_day
 
 
 @pytest.mark.parametrize(

@@ -4,25 +4,28 @@ from __future__ import annotations
 
 from datetime import datetime as real_datetime
 
-import agents.support.planning.materialization_service as materialization_module
-from auth.microsoft_auth import MicrosoftGraphStateTokenStore, MicrosoftOAuthClient, MicrosoftOAuthConfig
-from agents.support.planning.instances_repository import InMemoryStudyPlanInstancesRepository
-from agents.support.planning.materialization_service import StudyPlanMaterializationService
-from agents.support.planning.tracking_repository import InMemoryStudySessionTrackingRepository
-from agents.support.planning.tracking_service import StudySessionTrackingService
-from agents.support.state import Event
-from agents.support.tools.microsoft_graph_clients import (
+from integrations.microsoft_graph.auth_client import (
+    MicrosoftGraphStateTokenStore,
+    MicrosoftOAuthClient,
+    MicrosoftOAuthConfig,
+)
+from integrations.microsoft_graph.models import (
     MicrosoftTodoTaskList,
     MicrosoftTodoTaskUpsert,
     UpsertedMicrosoftTodoTask,
 )
-from agents.support.tools.microsoft_graph_state_repository import (
+import services.planning.materialization_service as materialization_module
+from repositories.microsoft_graph.state_repository import (
     InMemoryMicrosoftGraphStateRepository,
 )
-from agents.support.tools.microsoft_graph_sync_repository import (
+from repositories.microsoft_graph.sync_repository import (
     InMemoryMicrosoftGraphSyncRepository,
 )
-from agents.support.tools.microsoft_todo import MicrosoftTodoSyncService
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from repositories.planning.tracking_repository import InMemoryStudySessionTrackingRepository
+from schemas.scheduling import Event
+from services.planning import StudyPlanMaterializationService, StudySessionTrackingService
+from services.sync.microsoft_todo_sync_service import MicrosoftTodoSyncService
 
 
 class _FrozenDateTime(real_datetime):

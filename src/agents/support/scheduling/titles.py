@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 
-from .constants import ScheduleBlockType
+from services.scheduling.constants import ScheduleBlockType
 
 _STOPWORDS = {
     "a",

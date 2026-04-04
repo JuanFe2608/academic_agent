@@ -6,13 +6,14 @@ from datetime import datetime
 from PIL import Image
 from PIL import ImageDraw
 
-from agents.support.tools.event_labels import normalize_activity_label
-from agents.support.tools.schedule_renderer import (
+from agents.support.scheduling.event_labels import normalize_activity_label
+from agents.support.scheduling.schedule_renderer import (
     _load_fonts,
     _wrap_text,
     render_week_schedule,
 )
-from agents.support.state import Event, new_event_id
+from schemas.scheduling import Event
+from services.scheduling.validation import new_event_id
 
 
 def test_render_week_schedule(tmp_path):

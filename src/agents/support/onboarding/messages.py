@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.onboarding.config import OnboardingConfig
+from services.onboarding import OnboardingConfig
 
 PROFILE_FIELD_ORDER = (
     "full_name",

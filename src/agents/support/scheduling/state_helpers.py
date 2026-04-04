@@ -10,12 +10,12 @@ from __future__ import annotations
 from typing import Literal
 
 from agents.support.scheduling.contextual_parser import serialize_blocks_for_schedule_type
-from agents.support.scheduling.models import (
+from services.scheduling.models import (
     ScheduleFlowState,
     ensure_schedule_conflict,
     ensure_weekly_block,
 )
-from agents.support.state import RawInputs
+from schemas.scheduling import RawInputs
 
 FixedScheduleTarget = Literal["academic", "work"]
 

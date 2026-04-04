@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+from agents.support.flows.planning.persistence_support import (
+    persist_planning_snapshot_for_update,
+)
 from agents.support.nodes.utils import append_message
-from agents.support.planning import study_plan_state_to_update, sync_subjects_and_study_plan
 from agents.support.planning.formatter import build_study_plan_summary
-from agents.support.planning.persistence_support import persist_planning_snapshot_for_update
-from agents.support.priorities.state_helpers import subject_items_to_update
 from agents.support.scheduling.state_helpers import ensure_schedule_flow_state
 from agents.support.state import AgentState
+from services.planning import study_plan_state_to_update, sync_subjects_and_study_plan
+from services.priorities import subject_items_to_update
 
 
 def build_study_plan(state: AgentState) -> dict:

@@ -6,6 +6,6 @@
     },
     "env": ".env",
     "checkpointer": {
-        "path": "./src/agents/support/tools/langgraph_checkpointer.py:create_checkpointer"
+        "path": "./src/integrations/langgraph/checkpointer.py:create_checkpointer"
     }
 }

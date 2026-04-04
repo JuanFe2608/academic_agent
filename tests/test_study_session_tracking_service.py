@@ -4,12 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime as real_datetime
 
-import agents.support.planning.materialization_service as materialization_module
-from agents.support.planning.instances_repository import InMemoryStudyPlanInstancesRepository
-from agents.support.planning.materialization_service import StudyPlanMaterializationService
-from agents.support.planning.tracking_repository import InMemoryStudySessionTrackingRepository
-from agents.support.planning.tracking_service import StudySessionTrackingService
-from agents.support.state import Event
+import services.planning.materialization_service as materialization_module
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from repositories.planning.tracking_repository import InMemoryStudySessionTrackingRepository
+from schemas.scheduling import Event
+from services.planning import StudyPlanMaterializationService, StudySessionTrackingService
 
 
 class _FrozenDateTime(real_datetime):

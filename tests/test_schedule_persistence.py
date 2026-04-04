@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
+from agents.support.dependencies import set_schedule_service
 from agents.support.nodes.persist_schedule.node import persist_schedule
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.scheduling.repository import InMemoryScheduleRepository
-from agents.support.scheduling.service import ScheduleService
-from agents.support.tools.db import set_schedule_service
 from agents.support.state import AgentState
+from repositories.scheduling.repository import InMemoryScheduleRepository
+from services.scheduling import ScheduleService, WeeklyScheduleBlock
 
 
 def _block() -> WeeklyScheduleBlock:

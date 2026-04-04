@@ -7,11 +7,15 @@ from pydantic import BaseModel, Field
 from agents.support.nodes.collect_extracurricular_details.parsing import (
     parse_extracurricular_items_with_context,
 )
-from agents.support.state import ExtracurricularItem, PendingExtracurricularItem, PendingScheduleItem
+from schemas.scheduling import (
+    ExtracurricularItem,
+    PendingExtracurricularItem,
+    PendingScheduleItem,
+)
+from services.scheduling.constants import ScheduleBlockType
+from services.scheduling.models import WeeklyScheduleBlock
 
-from .constants import ScheduleBlockType
 from .contextual_parser import parse_schedule_section_with_context
-from .models import WeeklyScheduleBlock
 from .normalizer import normalize_schedule_section, replace_section_blocks
 
 

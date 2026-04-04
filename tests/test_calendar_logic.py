@@ -4,12 +4,13 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from agents.support.state import Event, new_event_id
-from agents.support.tools.calendar_logic import (
+from agents.support.scheduling.calendar_logic import (
     build_current_week_slots,
     format_week_title,
     resolve_weekly_events_to_current_week,
 )
+from schemas.scheduling import Event
+from services.scheduling.validation import new_event_id
 
 
 def test_build_current_week_slots_uses_current_week_dates() -> None:

@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import re
 
-from agents.support.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
 from agents.support.scheduling.normalizer import (
     _extract_days_from_text,
     _extract_time_range,
@@ -13,13 +12,15 @@ from agents.support.scheduling.normalizer import (
     _to_day_key,
 )
 from agents.support.scheduling.titles import normalize_schedule_title
-from agents.support.state import PendingScheduleItem, ScheduleContextType, normalize_day
-from agents.support.tools.schedule_parser import (
-    _is_subject_line,
-    _normalize_lines,
+from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
+from services.scheduling.text_parser import (
     is_ambiguous_time_range,
     parse_work_schedule_text,
 )
+from services.scheduling.text_parser.academic import is_subject_line as _is_subject_line
+from services.scheduling.text_parser._common import normalize_lines as _normalize_lines
+from schemas.scheduling import PendingScheduleItem, ScheduleContextType
+from services.scheduling.validation import normalize_day
 
 _TIME_RANGE_PATTERN = re.compile(
     r"(?:de|desde)?\s*(?:las\s+)?\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?\s*"

@@ -2,19 +2,18 @@
 
 from __future__ import annotations
 
+from bootstrap.errors import RepositoryConfigurationError
+
+from agents.support.dependencies import get_onboarding_service
 from agents.support.nodes.utils import append_message, copy_onboarding_state
-from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_field_prompt,
     build_verification_prompt,
     build_verification_sent_prompt,
 )
-from agents.support.onboarding.repository import (
-    OnboardingRepositoryError,
-    RepositoryConfigurationError,
-)
 from agents.support.state import AgentState
-from agents.support.tools.db import get_onboarding_service
+from services.onboarding import OnboardingRepositoryError
+from services.onboarding import load_onboarding_config
 
 
 def send_email_verification(state: AgentState) -> dict:

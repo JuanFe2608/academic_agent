@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agents.support.personalization.scoring import (
+from services.personalization.scoring import (
     assess_tiebreaker_need,
     evaluate_questionnaire,
     rank_techniques,

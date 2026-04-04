@@ -8,13 +8,13 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-from agents.support.tools.llm import (
+from integrations.ai import (
     get_last_llm_error,
     llm_extract_schedule_from_image,
     llm_extract_text_from_image,
     llm_normalize_schedule,
 )
-from agents.support.tools.schedule_parser import (
+from services.scheduling.text_parser import (
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )

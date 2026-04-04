@@ -4,27 +4,31 @@ from __future__ import annotations
 
 from datetime import datetime as real_datetime
 
-import agents.support.planning.materialization_service as materialization_module
-import agents.support.reminders_service as reminders_module
-from agents.support.nodes.persist_study_profile.node import persist_study_profile
-from agents.support.personalization import get_questions
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import InMemoryPersonalizationRepository
-from agents.support.personalization.service import PersonalizationService
-from agents.support.planning.instances_repository import InMemoryStudyPlanInstancesRepository
-from agents.support.planning.materialization_service import StudyPlanMaterializationService
-from agents.support.planning.persistence_service import StudyPlanningPersistenceService
-from agents.support.planning.repository import InMemoryStudyPlanningRepository
-from agents.support.reminders_repository import InMemoryRemindersRepository
-from agents.support.reminders_service import StudyPlanRemindersService
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.tools.db import (
+import services.planning.materialization_service as materialization_module
+import services.reminders.service as reminders_module
+from agents.support.dependencies import (
     set_personalization_service,
     set_reminders_service,
     set_study_plan_materialization_service,
     set_study_planning_persistence_service,
 )
+from agents.support.nodes.persist_study_profile.node import persist_study_profile
 from agents.support.state import AgentState
+from repositories.personalization.repository import InMemoryPersonalizationRepository
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from repositories.planning.repository import InMemoryStudyPlanningRepository
+from repositories.reminders.repository import InMemoryRemindersRepository
+from services.personalization import (
+    PersonalizationConfig,
+    PersonalizationService,
+    get_questions,
+)
+from services.planning import (
+    StudyPlanMaterializationService,
+    StudyPlanningPersistenceService,
+)
+from services.reminders import StudyPlanRemindersService
+from services.scheduling import WeeklyScheduleBlock
 
 
 class _FrozenDateTime(real_datetime):

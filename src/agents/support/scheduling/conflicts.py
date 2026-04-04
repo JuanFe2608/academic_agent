@@ -4,10 +4,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 
-from agents.support.state import normalize_time
-
-from .constants import DAY_ORDER
-from .models import ScheduleConflict, WeeklyScheduleBlock, ensure_weekly_block
+from services.scheduling.constants import DAY_ORDER
+from services.scheduling.models import ScheduleConflict, WeeklyScheduleBlock, ensure_weekly_block
+from services.scheduling.validation import normalize_time
 
 
 def detect_schedule_conflicts(

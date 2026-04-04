@@ -7,7 +7,7 @@ from agents.support.nodes.request_schedules.prompt import (
     PROMPT_MORE_ACADEMIC,
     PROMPT_MORE_WORK,
 )
-from agents.support.scheduling.schedule_parsing_service import (
+from agents.support.flows.scheduling.schedule_parsing_service import (
     ScheduleParsingPrompts,
     handle_schedule_parsing_turn,
 )

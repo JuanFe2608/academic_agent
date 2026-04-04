@@ -7,7 +7,7 @@ import unicodedata
 from typing import Any, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
-from agents.support.tools.schedule_parser import is_ambiguous_time_range
+from services.scheduling.text_parser import is_ambiguous_time_range
 
 _YES_TOKENS = {
     "si",

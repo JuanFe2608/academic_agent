@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from auth.microsoft_auth import build_microsoft_oauth_client_from_env
+from integrations.microsoft_graph.auth_client import build_microsoft_oauth_client_from_env
 
 
 def main() -> int:

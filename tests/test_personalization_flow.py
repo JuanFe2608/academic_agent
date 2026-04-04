@@ -4,6 +4,10 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
+from agents.support.dependencies import (
+    set_personalization_service,
+    set_schedule_service,
+)
 from agents.support.agent import _route_after_persist_schedule
 from agents.support.nodes.collect_study_profile.node import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker.node import (
@@ -11,17 +15,11 @@ from agents.support.nodes.collect_study_profile_tiebreaker.node import (
 )
 from agents.support.nodes.persist_schedule.node import persist_schedule
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import InMemoryPersonalizationRepository
-from agents.support.personalization.service import PersonalizationService
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.scheduling.repository import InMemoryScheduleRepository
-from agents.support.scheduling.service import ScheduleService
 from agents.support.state import AgentState
-from agents.support.tools.db import (
-    set_personalization_service,
-    set_schedule_service,
-)
+from repositories.personalization.repository import InMemoryPersonalizationRepository
+from repositories.scheduling.repository import InMemoryScheduleRepository
+from services.personalization import PersonalizationConfig, PersonalizationService
+from services.scheduling import ScheduleService, WeeklyScheduleBlock
 
 
 def _block() -> WeeklyScheduleBlock:
@@ -56,6 +54,7 @@ def _add_user_message(state: AgentState, text: str) -> AgentState:
 
 
 def test_personalization_feature_flag_off_keeps_current_behavior(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", raising=False)
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     try:
@@ -75,6 +74,7 @@ def test_personalization_feature_flag_off_keeps_current_behavior(monkeypatch) ->
 
 
 def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     set_personalization_service(
@@ -106,6 +106,7 @@ def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypat
 
 
 def test_collect_study_profile_reprompts_on_invalid_answer(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_personalization_service(
         PersonalizationService(
@@ -132,6 +133,7 @@ def test_collect_study_profile_reprompts_on_invalid_answer(monkeypatch) -> None:
 
 
 def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     personalization_repository = InMemoryPersonalizationRepository()
@@ -199,6 +201,7 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
 
 
 def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     personalization_repository = InMemoryPersonalizationRepository()

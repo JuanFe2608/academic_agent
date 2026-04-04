@@ -8,17 +8,24 @@ from typing import Callable
 from agents.support.nodes.collect_extracurricular_details.parsing import (
     parse_extracurricular_items,
 )
-from agents.support.state import normalize_day, normalize_time
-from agents.support.tools.llm import llm_extract_schedule_blocks, llm_normalize_schedule
-from agents.support.tools.schedule_parser import (
+from services.scheduling.ai_support import (
+    llm_extract_schedule_blocks,
+    llm_normalize_schedule,
+)
+from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     is_ambiguous_time_range,
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
+from services.scheduling.constants import DAY_ORDER, SPANISH_TO_ENGLISH, ScheduleBlockType
+from services.scheduling.models import (
+    NormalizedScheduleResult,
+    WeeklyScheduleBlock,
+    ensure_weekly_block,
+)
+from services.scheduling.validation import normalize_day, normalize_time
 
-from .constants import DAY_ORDER, ScheduleBlockType, SPANISH_TO_ENGLISH
-from .models import NormalizedScheduleResult, WeeklyScheduleBlock, ensure_weekly_block
 from .titles import normalize_schedule_title
 
 _DAY_TOKEN_PATTERN = (

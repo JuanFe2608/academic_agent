@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from agents.support.state import Event, new_event_id
-from agents.support.tools.schedule_renderer import render_week_schedule
-
-from .constants import BLOCK_TYPE_TO_EVENT_CATEGORY, DAY_LABELS
-from .models import WeeklyScheduleBlock, ensure_weekly_block
+from agents.support.scheduling.schedule_renderer import render_week_schedule
+from schemas.scheduling import Event
+from services.scheduling.constants import BLOCK_TYPE_TO_EVENT_CATEGORY, DAY_LABELS
+from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
+from services.scheduling.validation import new_event_id
 
 
 def blocks_to_events(blocks: list[WeeklyScheduleBlock]) -> list[Event]:

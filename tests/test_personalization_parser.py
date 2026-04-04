@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.personalization.parser import (
+from services.personalization.parser import (
     likert_label,
     parse_choice_answer,
     parse_likert_answer,

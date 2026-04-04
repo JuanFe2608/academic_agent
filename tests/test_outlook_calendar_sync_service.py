@@ -4,23 +4,27 @@ from __future__ import annotations
 
 from datetime import datetime as real_datetime
 
-import agents.support.planning.materialization_service as materialization_module
-from auth.microsoft_auth import MicrosoftGraphStateTokenStore, MicrosoftOAuthClient, MicrosoftOAuthConfig
-from agents.support.planning.instances_repository import InMemoryStudyPlanInstancesRepository
-from agents.support.planning.materialization_service import StudyPlanMaterializationService
-from agents.support.state import Event
-from agents.support.tools.calendar_outlook import OutlookCalendarSyncService
-from agents.support.tools.microsoft_graph_clients import (
+from integrations.microsoft_graph.auth_client import (
+    MicrosoftGraphStateTokenStore,
+    MicrosoftOAuthClient,
+    MicrosoftOAuthConfig,
+)
+from integrations.microsoft_graph.models import (
     OutlookCalendarEventUpsert,
     UpsertedOutlookCalendarEvent,
 )
-from agents.support.tools.microsoft_graph_state_repository import (
+import services.planning.materialization_service as materialization_module
+from repositories.microsoft_graph.state_repository import (
     InMemoryMicrosoftGraphStateRepository,
     OutlookCalendarEventLinkRecord,
 )
-from agents.support.tools.microsoft_graph_sync_repository import (
+from repositories.microsoft_graph.sync_repository import (
     InMemoryMicrosoftGraphSyncRepository,
 )
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from schemas.scheduling import Event
+from services.planning import StudyPlanMaterializationService
+from services.sync.outlook_calendar_sync_service import OutlookCalendarSyncService
 
 
 class _FrozenDateTime(real_datetime):

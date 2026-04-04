@@ -2,16 +2,20 @@
 
 from __future__ import annotations
 
+from agents.support.dependencies import set_personalization_service
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
-from agents.support.personalization import get_questions
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import InMemoryPersonalizationRepository
-from agents.support.personalization.service import PersonalizationService
-from agents.support.planning import build_initial_study_plan
-from agents.support.scheduling.constants import DAY_LABELS, DAY_ORDER
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.state import AgentState, SubjectItem, validate_event
-from agents.support.tools.db import set_personalization_service
+from agents.support.state import AgentState
+from repositories.personalization.repository import InMemoryPersonalizationRepository
+from schemas.planning import SubjectItem
+from services.personalization import (
+    PersonalizationConfig,
+    PersonalizationService,
+    get_questions,
+)
+from services.planning import build_initial_study_plan
+from services.scheduling import WeeklyScheduleBlock
+from services.scheduling.constants import DAY_LABELS, DAY_ORDER
+from services.scheduling.validation import validate_event
 
 
 def _academic_block(
@@ -174,7 +178,10 @@ def test_build_initial_study_plan_spreads_sessions_for_spaced_repetition() -> No
     assert plan.rules["spacing_days"] == 2
 
 
-def test_persist_study_profile_generates_study_plan_without_breaking_flow() -> None:
+def test_persist_study_profile_generates_study_plan_without_breaking_flow(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),

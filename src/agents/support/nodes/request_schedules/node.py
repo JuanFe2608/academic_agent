@@ -8,7 +8,7 @@ de aplicación de scheduling.
 from __future__ import annotations
 
 from agents.support.nodes.utils import detect_new_input
-from agents.support.scheduling.schedule_capture_service import (
+from agents.support.flows.scheduling.schedule_capture_service import (
     ScheduleCapturePrompts,
     handle_schedule_capture_turn,
 )

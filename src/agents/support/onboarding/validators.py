@@ -7,8 +7,8 @@ import unicodedata
 from dataclasses import dataclass
 from typing import Any
 
-from agents.support.onboarding.config import OnboardingConfig
 from agents.support.onboarding.messages import PROFILE_FIELD_ORDER
+from services.onboarding import OnboardingConfig
 
 _EMAIL_PATTERN = re.compile(
     r"^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@"

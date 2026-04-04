@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from agents.support.priorities import resolve_prioritized_subjects
-from agents.support.scheduling.models import WeeklyScheduleBlock
-from agents.support.state import SubjectItem
+from schemas.planning import SubjectItem
+from services.priorities import resolve_prioritized_subjects
+from services.scheduling import WeeklyScheduleBlock
 
 
 def _academic_block(

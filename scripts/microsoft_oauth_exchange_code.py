@@ -5,7 +5,7 @@ from __future__ import annotations
 import argparse
 from dataclasses import replace
 
-from auth.microsoft_auth import (
+from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
     build_microsoft_oauth_client_from_env,
 )

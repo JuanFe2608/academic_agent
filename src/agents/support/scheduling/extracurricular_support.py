@@ -7,10 +7,7 @@ por el flujo de captura de actividades extracurriculares.
 from __future__ import annotations
 
 from agents.support.nodes.utils import normalize_text
-from agents.support.state import (
-    ExtracurricularItem,
-    PendingExtracurricularItem,
-)
+from schemas.scheduling import ExtracurricularItem, PendingExtracurricularItem
 
 
 def coerce_extracurricular_pending_items(

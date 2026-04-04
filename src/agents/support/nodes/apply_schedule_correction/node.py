@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.scheduling.schedule_review_service import (
+from agents.support.flows.scheduling.schedule_review_service import (
     apply_schedule_correction_turn,
 )
 from agents.support.state import AgentState

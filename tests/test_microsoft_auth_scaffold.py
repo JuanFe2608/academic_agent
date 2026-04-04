@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from auth.microsoft_auth import (
+from integrations.microsoft_graph.auth_client import (
     InMemoryMicrosoftTokenStore,
     MicrosoftOAuthClient,
     MicrosoftOAuthConfig,

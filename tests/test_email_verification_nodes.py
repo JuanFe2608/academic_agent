@@ -4,14 +4,12 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
+from agents.support.dependencies import set_onboarding_service
 from agents.support.nodes.send_email_verification.node import send_email_verification
 from agents.support.nodes.verify_email_code.node import verify_email_code
-from agents.support.onboarding.config import OnboardingConfig
-from agents.support.onboarding.email_sender import InMemoryEmailSender
-from agents.support.onboarding.repository import InMemoryOnboardingRepository
-from agents.support.onboarding.service import OnboardingService
 from agents.support.state import AgentState
-from agents.support.tools.db import set_onboarding_service
+from repositories.onboarding.repository import InMemoryOnboardingRepository
+from services.onboarding import InMemoryEmailSender, OnboardingConfig, OnboardingService
 
 
 def test_email_verification_nodes_send_and_verify() -> None:

@@ -2,23 +2,22 @@
 
 from __future__ import annotations
 
+from bootstrap.errors import RepositoryConfigurationError
+
+from agents.support.dependencies import get_onboarding_service
 from agents.support.nodes.utils import (
     append_message,
     copy_onboarding_state,
     detect_new_input,
 )
-from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import (
     build_verification_error_prompt,
     build_verification_prompt,
 )
-from agents.support.onboarding.repository import (
-    OnboardingRepositoryError,
-    RepositoryConfigurationError,
-)
 from agents.support.onboarding.validators import normalize_text, validate_verification_code
 from agents.support.state import AgentState
-from agents.support.tools.db import get_onboarding_service
+from services.onboarding import OnboardingRepositoryError
+from services.onboarding import load_onboarding_config
 
 _RESEND_TOKENS = {
     "reenviar",

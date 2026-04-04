@@ -7,10 +7,10 @@ from agents.support.nodes.utils import (
     copy_onboarding_state,
     detect_new_input,
 )
-from agents.support.onboarding.config import load_onboarding_config
 from agents.support.onboarding.messages import build_field_prompt
 from agents.support.onboarding.validators import normalize_text, parse_yes_no
 from agents.support.state import AgentState
+from services.onboarding import load_onboarding_config
 
 from .prompt import PROMPT_FIELD
 

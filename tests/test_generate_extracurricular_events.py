@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from agents.support.nodes.generate_tentative_extracurricular.node import (
+from services.scheduling.extracurricular_events import (
     generate_tentative_extracurricular,
 )
-from agents.support.state import AgentState, ExtracurricularItem
+from agents.support.state import AgentState
+from schemas.scheduling import ExtracurricularItem
 
 
 def test_generate_fixed_extracurricular_events_from_schedule(monkeypatch) -> None:
     monkeypatch.setattr(
-        "agents.support.nodes.generate_tentative_extracurricular.node.llm_normalize_schedule",
+        "services.scheduling.extracurricular_events.llm_normalize_schedule",
         lambda *_args, **_kwargs: None,
     )
     state = AgentState(

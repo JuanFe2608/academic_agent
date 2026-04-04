@@ -4,11 +4,11 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 
-from agents.support.personalization.models import PersonalizationAnswer, TechniqueScore
-from agents.support.personalization.repository import (
+from repositories.personalization.repository import (
     InMemoryPersonalizationRepository,
     PostgresPersonalizationRepository,
 )
+from services.personalization.models import PersonalizationAnswer, TechniqueScore
 
 
 def _answer(question_id: str, technique_id: str, value: int) -> PersonalizationAnswer:

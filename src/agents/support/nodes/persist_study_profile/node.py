@@ -2,15 +2,17 @@
 
 from __future__ import annotations
 
+from agents.support.dependencies import get_personalization_service
+from agents.support.flows.planning.persistence_support import (
+    persist_planning_snapshot_for_update,
+)
 from agents.support.nodes.utils import append_message
-from agents.support.planning import study_plan_state_to_update, sync_subjects_and_study_plan
-from agents.support.planning.persistence_support import persist_planning_snapshot_for_update
-from agents.support.personalization import build_personalization_summary
-from agents.support.priorities import is_priorities_enabled
-from agents.support.priorities.state_helpers import priorities_state_to_update, subject_items_to_update
+from agents.support.personalization.formatter import build_personalization_summary
+from agents.support.priorities.config import is_priorities_enabled
 from agents.support.scheduling.state_helpers import ensure_schedule_flow_state
 from agents.support.state import AgentState
-from agents.support.tools.db import get_personalization_service
+from services.planning import study_plan_state_to_update, sync_subjects_and_study_plan
+from services.priorities import priorities_state_to_update, subject_items_to_update
 
 
 def persist_study_profile(state: AgentState) -> dict:

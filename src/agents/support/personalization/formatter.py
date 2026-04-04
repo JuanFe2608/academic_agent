@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from agents.support.personalization.questionnaire import (
+from services.personalization.questionnaire import (
     get_intro_prompt,
     get_invalid_answer_prompt,
     get_microfeedback,

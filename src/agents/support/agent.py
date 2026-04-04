@@ -33,8 +33,8 @@ from agents.support.onboarding.validators import (
     get_missing_profile_fields,
     profile_requires_email_verification,
 )
-from agents.support.personalization import is_personalization_enabled
 from agents.support.state import AgentState
+from services.personalization import is_personalization_enabled
 
 
 def _should_wait(state: AgentState) -> bool:

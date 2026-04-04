@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agents.support.state import StudyPlanState, SubjectItem
+from schemas.planning import StudyPlanState, SubjectItem
 
 
 def build_study_plan_summary(

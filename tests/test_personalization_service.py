@@ -2,12 +2,11 @@
 
 from __future__ import annotations
 
-from agents.support.personalization.config import PersonalizationConfig
-from agents.support.personalization.repository import (
+from repositories.personalization.repository import (
     InMemoryPersonalizationRepository,
     PersonalizationRepositoryError,
 )
-from agents.support.personalization.service import PersonalizationService
+from services.personalization import PersonalizationConfig, PersonalizationService
 
 
 def _completed_study_profile() -> dict[str, object]:

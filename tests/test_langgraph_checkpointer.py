@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agents.support.tools.langgraph_checkpointer import (
+from integrations.langgraph.checkpointer import (
     PostgresLangGraphCheckpointer,
     _assert_schema_ready,
     checkpoint_database_url_from_env,
@@ -75,7 +75,7 @@ def test_checkpoint_database_url_falls_back_to_application_database(monkeypatch)
 
 def test_assert_schema_ready_raises_when_tables_are_missing(monkeypatch) -> None:
     monkeypatch.setattr(
-        "agents.support.tools.langgraph_checkpointer.connect",
+        "integrations.langgraph.checkpointer.connect",
         lambda *args, **kwargs: _FakeConnection(
             [{"table_name": "langgraph_thread_checkpoints"}]
         ),
@@ -95,7 +95,7 @@ def test_create_checkpointer_builds_instance_when_schema_is_ready(monkeypatch) -
     monkeypatch.delenv("LANGGRAPH_CHECKPOINTER_DATABASE_URL", raising=False)
     monkeypatch.delenv("POSTGRES_URI", raising=False)
     monkeypatch.setattr(
-        "agents.support.tools.langgraph_checkpointer.connect",
+        "integrations.langgraph.checkpointer.connect",
         lambda *args, **kwargs: _FakeConnection(
             [
                 {"table_name": "langgraph_checkpoint_writes"},
