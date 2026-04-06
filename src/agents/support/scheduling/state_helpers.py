@@ -7,17 +7,30 @@ grafo y con las pruebas existentes.
 
 from __future__ import annotations
 
-from typing import Literal
+from collections.abc import Mapping
+from typing import Any, Literal
 
-from agents.support.scheduling.contextual_parser import serialize_blocks_for_schedule_type
+from agents.support.state import AgentState
 from services.scheduling.models import (
     ScheduleFlowState,
     ensure_schedule_conflict,
     ensure_weekly_block,
 )
-from schemas.scheduling import RawInputs
+from services.scheduling.event_projection import sync_schedule_block_events
+from services.scheduling.raw_input_sync import (
+    sync_schedule_blocks_to_raw_inputs,
+)
+from schemas.scheduling import (
+    Event,
+    ExtracurricularItem,
+    PendingExtracurricularItem,
+    PendingScheduleItem,
+    RawInputs,
+    SchedulePreview,
+)
 
 FixedScheduleTarget = Literal["academic", "work"]
+_SCHEDULING_FIELDS = set(AgentState.field_groups()["scheduling"])
 
 
 def ensure_schedule_flow_state(
@@ -39,6 +52,16 @@ def ensure_schedule_flow_state(
     return ScheduleFlowState(**data)
 
 
+def ensure_scheduling_state(
+    raw_state: AgentState | Mapping[str, object] | None,
+) -> Any:
+    """Coacciona la partición completa de scheduling a su vista tipada actual."""
+
+    if isinstance(raw_state, AgentState):
+        return raw_state.scheduling_state
+    return AgentState(**dict(raw_state or {})).scheduling_state
+
+
 def schedule_flow_state_to_update(schedule_state: ScheduleFlowState) -> dict[str, object]:
     """Serializa `ScheduleFlowState` preservando bloques/conflictos como modelos."""
 
@@ -55,6 +78,63 @@ def schedule_flow_state_to_update(schedule_state: ScheduleFlowState) -> dict[str
         "persisted_profile_id": schedule_state.persisted_profile_id,
         "persistence_error": schedule_state.persistence_error,
     }
+
+
+def scheduling_state_to_update(
+    raw_state: AgentState | Mapping[str, object] | None,
+) -> dict[str, object]:
+    """Serializa la partición de scheduling al contrato plano del grafo."""
+
+    normalized = ensure_scheduling_state(raw_state)
+    return {
+        "raw_inputs": raw_inputs_to_update(normalized.raw_inputs),
+        "extras_has_any": normalized.extras_has_any,
+        "extras_collect_stage": normalized.extras_collect_stage,
+        "extras_pending_is_variable": normalized.extras_pending_is_variable,
+        "extras_pending_items": list(normalized.extras_pending_items),
+        "academic_pending_items": list(normalized.academic_pending_items),
+        "work_pending_items": list(normalized.work_pending_items),
+        "extracurricular": list(normalized.extracurricular),
+        "events": list(normalized.events),
+        "events_validated": normalized.events_validated,
+        "schedule_preview": normalized.schedule_preview.model_dump(mode="python"),
+        "schedule": schedule_flow_state_to_update(normalized.schedule),
+    }
+
+
+def update_scheduling_state(
+    raw_state: AgentState | Mapping[str, object] | None,
+    **changes: object,
+) -> dict[str, object]:
+    """Valida cambios de scheduling y devuelve solo los campos modificados."""
+
+    if not changes:
+        return {}
+
+    unexpected = sorted(set(changes) - _SCHEDULING_FIELDS)
+    if unexpected:
+        joined = ", ".join(unexpected)
+        raise KeyError(f"Campos scheduling desconocidos: {joined}")
+
+    normalized = ensure_scheduling_state(raw_state)
+    normalized_changes = _normalize_scheduling_changes(changes)
+    data = normalized.model_dump(mode="python")
+    data.update(normalized_changes)
+    updated = normalized.__class__(**data)
+    should_sync_schedule_events = (
+        "schedule" in normalized_changes
+        and "events" not in normalized_changes
+        and updated.schedule.blocks != normalized.schedule.blocks
+    )
+
+    payload: dict[str, object] = {}
+    for field_name in normalized_changes:
+        payload[field_name] = _serialize_scheduling_field(updated, field_name)
+    if should_sync_schedule_events:
+        payload["events"] = list(
+            sync_schedule_block_events(normalized.events, updated.schedule.blocks)
+        )
+    return payload
 
 
 def update_schedule_flow_state(
@@ -105,6 +185,16 @@ def ensure_raw_inputs(raw_inputs: RawInputs | dict | None) -> RawInputs:
     return RawInputs(**dict(raw_inputs or {}))
 
 
+def ensure_schedule_preview(
+    raw_preview: SchedulePreview | dict | None,
+) -> SchedulePreview:
+    """Coacciona `schedule_preview` al modelo canónico del estado."""
+
+    if isinstance(raw_preview, SchedulePreview):
+        return raw_preview.model_copy(deep=True)
+    return SchedulePreview(**dict(raw_preview or {}))
+
+
 def raw_inputs_to_update(raw_inputs: RawInputs) -> dict[str, object]:
     """Serializa `RawInputs` preservando el formato esperado por el grafo."""
 
@@ -152,9 +242,104 @@ def serialize_schedule_blocks_to_raw_inputs(
     """Sincroniza `raw_inputs` desde bloques ya normalizados."""
 
     normalized_blocks = [ensure_weekly_block(block) for block in blocks]
-    serialized = serialize_blocks_for_schedule_type(normalized_blocks, target)
-    return replace_schedule_input_text(raw_inputs, target, serialized)
+    return sync_schedule_blocks_to_raw_inputs(
+        raw_inputs,
+        target,
+        normalized_blocks,
+    ).model_dump(mode="python")
 
 
 def _schedule_input_field(target: FixedScheduleTarget) -> str:
     return "horario_academico_text" if target == "academic" else "horario_laboral_text"
+
+
+def ensure_event(raw_event: Event | dict) -> Event:
+    """Coacciona un evento derivado del horario a su modelo canónico."""
+
+    if isinstance(raw_event, Event):
+        return raw_event.model_copy(deep=True)
+    return Event(**dict(raw_event))
+
+
+def ensure_extracurricular_item(
+    raw_item: ExtracurricularItem | dict,
+) -> ExtracurricularItem:
+    """Coacciona una actividad extracurricular a su modelo canónico."""
+
+    if isinstance(raw_item, ExtracurricularItem):
+        return raw_item.model_copy(deep=True)
+    return ExtracurricularItem(**dict(raw_item))
+
+
+def ensure_pending_extracurricular_item(
+    raw_item: PendingExtracurricularItem | dict,
+) -> PendingExtracurricularItem:
+    """Coacciona un pendiente extracurricular a su modelo canónico."""
+
+    if isinstance(raw_item, PendingExtracurricularItem):
+        return raw_item.model_copy(deep=True)
+    return PendingExtracurricularItem(**dict(raw_item))
+
+
+def ensure_pending_schedule_item(
+    raw_item: PendingScheduleItem | dict,
+) -> PendingScheduleItem:
+    """Coacciona un pendiente académico/laboral a su modelo canónico."""
+
+    if isinstance(raw_item, PendingScheduleItem):
+        return raw_item.model_copy(deep=True)
+    return PendingScheduleItem(**dict(raw_item))
+
+
+def _normalize_scheduling_changes(changes: dict[str, object]) -> dict[str, object]:
+    normalized = dict(changes)
+    if "raw_inputs" in normalized and normalized["raw_inputs"] is not None:
+        normalized["raw_inputs"] = ensure_raw_inputs(normalized["raw_inputs"])
+    if "schedule_preview" in normalized and normalized["schedule_preview"] is not None:
+        normalized["schedule_preview"] = ensure_schedule_preview(normalized["schedule_preview"])
+    if "schedule" in normalized and normalized["schedule"] is not None:
+        normalized["schedule"] = ensure_schedule_flow_state(normalized["schedule"])
+    if "events" in normalized and normalized["events"] is not None:
+        normalized["events"] = [
+            ensure_event(item) for item in list(normalized["events"])
+        ]
+    if "extracurricular" in normalized and normalized["extracurricular"] is not None:
+        normalized["extracurricular"] = [
+            ensure_extracurricular_item(item)
+            for item in list(normalized["extracurricular"])
+        ]
+    if "extras_pending_items" in normalized and normalized["extras_pending_items"] is not None:
+        normalized["extras_pending_items"] = [
+            ensure_pending_extracurricular_item(item)
+            for item in list(normalized["extras_pending_items"])
+        ]
+    if "academic_pending_items" in normalized and normalized["academic_pending_items"] is not None:
+        normalized["academic_pending_items"] = [
+            ensure_pending_schedule_item(item)
+            for item in list(normalized["academic_pending_items"])
+        ]
+    if "work_pending_items" in normalized and normalized["work_pending_items"] is not None:
+        normalized["work_pending_items"] = [
+            ensure_pending_schedule_item(item)
+            for item in list(normalized["work_pending_items"])
+        ]
+    return normalized
+
+
+def _serialize_scheduling_field(state: Any, field_name: str) -> object:
+    value = getattr(state, field_name)
+    if field_name == "raw_inputs":
+        return raw_inputs_to_update(value)
+    if field_name == "schedule_preview":
+        return value.model_dump(mode="python")
+    if field_name == "schedule":
+        return schedule_flow_state_to_update(value)
+    if field_name in {
+        "events",
+        "extracurricular",
+        "extras_pending_items",
+        "academic_pending_items",
+        "work_pending_items",
+    }:
+        return list(value)
+    return value

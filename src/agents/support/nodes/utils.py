@@ -54,6 +54,11 @@ def get_last_user_text(messages: list[BaseMessage] | list) -> str:
             return _coerce_text(message.content)
         if isinstance(message, AIMessage):
             continue
+        if isinstance(message, BaseMessage):
+            role = getattr(message, "type", None)
+            if role in {"ai", "assistant"}:
+                continue
+            return _coerce_text(getattr(message, "content", None))
         if isinstance(message, str):
             return message.strip()
         if isinstance(message, dict):
@@ -77,6 +82,11 @@ def get_last_user_images(messages: list[BaseMessage] | list) -> list[str]:
             continue
         if isinstance(message, HumanMessage):
             return _extract_images(message.content)
+        if isinstance(message, BaseMessage):
+            role = getattr(message, "type", None)
+            if role in {"ai", "assistant"}:
+                continue
+            return _extract_images(getattr(message, "content", None))
         if isinstance(message, dict):
             role = message.get("role") or message.get("type")
             if role in (None, "user", "human"):
@@ -202,6 +212,10 @@ def count_user_messages(messages: list[BaseMessage] | list) -> int:
     for message in messages:
         if isinstance(message, HumanMessage):
             count += 1
+        elif isinstance(message, BaseMessage):
+            role = getattr(message, "type", None)
+            if role in (None, "user", "human"):
+                count += 1
         elif isinstance(message, dict):
             role = message.get("role") or message.get("type")
             if role in (None, "user", "human"):

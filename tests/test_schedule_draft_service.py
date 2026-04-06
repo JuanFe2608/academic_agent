@@ -60,3 +60,5 @@ def test_build_schedule_draft_turn_builds_clean_summary_without_conflicts() -> N
     assert update["schedule"]["blocks"][0].has_conflict is False
     assert update["schedule_preview"]["text"] == update["schedule"]["summary_text"]
     assert len(update["events"]) == 1
+    assert update["events"][0].id == f"schedule-block:{update['schedule']['blocks'][0].block_id}"
+    assert update["events"][0].origen == "schedule_block"

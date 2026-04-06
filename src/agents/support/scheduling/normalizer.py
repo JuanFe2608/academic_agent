@@ -5,13 +5,11 @@ from __future__ import annotations
 import re
 from typing import Callable
 
-from agents.support.nodes.collect_extracurricular_details.parsing import (
-    parse_extracurricular_items,
-)
 from services.scheduling.ai_support import (
     llm_extract_schedule_blocks,
     llm_normalize_schedule,
 )
+from services.scheduling.extracurricular_parsing import parse_extracurricular_items
 from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     is_ambiguous_time_range,
@@ -19,6 +17,10 @@ from services.scheduling.text_parser import (
     parse_work_schedule_text,
 )
 from services.scheduling.constants import DAY_ORDER, SPANISH_TO_ENGLISH, ScheduleBlockType
+from services.scheduling.block_operations import (
+    merge_section_blocks as _merge_section_blocks,
+    replace_section_blocks as _replace_section_blocks,
+)
 from services.scheduling.models import (
     NormalizedScheduleResult,
     WeeklyScheduleBlock,
@@ -87,10 +89,7 @@ def merge_section_blocks(
 ) -> list[WeeklyScheduleBlock]:
     """Agrega bloques y elimina duplicados exactos."""
 
-    merged = [ensure_weekly_block(block) for block in existing] + [
-        ensure_weekly_block(block) for block in new_blocks
-    ]
-    return _dedupe_blocks(merged)
+    return _merge_section_blocks(existing, new_blocks)
 
 
 def replace_section_blocks(
@@ -100,13 +99,7 @@ def replace_section_blocks(
 ) -> list[WeeklyScheduleBlock]:
     """Reemplaza por completo una sección del horario."""
 
-    kept = [
-        ensure_weekly_block(block)
-        for block in existing
-        if ensure_weekly_block(block).block_type != block_type
-    ]
-    normalized_new = [ensure_weekly_block(block) for block in new_blocks]
-    return _dedupe_blocks(kept + normalized_new)
+    return _replace_section_blocks(existing, block_type, new_blocks)
 
 
 def _normalize_work_schedule(text: str, timezone: str) -> NormalizedScheduleResult:

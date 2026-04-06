@@ -40,36 +40,41 @@ from services.personalization import is_personalization_enabled
 def _should_wait(state: AgentState) -> bool:
     """Indica si el grafo debe detenerse hasta recibir nueva entrada."""
 
-    messages = state.get("messages", [])
-    last_images = state.get("last_user_images", []) if state.get("phase") == "schedules" else None
+    conversation = state.conversation_state
+    messages = conversation.messages
+    last_images = (
+        conversation.last_user_images if conversation.phase == "schedules" else None
+    )
     has_new_input, _, _ = detect_new_input(
         messages,
-        state.get("user_message_count", 0),
-        state.get("awaiting_user_input", False),
-        state.get("last_user_text"),
+        conversation.user_message_count,
+        conversation.awaiting_user_input,
+        conversation.last_user_text,
         last_images,
     )
-    return bool(state.get("awaiting_user_input") and not has_new_input)
+    return bool(conversation.awaiting_user_input and not has_new_input)
 
 
 def _route_welcome(state: AgentState) -> str:
     """Resuelve el siguiente nodo cuando el flujo parte desde bienvenida."""
 
-    if state.get("user_status") == "out_of_scope":
+    conversation = state.conversation_state
+    onboarding = state.onboarding_state
+    if conversation.user_status == "out_of_scope":
         has_new_input, _, _ = detect_new_input(
-            state.get("messages", []),
-            state.get("user_message_count", 0),
-            state.get("awaiting_user_input", False),
-            state.get("last_user_text"),
+            conversation.messages,
+            conversation.user_message_count,
+            conversation.awaiting_user_input,
+            conversation.last_user_text,
         )
         return "welcome_consent" if has_new_input else "end"
     if _should_wait(state):
         return "end"
-    if state.get("phase") == "end":
+    if conversation.phase == "end":
         return "end"
-    if state.get("phase") != "consent":
+    if conversation.phase != "consent":
         return _route_from_phase(state)
-    if state.get("consent", {}).get("accepted"):
+    if onboarding.consent.accepted:
         return "collect_profile"
     return "welcome_consent"
 
@@ -77,7 +82,10 @@ def _route_welcome(state: AgentState) -> str:
 def _route_from_phase(state: AgentState) -> str:
     """Mapea la `phase` persistida al nodo operativo correspondiente."""
 
-    phase = state.get("phase")
+    conversation = state.conversation_state
+    scheduling = state.scheduling_state
+    planning = state.planning_state
+    phase = conversation.phase
     if phase == "profile":
         return "collect_profile"
     if phase == "email_verification_send":
@@ -95,8 +103,8 @@ def _route_from_phase(state: AgentState) -> str:
     if phase == "draft":
         return "build_draft_schedule"
     if phase == "validate":
-        preview = state.get("schedule_preview", {})
-        if not preview.get("text") and not preview.get("image_path"):
+        preview = scheduling.schedule_preview
+        if not preview.text and not preview.image_path:
             return "render_schedule_preview"
         return "validate_schedule"
     if phase == "schedule_edit":
@@ -105,8 +113,7 @@ def _route_from_phase(state: AgentState) -> str:
         return "persist_schedule"
     if phase == "sync":
         if is_personalization_enabled():
-            study_profile = state.get("study_profile", {})
-            if study_profile.get("status") != "completed":
+            if planning.study_profile.status != "completed":
                 return "collect_study_profile"
         return "end"
     if phase == "study_profile":
@@ -125,14 +132,16 @@ def _route_from_phase(state: AgentState) -> str:
 def _route_collect_profile(state: AgentState) -> str:
     """Decide si el onboarding continúa, verifica correo o confirma perfil."""
 
-    if state.get("user_status") == "out_of_scope" or state.get("phase") == "end":
+    conversation = state.conversation_state
+    onboarding = state.onboarding_state
+    if conversation.user_status == "out_of_scope" or conversation.phase == "end":
         return "end"
     if _should_wait(state):
         return "end"
-    profile = state.get("student_profile", {})
-    if profile_requires_email_verification(profile):
+    profile = onboarding.student_profile
+    if profile_requires_email_verification(profile.model_dump(mode="python")):
         return "send_email_verification"
-    if not get_missing_profile_fields(profile):
+    if not get_missing_profile_fields(profile.model_dump(mode="python")):
         return "confirm_profile"
     return "collect_profile"
 
@@ -142,7 +151,7 @@ def _route_send_email_verification(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "profile":
         return "collect_profile"
     return "verify_email_code"
@@ -153,7 +162,7 @@ def _route_verify_email_code(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "email_verification_send":
         return "send_email_verification"
     if phase == "profile":
@@ -166,7 +175,7 @@ def _route_confirm_profile(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "profile":
         return "collect_profile"
     if phase == "profile_persist":
@@ -181,7 +190,7 @@ def _route_persist_profile(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "profile":
         return "collect_profile"
     if phase == "profile_confirm":
@@ -198,21 +207,16 @@ def _route_request_schedules(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    occupation = state.get("student_profile", {}).get("occupation")
-    raw_inputs = state.get("raw_inputs", {})
-    academic_pending_items = state.get("academic_pending_items", [])
-    work_pending_items = state.get("work_pending_items", [])
-    schedule_state = state.get("schedule", {})
-    capture_target = (
-        schedule_state.get("capture_target")
-        if isinstance(schedule_state, dict)
-        else getattr(schedule_state, "capture_target", None)
-    )
-    capture_stage = (
-        schedule_state.get("capture_stage")
-        if isinstance(schedule_state, dict)
-        else getattr(schedule_state, "capture_stage", "idle")
-    )
+    onboarding = state.onboarding_state
+    scheduling = state.scheduling_state
+    conversation = state.conversation_state
+    occupation = onboarding.student_profile.occupation
+    raw_inputs = scheduling.raw_inputs
+    academic_pending_items = scheduling.academic_pending_items
+    work_pending_items = scheduling.work_pending_items
+    schedule_state = scheduling.schedule
+    capture_target = schedule_state.capture_target
+    capture_stage = schedule_state.capture_stage or "idle"
 
     if not occupation:
         return "request_schedules"
@@ -223,21 +227,21 @@ def _route_request_schedules(state: AgentState) -> str:
     if academic_pending_items or work_pending_items:
         return "request_schedules"
 
-    if capture_target in {"academic", "work"} and not state.get("awaiting_user_input"):
+    if capture_target in {"academic", "work"} and not conversation.awaiting_user_input:
         return "parse_schedules_to_events"
 
     if (
-        not state.get("awaiting_user_input")
+        not conversation.awaiting_user_input
         and (
-            raw_inputs.get("horario_academico_text")
-            or raw_inputs.get("horario_laboral_text")
+            raw_inputs.horario_academico_text
+            or raw_inputs.horario_laboral_text
         )
     ):
-        if occupation == "ambos" and not raw_inputs.get("horario_academico_text"):
+        if occupation == "ambos" and not raw_inputs.horario_academico_text:
             return "request_schedules"
         return "parse_schedules_to_events"
 
-    if state.get("phase") == "extras":
+    if conversation.phase == "extras":
         return "ask_extracurricular"
 
     if capture_stage == "idle":
@@ -251,7 +255,7 @@ def _route_extras(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    extras_has_any = state.get("extras_has_any")
+    extras_has_any = state.scheduling_state.extras_has_any
     if extras_has_any is True:
         return "collect_extracurricular_details"
     if extras_has_any is False:
@@ -264,7 +268,7 @@ def _route_collect_extracurricular(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    stage = state.get("extras_collect_stage")
+    stage = state.scheduling_state.extras_collect_stage
     if stage == "done":
         return "build_draft_schedule"
     return "collect_extracurricular_details"
@@ -275,7 +279,7 @@ def _route_after_parse_schedules(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    if state.get("phase") == "extras":
+    if state.conversation_state.phase == "extras":
         return "ask_extracurricular"
     return "end"
 
@@ -285,7 +289,7 @@ def _route_validate(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "schedule_edit":
         return "apply_schedule_correction"
     if phase == "schedule_persist":
@@ -298,7 +302,7 @@ def _route_after_schedule_edit(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    if state.get("phase") == "validate":
+    if state.conversation_state.phase == "validate":
         return "validate_schedule"
     return "build_draft_schedule"
 
@@ -308,14 +312,15 @@ def _route_after_persist_schedule(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
+    conversation = state.conversation_state
+    planning = state.planning_state
     if not is_personalization_enabled():
         return "end"
-    if state.get("phase") == "study_profile_persist":
+    if conversation.phase == "study_profile_persist":
         return "persist_study_profile"
-    if state.get("phase") == "study_profile":
+    if conversation.phase == "study_profile":
         return "collect_study_profile"
-    study_profile = state.get("study_profile", {})
-    if state.get("phase") == "sync" and study_profile.get("status") != "completed":
+    if conversation.phase == "sync" and planning.study_profile.status != "completed":
         return "collect_study_profile"
     return "end"
 
@@ -325,7 +330,7 @@ def _route_collect_study_profile(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "study_profile_tiebreaker":
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
@@ -340,7 +345,7 @@ def _route_collect_study_profile_tiebreaker(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "study_profile":
         return "collect_study_profile"
     if phase == "study_profile_persist":
@@ -355,13 +360,14 @@ def _route_persist_study_profile(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    if state.get("phase") == "study_profile_tiebreaker":
+    phase = state.conversation_state.phase
+    if phase == "study_profile_tiebreaker":
         return "collect_study_profile_tiebreaker"
-    if state.get("phase") == "study_profile":
+    if phase == "study_profile":
         return "collect_study_profile"
-    if state.get("phase") == "priorities":
+    if phase == "priorities":
         return "collect_priorities"
-    if state.get("phase") == "study_plan":
+    if phase == "study_plan":
         return "build_study_plan"
     return "end"
 
@@ -371,7 +377,7 @@ def _route_collect_priorities(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    phase = state.get("phase")
+    phase = state.conversation_state.phase
     if phase == "study_plan":
         return "build_study_plan"
     if phase == "end":
@@ -384,7 +390,7 @@ def _route_build_study_plan(state: AgentState) -> str:
 
     if _should_wait(state):
         return "end"
-    if state.get("phase") == "priorities":
+    if state.conversation_state.phase == "priorities":
         return "collect_priorities"
     return "end"
 

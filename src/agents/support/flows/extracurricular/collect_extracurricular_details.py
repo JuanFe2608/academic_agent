@@ -12,21 +12,23 @@ from agents.support.nodes.utils import (
     normalize_text,
     parse_yes_no,
 )
-from agents.support.scheduling import merge_section_blocks, normalize_schedule_section
-from agents.support.scheduling.extracurricular_support import (
+from agents.support.runtime_state_helpers import update_conversation_state
+from agents.support.scheduling import normalize_schedule_section
+from services.scheduling.extracurricular_state import (
     build_extracurricular_item_source_text as shared_build_extracurricular_item_source_text,
     build_extracurricular_reply_hint as shared_build_extracurricular_reply_hint,
     coerce_extracurricular_pending_items as shared_coerce_extracurricular_pending_items,
     merge_extracurricular_items as shared_merge_extracurricular_items,
 )
 from agents.support.scheduling.state_helpers import reset_schedule_review_state
+from agents.support.scheduling.state_helpers import update_scheduling_state
 from agents.support.state import AgentState
 from schemas.scheduling import ExtracurricularItem, PendingExtracurricularItem
-
-from agents.support.nodes.collect_extracurricular_details.parsing import (
+from services.scheduling.extracurricular_parsing import (
     complete_pending_extracurricular_item,
     parse_extracurricular_items_with_context,
 )
+from services.scheduling.section_mutations import append_section_blocks
 from agents.support.nodes.collect_extracurricular_details.prompt import (
     PROMPT_DETAILS,
     PROMPT_MORE,
@@ -53,6 +55,34 @@ _DAY_HINT_PATTERN = re.compile(
 )
 
 
+def _build_extras_update(
+    state: AgentState,
+    *,
+    phase: str,
+    awaiting_user_input: bool,
+    current_count: int,
+    last_text: str | None,
+    prompt: str | None = None,
+    **scheduling_changes: object,
+) -> dict:
+    conversation_changes: dict[str, object] = {
+        "phase": phase,
+        "user_message_count": current_count,
+        "last_user_text": last_text,
+        "awaiting_user_input": awaiting_user_input,
+    }
+    if prompt:
+        conversation_changes["messages"] = append_message(
+            state.get("messages", []),
+            "assistant",
+            prompt,
+        )
+    return {
+        **update_scheduling_state(state, **scheduling_changes),
+        **update_conversation_state(state, **conversation_changes),
+    }
+
+
 def collect_extracurricular_details(state: AgentState) -> dict:
     """Recolecta actividades extracurriculares y avanza al draft."""
     messages = state.get("messages", [])
@@ -72,91 +102,85 @@ def collect_extracurricular_details(state: AgentState) -> dict:
         if normalized_reply in _CONTINUE_TOKENS or any(
             contains_normalized_phrase(normalized_reply, token) for token in _CONTINUE_TOKENS
         ):
-            return {
-                "extras_collect_stage": "done",
-                "extras_pending_is_variable": None,
-                "extras_pending_items": [],
-                "phase": "draft",
-                "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-                "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-                "awaiting_user_input": False,
-                "messages": append_message(
-                    messages,
-                    "assistant",
-                    "Listo. Voy a preparar el resumen de tu horario.",
-                ),
-            }
+            return _build_extras_update(
+                state,
+                extras_collect_stage="done",
+                extras_pending_is_variable=None,
+                extras_pending_items=[],
+                phase="draft",
+                current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                last_text=last_text if has_new_input else state.get("last_user_text"),
+                awaiting_user_input=False,
+                prompt="Listo. Voy a preparar el resumen de tu horario.",
+            )
 
         if has_new_input and _looks_like_extracurricular_content(last_text):
             stage = "awaiting_details"
         else:
             if answer is False:
-                return {
-                    "extras_collect_stage": "done",
-                    "extras_pending_is_variable": None,
-                    "extras_pending_items": [],
-                    "phase": "draft",
-                    "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-                    "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-                    "awaiting_user_input": False,
-                    "messages": append_message(
-                        messages,
-                        "assistant",
-                        "Listo. Voy a preparar el resumen de tu horario.",
-                    ),
-                }
+                return _build_extras_update(
+                    state,
+                    extras_collect_stage="done",
+                    extras_pending_is_variable=None,
+                    extras_pending_items=[],
+                    phase="draft",
+                    current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                    last_text=last_text if has_new_input else state.get("last_user_text"),
+                    awaiting_user_input=False,
+                    prompt="Listo. Voy a preparar el resumen de tu horario.",
+                )
 
             if answer is True or any(
                 contains_normalized_phrase(normalized_reply, token)
                 for token in ("agregar", "mas", "más", "otro", "otra")
             ):
-                return {
-                    "extras_collect_stage": "awaiting_details",
-                    "extras_pending_is_variable": None,
-                    "extras_pending_items": [],
-                    "phase": "extras",
-                    "user_message_count": current_count,
-                    "last_user_text": last_text,
-                    "awaiting_user_input": True,
-                    "messages": append_message(messages, "assistant", PROMPT_DETAILS),
-                }
+                return _build_extras_update(
+                    state,
+                    extras_collect_stage="awaiting_details",
+                    extras_pending_is_variable=None,
+                    extras_pending_items=[],
+                    phase="extras",
+                    current_count=current_count,
+                    last_text=last_text,
+                    awaiting_user_input=True,
+                    prompt=PROMPT_DETAILS,
+                )
 
-            return {
-                "extras_collect_stage": "awaiting_more",
-                "phase": "extras",
-                "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-                "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-                "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", PROMPT_MORE),
-            }
+            return _build_extras_update(
+                state,
+                extras_collect_stage="awaiting_more",
+                phase="extras",
+                current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                last_text=last_text if has_new_input else state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=PROMPT_MORE,
+            )
 
     if stage in (None, "awaiting_type"):
-        return {
-            "extras_collect_stage": "awaiting_details",
-            "extras_pending_is_variable": pending_is_variable,
-            "extras_pending_items": pending_items,
-            "phase": "extras",
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                _build_pending_prompt(pending_items) if pending_items else PROMPT_DETAILS,
-            ),
-        }
+        return _build_extras_update(
+            state,
+            extras_collect_stage="awaiting_details",
+            extras_pending_is_variable=pending_is_variable,
+            extras_pending_items=pending_items,
+            phase="extras",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=True,
+            prompt=_build_pending_prompt(pending_items) if pending_items else PROMPT_DETAILS,
+        )
 
     if not has_new_input or not last_text:
-        return {
-            "extras_collect_stage": "awaiting_details",
-            "extras_pending_is_variable": pending_is_variable,
-            "extras_pending_items": pending_items,
-            "phase": "extras",
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                _build_pending_prompt(pending_items) if pending_items else PROMPT_DETAILS,
-            ),
-        }
+        return _build_extras_update(
+            state,
+            extras_collect_stage="awaiting_details",
+            extras_pending_is_variable=pending_is_variable,
+            extras_pending_items=pending_items,
+            phase="extras",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=True,
+            prompt=_build_pending_prompt(pending_items) if pending_items else PROMPT_DETAILS,
+        )
 
     timezone = state.get("timezone", "America/Bogota")
     if pending_items:
@@ -181,7 +205,7 @@ def collect_extracurricular_details(state: AgentState) -> dict:
     )
     extracurricular = _merge_extracurricular_items(state.get("extracurricular", []), items)
     schedule_state = dict(state.get("schedule", {}))
-    schedule_blocks = merge_section_blocks(
+    schedule_blocks = append_section_blocks(
         list(schedule_state.get("blocks", [])),
         result.blocks,
     )
@@ -191,31 +215,33 @@ def collect_extracurricular_details(state: AgentState) -> dict:
             items,
             parsed_pending_items,
         )
-        return {
-            "extracurricular": extracurricular,
-            "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
-            "extras_collect_stage": "awaiting_details",
-            "extras_pending_is_variable": pending_is_variable,
-            "extras_pending_items": parsed_pending_items,
-            "phase": "extras",
-            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-            "awaiting_user_input": True,
-            "messages": append_message(messages, "assistant", prompt),
-        }
+        return _build_extras_update(
+            state,
+            extracurricular=extracurricular,
+            schedule=reset_schedule_review_state(schedule_state, schedule_blocks),
+            extras_collect_stage="awaiting_details",
+            extras_pending_is_variable=pending_is_variable,
+            extras_pending_items=parsed_pending_items,
+            phase="extras",
+            current_count=current_count if has_new_input else state.get("user_message_count", 0),
+            last_text=last_text if has_new_input else state.get("last_user_text"),
+            awaiting_user_input=True,
+            prompt=prompt,
+        )
 
-    return {
-        "extracurricular": extracurricular,
-        "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
-        "extras_collect_stage": "awaiting_more",
-        "extras_pending_is_variable": None,
-        "extras_pending_items": [],
-        "phase": "extras",
-        "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
-        "last_user_text": last_text if has_new_input else state.get("last_user_text"),
-        "awaiting_user_input": True,
-        "messages": append_message(messages, "assistant", PROMPT_MORE),
-    }
+    return _build_extras_update(
+        state,
+        extracurricular=extracurricular,
+        schedule=reset_schedule_review_state(schedule_state, schedule_blocks),
+        extras_collect_stage="awaiting_more",
+        extras_pending_is_variable=None,
+        extras_pending_items=[],
+        phase="extras",
+        current_count=current_count if has_new_input else state.get("user_message_count", 0),
+        last_text=last_text if has_new_input else state.get("last_user_text"),
+        awaiting_user_input=True,
+        prompt=PROMPT_MORE,
+    )
 
 
 def _looks_like_extracurricular_content(text: str | None) -> bool:
@@ -274,42 +300,40 @@ def _complete_pending_item_reply(
         "extracurricular",
         timezone=state.get("timezone", "America/Bogota"),
     )
-    schedule_blocks = merge_section_blocks(
+    schedule_blocks = append_section_blocks(
         list(schedule_state.get("blocks", [])),
         completion_result.blocks,
     )
     remaining_pending = pending_items[1:]
 
     if remaining_pending:
-        return {
-            "extracurricular": merged_items,
-            "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
-            "extras_collect_stage": "awaiting_details",
-            "extras_pending_is_variable": pending_is_variable,
-            "extras_pending_items": remaining_pending,
-            "phase": "extras",
-            "user_message_count": current_count,
-            "last_user_text": response_text,
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                _build_pending_prompt(remaining_pending),
-            ),
-        }
+        return _build_extras_update(
+            state,
+            extracurricular=merged_items,
+            schedule=reset_schedule_review_state(schedule_state, schedule_blocks),
+            extras_collect_stage="awaiting_details",
+            extras_pending_is_variable=pending_is_variable,
+            extras_pending_items=remaining_pending,
+            phase="extras",
+            current_count=current_count,
+            last_text=response_text,
+            awaiting_user_input=True,
+            prompt=_build_pending_prompt(remaining_pending),
+        )
 
-    return {
-        "extracurricular": merged_items,
-        "schedule": reset_schedule_review_state(schedule_state, schedule_blocks),
-        "extras_collect_stage": "awaiting_more",
-        "extras_pending_is_variable": None,
-        "extras_pending_items": [],
-        "phase": "extras",
-        "user_message_count": current_count,
-        "last_user_text": response_text,
-        "awaiting_user_input": True,
-        "messages": append_message(messages, "assistant", PROMPT_MORE),
-    }
+    return _build_extras_update(
+        state,
+        extracurricular=merged_items,
+        schedule=reset_schedule_review_state(schedule_state, schedule_blocks),
+        extras_collect_stage="awaiting_more",
+        extras_pending_is_variable=None,
+        extras_pending_items=[],
+        phase="extras",
+        current_count=current_count,
+        last_text=response_text,
+        awaiting_user_input=True,
+        prompt=PROMPT_MORE,
+    )
 
 
 def _build_item_source_text(item: ExtracurricularItem) -> str:

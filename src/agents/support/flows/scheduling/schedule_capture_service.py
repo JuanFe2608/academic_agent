@@ -16,12 +16,14 @@ from agents.support.nodes.utils import (
     has_time_range,
     normalize_text,
 )
+from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.state import AgentState
 from schemas.scheduling import PendingScheduleItem
 
 from agents.support.scheduling.state_helpers import (
     append_schedule_input_text,
     ensure_schedule_flow_state,
+    update_scheduling_state,
     update_schedule_flow_state,
 )
 
@@ -539,21 +541,28 @@ def _build_schedule_update(
     last_text: str | None,
     prompt: str | None = None,
 ) -> dict:
-    update = {
-        "student_profile": profile,
-        "raw_inputs": raw_inputs,
-        "schedule": schedule_state,
-        "academic_pending_items": academic_pending_items,
-        "work_pending_items": work_pending_items,
+    conversation_changes: dict[str, object] = {
         "phase": phase,
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": awaiting_user_input,
     }
     if prompt:
-        update["messages"] = append_message(
+        conversation_changes["messages"] = append_message(
             state.get("messages", []),
             "assistant",
             prompt,
         )
+
+    update = {
+        "student_profile": profile,
+        **update_scheduling_state(
+            state,
+            raw_inputs=raw_inputs,
+            schedule=schedule_state,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+        ),
+        **update_conversation_state(state, **conversation_changes),
+    }
     return update

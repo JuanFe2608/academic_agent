@@ -29,10 +29,10 @@ _MODULE_BY_NAME = {
     "build_section_summary": "agents.support.scheduling.formatter",
     "build_schedule_summary": "agents.support.scheduling.formatter",
     "detect_schedule_conflicts": "agents.support.scheduling.conflicts",
-    "merge_section_blocks": "agents.support.scheduling.normalizer",
+    "merge_section_blocks": "services.scheduling.block_operations",
     "normalize_schedule_section": "agents.support.scheduling.normalizer",
     "render_recurring_schedule": "agents.support.scheduling.render",
-    "replace_section_blocks": "agents.support.scheduling.normalizer",
+    "replace_section_blocks": "services.scheduling.block_operations",
 }
 
 

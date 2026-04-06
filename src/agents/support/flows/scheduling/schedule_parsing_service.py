@@ -11,7 +11,6 @@ from dataclasses import dataclass
 
 from agents.support.nodes.utils import append_message
 from agents.support.scheduling import replace_section_blocks
-from agents.support.scheduling.contextual_parser import build_schedule_pending_prompt
 from agents.support.scheduling.pipeline import parse_fixed_schedule_section
 from agents.support.scheduling.render import blocks_to_events
 from agents.support.scheduling.state_helpers import (
@@ -22,6 +21,7 @@ from agents.support.scheduling.state_helpers import (
     update_schedule_flow_state,
 )
 from agents.support.state import AgentState
+from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
 
 
 @dataclass(frozen=True)

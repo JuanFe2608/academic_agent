@@ -6,33 +6,14 @@ from datetime import datetime
 
 from agents.support.scheduling.schedule_renderer import render_week_schedule
 from schemas.scheduling import Event
-from services.scheduling.constants import BLOCK_TYPE_TO_EVENT_CATEGORY, DAY_LABELS
-from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
-from services.scheduling.validation import new_event_id
+from services.scheduling.event_projection import blocks_to_schedule_events
+from services.scheduling.models import WeeklyScheduleBlock
 
 
 def blocks_to_events(blocks: list[WeeklyScheduleBlock]) -> list[Event]:
     """Convierte bloques recurrentes al modelo visual actual de eventos."""
 
-    events: list[Event] = []
-    for raw_block in blocks:
-        block = ensure_weekly_block(raw_block)
-        category = BLOCK_TYPE_TO_EVENT_CATEGORY[block.block_type]
-        spanish_day = DAY_LABELS[block.day_of_week]
-        events.append(
-            Event(
-                id=new_event_id(),
-                dia=spanish_day.replace("é", "e").replace("á", "a"),
-                inicio=block.start_time,
-                fin=block.end_time,
-                titulo=block.title,
-                tipo="confirmado",
-                categoria=category,
-                origen="schedule_block",
-                timezone=block.timezone,
-            )
-        )
-    return events
+    return blocks_to_schedule_events(blocks)
 
 
 def render_recurring_schedule(

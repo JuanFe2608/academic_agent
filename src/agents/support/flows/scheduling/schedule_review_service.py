@@ -7,22 +7,14 @@ observable por el usuario.
 
 from __future__ import annotations
 
-from agents.support.nodes.collect_extracurricular_details.parsing import (
-    complete_pending_extracurricular_item,
-    parse_extracurricular_items,
-)
 from agents.support.nodes.utils import append_message, normalize_text, parse_yes_no
+from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.scheduling import (
     build_section_summary,
-    merge_section_blocks,
     normalize_schedule_section,
     replace_section_blocks,
 )
-from agents.support.scheduling.contextual_parser import (
-    build_schedule_pending_prompt,
-    complete_pending_schedule_item,
-)
-from agents.support.scheduling.extracurricular_support import (
+from services.scheduling.extracurricular_state import (
     build_extracurricular_items_source_text,
     build_extracurricular_reply_hint,
     coerce_extracurricular_pending_items,
@@ -34,15 +26,53 @@ from agents.support.scheduling.pipeline import (
 )
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
-    replace_schedule_input_text,
     reset_schedule_review_state,
-    serialize_schedule_blocks_to_raw_inputs,
+    update_scheduling_state,
     update_schedule_flow_state,
 )
 from agents.support.state import AgentState
+from services.scheduling.contextual_schedule_parsing import complete_pending_schedule_item
 from services.scheduling.models import ensure_schedule_conflict, ensure_weekly_block
+from services.scheduling.correction_sync import (
+    merge_completed_fixed_section,
+    replace_fixed_section,
+    sync_fixed_section_result,
+)
+from services.scheduling.extracurricular_parsing import (
+    complete_pending_extracurricular_item,
+    parse_extracurricular_items,
+)
+from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
 
 from .schedule_pending_resolution_service import coerce_schedule_pending_items
+
+
+def _build_schedule_review_update(
+    state: AgentState,
+    *,
+    phase: str,
+    awaiting_user_input: bool,
+    current_count: int,
+    last_text: str | None,
+    prompt: str | None = None,
+    **scheduling_changes: object,
+) -> dict:
+    conversation_changes: dict[str, object] = {
+        "phase": phase,
+        "user_message_count": current_count,
+        "last_user_text": last_text,
+        "awaiting_user_input": awaiting_user_input,
+    }
+    if prompt:
+        conversation_changes["messages"] = append_message(
+            state.get("messages", []),
+            "assistant",
+            prompt,
+        )
+    return {
+        **update_scheduling_state(state, **scheduling_changes),
+        **update_conversation_state(state, **conversation_changes),
+    }
 
 
 def handle_schedule_review_turn(
@@ -78,25 +108,24 @@ def handle_schedule_review_turn(
                 ensure_schedule_conflict(conflict).model_copy(update={"accepted": True})
                 for conflict in conflicts
             ]
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     blocks=updated_blocks,
                     conflicts=updated_conflicts,
                     conflicts_accepted=True,
                     review_stage="awaiting_confirmation",
                 ),
-                "phase": "validate",
-                "user_message_count": current_count,
-                "last_user_text": last_text,
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    messages,
-                    "assistant",
+                phase="validate",
+                current_count=current_count,
+                last_text=last_text,
+                awaiting_user_input=True,
+                prompt=(
                     "Entendido. Dejaré esos cruces como aceptados conscientemente.\n"
-                    "✅ ¿El horario completo quedó correcto? Responde sí o no.",
+                    "✅ ¿El horario completo quedó correcto? Responde sí o no."
                 ),
-            }
+            )
         if decision == "correct":
             return _prompt_correction_target(
                 state,
@@ -118,19 +147,18 @@ def handle_schedule_review_turn(
         target = _parse_correction_target(last_text, state) if has_new_input else None
         if target:
             return {
-                "schedule": update_schedule_flow_state(
-                    schedule_state,
-                    review_stage="awaiting_correction_payload",
-                    correction_target=target,
-                ),
-                "phase": "validate",
-                "user_message_count": current_count,
-                "last_user_text": last_text,
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    messages,
-                    "assistant",
-                    _build_payload_prompt(target, schedule_state),
+                **_build_schedule_review_update(
+                    state,
+                    schedule=update_schedule_flow_state(
+                        schedule_state,
+                        review_stage="awaiting_correction_payload",
+                        correction_target=target,
+                    ),
+                    phase="validate",
+                    current_count=current_count,
+                    last_text=last_text,
+                    awaiting_user_input=True,
+                    prompt=_build_payload_prompt(target, schedule_state),
                 ),
             }
         return _prompt_correction_target(
@@ -150,21 +178,18 @@ def handle_schedule_review_turn(
                 schedule_state,
                 _build_payload_prompt(str(correction_target or "academic"), schedule_state),
             )
-        return {
-            "schedule": update_schedule_flow_state(
+        return _build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(
                 schedule_state,
                 pending_correction_text=str(last_text).strip(),
             ),
-            "phase": "schedule_edit",
-            "user_message_count": current_count,
-            "last_user_text": last_text,
-            "awaiting_user_input": False,
-            "messages": append_message(
-                messages,
-                "assistant",
-                "Perfecto. Voy a recalcular esa parte del horario.",
-            ),
-        }
+            phase="schedule_edit",
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=False,
+            prompt="Perfecto. Voy a recalcular esa parte del horario.",
+        )
 
     answer = _parse_confirmation_answer(last_text) if has_new_input else None
     if answer is True:
@@ -172,23 +197,20 @@ def handle_schedule_review_turn(
             ensure_weekly_block(block).model_copy(update={"user_confirmed": True})
             for block in schedule_state.blocks
         ]
-        return {
-            "schedule": update_schedule_flow_state(
+        return _build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(
                 schedule_state,
                 blocks=updated_blocks,
                 review_stage="idle",
             ),
-            "events_validated": True,
-            "phase": "schedule_persist",
-            "user_message_count": current_count,
-            "last_user_text": last_text,
-            "awaiting_user_input": False,
-            "messages": append_message(
-                messages,
-                "assistant",
-                "Perfecto. Voy a guardar tu horario semanal.",
-            ),
-        }
+            events_validated=True,
+            phase="schedule_persist",
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=False,
+            prompt="Perfecto. Voy a guardar tu horario semanal.",
+        )
     if answer is False:
         return _prompt_correction_target(
             state,
@@ -232,14 +254,17 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
         "no tengo",
     }:
         updated_blocks = replace_section_blocks(blocks, "extracurricular", [])
-        return {
-            "schedule": _reset_schedule_review_state(schedule_state, updated_blocks),
-            "extracurricular": [],
-            "extras_has_any": False,
-            "extras_pending_items": [],
-            "phase": "draft",
-            "awaiting_user_input": False,
-        }
+        return _build_schedule_review_update(
+            state,
+            schedule=_reset_schedule_review_state(schedule_state, updated_blocks),
+            extracurricular=[],
+            extras_has_any=False,
+            extras_pending_items=[],
+            phase="draft",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=False,
+        )
 
     if target == "extracurricular" and pending_items:
         completed_item, missing = complete_pending_extracurricular_item(
@@ -263,17 +288,20 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
                 "extracurricular",
                 result.blocks,
             )
-            return {
-                "schedule": _reset_schedule_review_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=_reset_schedule_review_state(
                     schedule_state,
                     updated_schedule_blocks,
                 ),
-                "extracurricular": merged_items,
-                "extras_has_any": bool(merged_items),
-                "extras_pending_items": [],
-                "phase": "draft",
-                "awaiting_user_input": False,
-            }
+                extracurricular=merged_items,
+                extras_has_any=bool(merged_items),
+                extras_pending_items=[],
+                phase="draft",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=False,
+            )
 
     target_pending_items = academic_pending_items if target == "academic" else work_pending_items
     if target in {"academic", "work"} and target_pending_items:
@@ -284,39 +312,33 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
         )
         if updated_pending is not None:
             refreshed_items = [updated_pending] + target_pending_items[1:]
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     review_stage="awaiting_correction_payload",
                 ),
-                "academic_pending_items": (
+                academic_pending_items=(
                     refreshed_items if target == "academic" else academic_pending_items
                 ),
-                "work_pending_items": (
+                work_pending_items=(
                     refreshed_items if target == "work" else work_pending_items
                 ),
-                "phase": "validate",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    state.get("messages", []),
-                    "assistant",
-                    build_schedule_pending_prompt(target, refreshed_items),
-                ),
-            }
+                phase="validate",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=build_schedule_pending_prompt(target, refreshed_items),
+            )
 
-        current_section_blocks = [
-            block
-            for block in blocks
-            if str(block.get("block_type") if isinstance(block, dict) else block.block_type)
-            == target
-        ]
-        merged_target_blocks = merge_section_blocks(current_section_blocks, completed_blocks)
-        updated_schedule_blocks = replace_section_blocks(blocks, target, merged_target_blocks)
-        raw_inputs = serialize_schedule_blocks_to_raw_inputs(
+        sync_result = merge_completed_fixed_section(
+            blocks,
             state.get("raw_inputs", {}),
-            target,
-            merged_target_blocks,
+            target,  # type: ignore[arg-type]
+            completed_blocks,
         )
+        updated_schedule_blocks = sync_result.schedule_blocks
+        raw_inputs = sync_result.raw_inputs.model_dump(mode="python")
         if target == "academic":
             academic_pending_items = target_pending_items[1:]
         else:
@@ -326,37 +348,39 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
             academic_pending_items if target == "academic" else work_pending_items
         )
         if remaining_target_items:
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     blocks=updated_schedule_blocks,
                     review_stage="awaiting_correction_payload",
                     pending_correction_text=None,
                 ),
-                "raw_inputs": raw_inputs,
-                "academic_pending_items": academic_pending_items,
-                "work_pending_items": work_pending_items,
-                "phase": "validate",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    state.get("messages", []),
-                    "assistant",
-                    build_schedule_pending_prompt(target, remaining_target_items),
-                ),
-            }
+                raw_inputs=raw_inputs,
+                academic_pending_items=academic_pending_items,
+                work_pending_items=work_pending_items,
+                phase="validate",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=build_schedule_pending_prompt(target, remaining_target_items),
+            )
 
-        return {
-            "schedule": _reset_schedule_review_state(
+        return _build_schedule_review_update(
+            state,
+            schedule=_reset_schedule_review_state(
                 schedule_state,
                 updated_schedule_blocks,
             ),
-            "raw_inputs": raw_inputs,
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "draft",
-            "extras_pending_items": [],
-            "awaiting_user_input": False,
-        }
+            raw_inputs=raw_inputs,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            extras_pending_items=[],
+            phase="draft",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=False,
+        )
 
     if target in {"academic", "work"}:
         section_result = parse_fixed_schedule_section(
@@ -366,34 +390,33 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
         )
         if section_result.pending_schedule_items:
             updated_schedule_blocks = replace_section_blocks(blocks, target, section_result.blocks)
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     blocks=updated_schedule_blocks,
                     review_stage="awaiting_correction_payload",
                 ),
-                "academic_pending_items": (
+                academic_pending_items=(
                     section_result.pending_schedule_items
                     if target == "academic"
                     else academic_pending_items
                 ),
-                "work_pending_items": (
+                work_pending_items=(
                     section_result.pending_schedule_items
                     if target == "work"
                     else work_pending_items
                 ),
-                "phase": "validate",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    state.get("messages", []),
-                    "assistant",
-                    build_schedule_pending_prompt(
-                        target,
-                        section_result.pending_schedule_items,
-                        section_result.clarifications,
-                    ),
+                phase="validate",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=build_schedule_pending_prompt(
+                    target,
+                    section_result.pending_schedule_items,
+                    section_result.clarifications,
                 ),
-            }
+            )
 
     result = normalize_schedule_section(text, target or "academic", timezone=timezone)
     if result.needs_clarification:
@@ -403,25 +426,24 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
                 timezone=timezone,
                 expected_is_variable=False,
             )
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     review_stage="awaiting_correction_payload",
                 ),
-                "extracurricular": section_result.extracurricular_items,
-                "extras_has_any": bool(section_result.extracurricular_items),
-                "extras_pending_items": section_result.pending_extracurricular_items,
-                "phase": "validate",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    state.get("messages", []),
-                    "assistant",
-                    _build_extracurricular_correction_prompt(
-                        section_result.clarifications or result.clarifications,
-                        section_result.pending_extracurricular_items,
-                    ),
+                extracurricular=section_result.extracurricular_items,
+                extras_has_any=bool(section_result.extracurricular_items),
+                extras_pending_items=section_result.pending_extracurricular_items,
+                phase="validate",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=_build_extracurricular_correction_prompt(
+                    section_result.clarifications or result.clarifications,
+                    section_result.pending_extracurricular_items,
                 ),
-            }
+            )
         if target in {"academic", "work"}:
             section_result = parse_fixed_schedule_section(
                 text,
@@ -429,76 +451,73 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
                 timezone=timezone,
             )
             if section_result.blocks and not section_result.pending_schedule_items:
-                updated_schedule_blocks = replace_section_blocks(
+                sync_result = sync_fixed_section_result(
                     blocks,
-                    target,
-                    section_result.blocks,
-                )
-                raw_inputs = serialize_schedule_blocks_to_raw_inputs(
                     state.get("raw_inputs", {}),
                     target,
-                    section_result.blocks,
+                    section_result,
                 )
-                return {
-                    "schedule": _reset_schedule_review_state(
+                return _build_schedule_review_update(
+                    state,
+                    schedule=_reset_schedule_review_state(
                         schedule_state,
-                        updated_schedule_blocks,
+                        sync_result.schedule_blocks,
                     ),
-                    "raw_inputs": raw_inputs,
-                    "academic_pending_items": [],
-                    "work_pending_items": [],
-                    "phase": "draft",
-                    "extras_pending_items": [],
-                    "awaiting_user_input": False,
-                }
+                    raw_inputs=sync_result.raw_inputs.model_dump(mode="python"),
+                    academic_pending_items=[],
+                    work_pending_items=[],
+                    extras_pending_items=[],
+                    phase="draft",
+                    current_count=state.get("user_message_count", 0),
+                    last_text=state.get("last_user_text"),
+                    awaiting_user_input=False,
+                )
             updated_schedule_blocks = replace_section_blocks(
                 blocks,
                 target,
                 section_result.blocks,
             )
-            return {
-                "schedule": update_schedule_flow_state(
+            return _build_schedule_review_update(
+                state,
+                schedule=update_schedule_flow_state(
                     schedule_state,
                     blocks=updated_schedule_blocks,
                     review_stage="awaiting_correction_payload",
                 ),
-                "academic_pending_items": (
+                academic_pending_items=(
                     section_result.pending_schedule_items
                     if target == "academic"
                     else academic_pending_items
                 ),
-                "work_pending_items": (
+                work_pending_items=(
                     section_result.pending_schedule_items
                     if target == "work"
                     else work_pending_items
                 ),
-                "phase": "validate",
-                "awaiting_user_input": True,
-                "messages": append_message(
-                    state.get("messages", []),
-                    "assistant",
-                    build_schedule_pending_prompt(
-                        target,
-                        section_result.pending_schedule_items,
-                        section_result.clarifications or result.clarifications,
-                    ),
+                phase="validate",
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=build_schedule_pending_prompt(
+                    target,
+                    section_result.pending_schedule_items,
+                    section_result.clarifications or result.clarifications,
                 ),
-            }
-        return {
-            "schedule": update_schedule_flow_state(
+            )
+        return _build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(
                 schedule_state,
                 review_stage="awaiting_correction_payload",
             ),
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "validate",
-            "awaiting_user_input": True,
-            "messages": append_message(
-                state.get("messages", []),
-                "assistant",
-                "\n".join(result.clarifications),
-            ),
-        }
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            phase="validate",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=True,
+            prompt="\n".join(result.clarifications),
+        )
 
     updated_schedule_blocks = replace_section_blocks(
         blocks,
@@ -506,25 +525,34 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
         result.blocks,
     )
     update: dict[str, object] = {
-        "schedule": _reset_schedule_review_state(schedule_state, updated_schedule_blocks),
-        "phase": "draft",
-        "academic_pending_items": [],
-        "work_pending_items": [],
-        "extras_pending_items": [],
-        "awaiting_user_input": False,
+        **_build_schedule_review_update(
+            state,
+            schedule=_reset_schedule_review_state(schedule_state, updated_schedule_blocks),
+            phase="draft",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            academic_pending_items=[],
+            work_pending_items=[],
+            extras_pending_items=[],
+            awaiting_user_input=False,
+        ),
     }
     if target == "academic":
-        update["raw_inputs"] = replace_schedule_input_text(
+        sync_result = replace_fixed_section(
+            blocks,
             state.get("raw_inputs", {}),
             "academic",
-            text,
+            result.blocks,
         )
+        update["raw_inputs"] = sync_result.raw_inputs.model_dump(mode="python")
     elif target == "work":
-        update["raw_inputs"] = replace_schedule_input_text(
+        sync_result = replace_fixed_section(
+            blocks,
             state.get("raw_inputs", {}),
             "work",
-            text,
+            result.blocks,
         )
+        update["raw_inputs"] = sync_result.raw_inputs.model_dump(mode="python")
     elif target == "extracurricular":
         items, _ = parse_extracurricular_items(text, expected_is_variable=False)
         update["extracurricular"] = items
@@ -546,20 +574,19 @@ def _prompt_correction_target(
     messages: list,
 ) -> dict:
     return {
-        "schedule": update_schedule_flow_state(
-            schedule_state,
-            review_stage="awaiting_correction_target",
-            correction_target=None,
-            pending_correction_text=None,
-        ),
-        "phase": "validate",
-        "user_message_count": current_count,
-        "last_user_text": last_text,
-        "awaiting_user_input": True,
-        "messages": append_message(
-            messages,
-            "assistant",
-            _build_correction_menu(state),
+        **_build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(
+                schedule_state,
+                review_stage="awaiting_correction_target",
+                correction_target=None,
+                pending_correction_text=None,
+            ),
+            phase="validate",
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=True,
+            prompt=_build_correction_menu(state),
         ),
     }
 
@@ -572,12 +599,15 @@ def _prompt_again(
     prompt: str,
 ) -> dict:
     return {
-        "schedule": update_schedule_flow_state(schedule_state),
-        "phase": "validate",
-        "user_message_count": current_count if current_count else state.get("user_message_count", 0),
-        "last_user_text": last_text if current_count else state.get("last_user_text"),
-        "awaiting_user_input": True,
-        "messages": append_message(state.get("messages", []), "assistant", prompt),
+        **_build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(schedule_state),
+            phase="validate",
+            current_count=current_count if current_count else state.get("user_message_count", 0),
+            last_text=last_text if current_count else state.get("last_user_text"),
+            awaiting_user_input=True,
+            prompt=prompt,
+        ),
     }
 
 

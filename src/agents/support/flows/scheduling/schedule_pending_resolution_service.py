@@ -9,18 +9,20 @@ para mantener el comportamiento actual del grafo.
 from __future__ import annotations
 
 from agents.support.nodes.utils import append_message
-from agents.support.scheduling import merge_section_blocks, replace_section_blocks
-from agents.support.scheduling.contextual_parser import (
-    build_schedule_pending_prompt,
-    complete_pending_schedule_item,
-)
+from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
-    serialize_schedule_blocks_to_raw_inputs,
+    update_scheduling_state,
     update_schedule_flow_state,
 )
 from agents.support.state import AgentState
 from schemas.scheduling import PendingScheduleItem
+from services.scheduling.correction_sync import merge_completed_fixed_section
+from services.scheduling.contextual_schedule_parsing import complete_pending_schedule_item
+from services.scheduling.pending_schedule_support import (
+    build_schedule_pending_prompt,
+    coerce_pending_schedule_items as _coerce_pending_schedule_items,
+)
 
 
 def coerce_schedule_pending_items(
@@ -28,10 +30,7 @@ def coerce_schedule_pending_items(
 ) -> list[PendingScheduleItem]:
     """Convierte items pendientes académicos/laborales al tipo canónico."""
 
-    return [
-        item if isinstance(item, PendingScheduleItem) else PendingScheduleItem(**item)
-        for item in raw_items
-    ]
+    return _coerce_pending_schedule_items(raw_items)
 
 
 def has_block_type(blocks: list, block_type: str) -> bool:
@@ -72,45 +71,33 @@ def resolve_capture_pending_reply(
     )
     if updated_pending is not None:
         refreshed_items = [updated_pending] + pending_items[1:]
-        return {
-            "raw_inputs": raw_inputs,
-            "schedule": update_schedule_flow_state(
+        return _build_capture_pending_update(
+            state,
+            raw_inputs=raw_inputs,
+            schedule=update_schedule_flow_state(
                 schedule_flow_state,
                 capture_target=target,
                 capture_stage="awaiting_input",
             ),
-            "academic_pending_items": (
+            academic_pending_items=(
                 refreshed_items if target == "academic" else academic_pending_items
             ),
-            "work_pending_items": (
+            work_pending_items=(
                 refreshed_items if target == "work" else work_pending_items
             ),
-            "phase": "schedules",
-            "user_message_count": current_count,
-            "last_user_text": response_text,
-            "awaiting_user_input": True,
-            "messages": append_message(
-                state.get("messages", []),
-                "assistant",
-                build_schedule_pending_prompt(target, refreshed_items),
-            ),
-        }
+            current_count=current_count,
+            last_text=response_text,
+            prompt=build_schedule_pending_prompt(target, refreshed_items),
+        )
 
-    existing_blocks = list(schedule_flow_state.blocks)
-    current_section_blocks = [
-        block
-        for block in existing_blocks
-        if str(block.get("block_type") if isinstance(block, dict) else block.block_type)
-        == target
-    ]
-    merged_target_blocks = merge_section_blocks(current_section_blocks, completed_blocks)
-    updated_blocks = replace_section_blocks(existing_blocks, target, merged_target_blocks)
-
-    updated_raw_inputs = serialize_schedule_blocks_to_raw_inputs(
+    sync_result = merge_completed_fixed_section(
+        list(schedule_flow_state.blocks),
         raw_inputs,
         target,
-        merged_target_blocks,
+        completed_blocks,
     )
+    updated_blocks = sync_result.schedule_blocks
+    updated_raw_inputs = sync_result.raw_inputs.model_dump(mode="python")
     if target == "academic":
         academic_pending_items = pending_items[1:]
     else:
@@ -118,47 +105,37 @@ def resolve_capture_pending_reply(
 
     next_target, next_items = _next_pending_items(academic_pending_items, work_pending_items)
     if next_target is not None and next_items:
-        return {
-            "raw_inputs": updated_raw_inputs,
-            "schedule": update_schedule_flow_state(
+        return _build_capture_pending_update(
+            state,
+            raw_inputs=updated_raw_inputs,
+            schedule=update_schedule_flow_state(
                 schedule_flow_state,
                 blocks=updated_blocks,
                 capture_target=next_target,
                 capture_stage="awaiting_input",
             ),
-            "academic_pending_items": academic_pending_items,
-            "work_pending_items": work_pending_items,
-            "phase": "schedules",
-            "user_message_count": current_count,
-            "last_user_text": response_text,
-            "awaiting_user_input": True,
-            "messages": append_message(
-                state.get("messages", []),
-                "assistant",
-                build_schedule_pending_prompt(next_target, next_items),
-            ),
-        }
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+            current_count=current_count,
+            last_text=response_text,
+            prompt=build_schedule_pending_prompt(next_target, next_items),
+        )
 
-    return {
-        "raw_inputs": updated_raw_inputs,
-        "schedule": update_schedule_flow_state(
+    return _build_capture_pending_update(
+        state,
+        raw_inputs=updated_raw_inputs,
+        schedule=update_schedule_flow_state(
             schedule_flow_state,
             blocks=updated_blocks,
             capture_target=target,
             capture_stage="awaiting_more",
         ),
-        "academic_pending_items": academic_pending_items,
-        "work_pending_items": work_pending_items,
-        "phase": "schedules",
-        "user_message_count": current_count,
-        "last_user_text": response_text,
-        "awaiting_user_input": True,
-        "messages": append_message(
-            state.get("messages", []),
-            "assistant",
-            more_prompt or "",
-        ),
-    }
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+        current_count=current_count,
+        last_text=response_text,
+        prompt=more_prompt or "",
+    )
 
 
 def _next_pending_items(
@@ -170,3 +147,37 @@ def _next_pending_items(
     if work_pending_items:
         return "work", work_pending_items
     return None, []
+
+
+def _build_capture_pending_update(
+    state: AgentState,
+    *,
+    raw_inputs: dict,
+    schedule: dict,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    current_count: int,
+    last_text: str | None,
+    prompt: str,
+) -> dict:
+    return {
+        **update_scheduling_state(
+            state,
+            raw_inputs=raw_inputs,
+            schedule=schedule,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
+        ),
+        **update_conversation_state(
+            state,
+            phase="schedules",
+            user_message_count=current_count,
+            last_user_text=last_text,
+            awaiting_user_input=True,
+            messages=append_message(
+                state.get("messages", []),
+                "assistant",
+                prompt,
+            ),
+        ),
+    }

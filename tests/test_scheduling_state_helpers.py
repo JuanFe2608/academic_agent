@@ -7,8 +7,10 @@ from agents.support.scheduling.state_helpers import (
     replace_schedule_input_text,
     reset_schedule_review_state,
     serialize_schedule_blocks_to_raw_inputs,
+    update_scheduling_state,
     update_schedule_flow_state,
 )
+from agents.support.state import AgentState
 from services.scheduling import ScheduleConflict, WeeklyScheduleBlock
 
 
@@ -87,3 +89,37 @@ def test_raw_input_helpers_update_only_target_section() -> None:
     assert replaced["horario_laboral_text"] == "Lunes 09:00-18:00"
     assert serialized["horario_academico_text"] == "Lunes 08:00-10:00 Calculo"
     assert serialized["horario_laboral_text"] == "Lunes 09:00-18:00"
+
+
+def test_update_scheduling_state_resyncs_only_schedule_block_events() -> None:
+    block = _academic_block()
+    state = AgentState(
+        events=[
+            {
+                "id": "study-plan-1",
+                "dia": "Martes",
+                "inicio": "14:00",
+                "fin": "15:00",
+                "titulo": "Sesion de estudio",
+                "tipo": "confirmado",
+                "categoria": "estudio",
+                "origen": "study_planner",
+                "timezone": "America/Bogota",
+            }
+        ],
+        schedule={"blocks": []},
+    )
+
+    update = update_scheduling_state(
+        state,
+        schedule={"blocks": [block], "review_stage": "idle"},
+    )
+
+    assert "events" in update
+    assert [event.origen for event in update["events"]] == [
+        "schedule_block",
+        "study_planner",
+    ]
+    assert update["events"][0].id == f"schedule-block:{block.block_id}"
+    assert update["events"][0].titulo == "Calculo"
+    assert update["events"][1].id == "study-plan-1"

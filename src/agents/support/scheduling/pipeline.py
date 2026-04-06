@@ -2,35 +2,15 @@
 
 from __future__ import annotations
 
-from pydantic import BaseModel, Field
-
-from agents.support.nodes.collect_extracurricular_details.parsing import (
+from services.scheduling.extracurricular_parsing import (
     parse_extracurricular_items_with_context,
-)
-from schemas.scheduling import (
-    ExtracurricularItem,
-    PendingExtracurricularItem,
-    PendingScheduleItem,
 )
 from services.scheduling.constants import ScheduleBlockType
 from services.scheduling.models import WeeklyScheduleBlock
+from services.scheduling.parsing_results import SectionPipelineResult
 
 from .contextual_parser import parse_schedule_section_with_context
 from .normalizer import normalize_schedule_section, replace_section_blocks
-
-
-class SectionPipelineResult(BaseModel):
-    """Resultado unificado de una sección de horario."""
-
-    blocks: list[WeeklyScheduleBlock] = Field(default_factory=list)
-    clarifications: list[str] = Field(default_factory=list)
-    pending_schedule_items: list[PendingScheduleItem] = Field(default_factory=list)
-    extracurricular_items: list[ExtracurricularItem] = Field(default_factory=list)
-    pending_extracurricular_items: list[PendingExtracurricularItem] = Field(
-        default_factory=list
-    )
-    needs_clarification: bool = False
-    parser_used: str | None = None
 
 
 def parse_fixed_schedule_section(
