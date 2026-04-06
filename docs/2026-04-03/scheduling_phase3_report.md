@@ -38,7 +38,7 @@ Se creó `src/agents/support/scheduling/schedule_parsing_service.py` para centra
 
 - `src/agents/support/scheduling/schedule_parsing_service.py`
 - `tests/test_schedule_parsing_service.py`
-- `docs/scheduling_phase3_report.md`
+- `docs/2026-04-03/scheduling_phase3_report.md`
 
 ### Actualizados
 

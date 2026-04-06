@@ -2,13 +2,13 @@
 
 Fecha: 2026-04-03
 
-Documento rector original: `docs/plan_maestro_refactorizacion_arquitectura.md`
+Documento rector original: `docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md`
 
 Documentos de referencia:
 
-- `docs/informe_arquitectura_actual_agente.md`
-- `docs/analisis_recomendaciones_arquitectura_final.md`
-- `docs/architecture_rules.md`
+- `docs/2026-04-03/informe_arquitectura_actual_agente.md`
+- `docs/2026-04-03/analisis_recomendaciones_arquitectura_final.md`
+- `docs/2026-04-03/architecture_rules.md`
 
 ## 1. Veredicto ejecutivo
 

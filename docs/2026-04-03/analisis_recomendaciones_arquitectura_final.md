@@ -2,11 +2,11 @@
 
 Fecha: 2026-04-03
 
-Documento base: `docs/informe_arquitectura_actual_agente.md`
+Documento base: `docs/2026-04-03/informe_arquitectura_actual_agente.md`
 
 ## 1. Objetivo del análisis
 
-Este documento evalúa las recomendaciones técnicas propuestas al final de `docs/informe_arquitectura_actual_agente.md` y determina:
+Este documento evalúa las recomendaciones técnicas propuestas al final de `docs/2026-04-03/informe_arquitectura_actual_agente.md` y determina:
 
 - cuáles deben ejecutarse para considerar la arquitectura "final";
 - cuáles deben posponerse;

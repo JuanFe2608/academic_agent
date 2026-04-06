@@ -2,7 +2,7 @@
 
 Fecha: 2026-04-03
 
-Documento rector analizado: `docs/plan_maestro_refactorizacion_arquitectura.md`
+Documento rector analizado: `docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md`
 
 ## 1. Resumen ejecutivo
 

@@ -67,7 +67,7 @@ La versión actual del planificador usa reglas explícitas y predecibles:
 - `src/agents/support/planning/state_helpers.py`
 - `src/agents/support/planning/study_planning_service.py`
 - `tests/test_study_planning_service.py`
-- `docs/study_planning_phase5_report.md`
+- `docs/2026-04-03/study_planning_phase5_report.md`
 
 ### Actualizados
 

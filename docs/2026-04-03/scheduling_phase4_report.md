@@ -40,7 +40,7 @@ Sí se alineó con los helpers tipados de estado para reducir mutaciones manuale
 
 - `src/agents/support/scheduling/schedule_draft_service.py`
 - `tests/test_schedule_draft_service.py`
-- `docs/scheduling_phase4_report.md`
+- `docs/2026-04-03/scheduling_phase4_report.md`
 
 ### Actualizados
 

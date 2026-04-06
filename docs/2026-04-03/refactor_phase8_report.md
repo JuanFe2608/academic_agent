@@ -11,7 +11,7 @@ Se cerró la fase de enforcement arquitectónico y documentación final para evi
 - se agregaron guardrails de frontera de capas para validar que `agents/` no importe `repositories/` ni `integrations/` directamente, salvo wrappers de compatibilidad explícitos;
 - se reforzó la protección sobre `schemas/`, `state.py` y la zona `src/agents/support/tools/`;
 - se eliminaron acoples directos de `agents/` hacia `integrations/ai` y `repositories/onboarding` mediante wrappers válidos en `services/`;
-- se consolidó la documentación de arquitectura en `README.md` y `docs/architecture_rules.md`;
+- se consolidó la documentación de arquitectura en `README.md` y `docs/2026-04-03/architecture_rules.md`;
 - se preparó estructura inicial para líneas futuras en `src/rag/` y `src/integrations/whatsapp/`.
 
 ## Ajustes de capa realizados

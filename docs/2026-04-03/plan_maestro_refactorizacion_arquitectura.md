@@ -8,9 +8,9 @@ Alcance: Reorganizacion progresiva del codebase para alinear la arquitectura rea
 
 Documento base relacionado:
 
-- `docs/architecture_audit.md`
-- `docs/refactor_plan.md`
-- `docs/codebase_map.md`
+- `docs/2026-04-01/architecture_audit.md`
+- `docs/2026-04-01/refactor_plan.md`
+- `docs/2026-04-01/codebase_map.md`
 
 Este documento debe considerarse el plan rector a seguir para la refactorizacion.
 

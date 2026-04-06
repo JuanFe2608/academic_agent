@@ -4,7 +4,7 @@ Fecha de baseline: 2026-04-03
 
 Estado: activo para fases 0 y 1
 
-Documento rector: `docs/plan_maestro_refactorizacion_arquitectura.md`
+Documento rector: `docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md`
 
 ## 1. Alcance Del Baseline
 

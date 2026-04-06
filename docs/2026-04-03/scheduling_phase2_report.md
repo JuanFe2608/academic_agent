@@ -79,7 +79,7 @@ La lógica consolidada incluye:
 - `src/agents/support/scheduling/state_helpers.py`
 - `src/agents/support/scheduling/extracurricular_support.py`
 - `tests/test_scheduling_state_helpers.py`
-- `docs/scheduling_phase2_report.md`
+- `docs/2026-04-03/scheduling_phase2_report.md`
 
 ### Actualizados
 

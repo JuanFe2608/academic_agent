@@ -40,7 +40,7 @@ Regla principal de dependencia:
 - `src/agents/support/tools/` quedó congelado como zona curada de compatibilidad; no se deben agregar módulos nuevos allí.
 - `src/agents/support/state.py` no debe volver a absorber parsing, validación o utilidades de dominio fuera de sus re-exports permitidos.
 
-Las reglas detalladas y la guía de responsabilidades están en [docs/architecture_rules.md](/home/jfjaramillo12/TESIS/academic_agentAI/docs/architecture_rules.md).
+Las reglas detalladas y la guía de responsabilidades están en [docs/2026-04-03/architecture_rules.md](/home/jfjaramillo12/TESIS/academic_agentAI/docs/2026-04-03/architecture_rules.md).
 
 ## Capacidades futuras
 
@@ -49,5 +49,5 @@ Las reglas detalladas y la guía de responsabilidades están en [docs/architectu
 
 ## Refactor arquitectónico
 
-El plan rector está en [docs/plan_maestro_refactorizacion_arquitectura.md](/home/jfjaramillo12/TESIS/academic_agentAI/docs/plan_maestro_refactorizacion_arquitectura.md).
-Los reportes ejecutados por fase viven en `docs/refactor_phase*.md`.
+El plan rector está en [docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md](/home/jfjaramillo12/TESIS/academic_agentAI/docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md).
+Los reportes ejecutados por fase viven en `docs/2026-04-03/refactor_phase*.md`.

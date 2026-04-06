@@ -4,7 +4,7 @@ Fecha: 2026-04-03
 
 Estado: completada
 
-Documento rector: `docs/plan_maestro_refactorizacion_arquitectura.md`
+Documento rector: `docs/2026-04-03/plan_maestro_refactorizacion_arquitectura.md`
 
 ## Objetivo Ejecutado
 
