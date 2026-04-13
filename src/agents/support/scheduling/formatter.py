@@ -56,9 +56,11 @@ def build_conflict_message(conflicts: list[ScheduleConflict]) -> str:
         )
     lines.append("")
     lines.append(
-        "No es lo más recomendable para una buena planificación. "
-        "¿Quieres dejarlo así o prefieres corregirlo?"
+        "No es lo más recomendable para una buena planificación."
     )
+    lines.append("(Escribe el número de la opción que quieres elegir)")
+    lines.append("1. Sí, dejarlo así")
+    lines.append("2. No, quiero corregirlo")
     return "\n".join(lines)
 
 

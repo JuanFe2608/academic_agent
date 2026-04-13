@@ -36,6 +36,14 @@ from services.sync.outlook_calendar_sync_service import (
     OutlookCalendarSyncService,
     build_outlook_calendar_sync_service,
 )
+from services.sync.outlook_fixed_schedule_sync_service import (
+    OutlookFixedScheduleSyncService,
+    build_outlook_fixed_schedule_sync_service,
+)
+from services.sync.outlook_fixed_schedule_repair_service import (
+    OutlookFixedScheduleRepairService,
+    build_outlook_fixed_schedule_repair_service,
+)
 from repositories.microsoft_graph.state_repository import (
     MicrosoftGraphStateRepository,
     build_microsoft_graph_state_repository,
@@ -152,6 +160,30 @@ class AppContainer:
     ) -> None:
         self._set_override("outlook_calendar_sync_service", service)
 
+    def get_outlook_fixed_schedule_sync_service(self) -> OutlookFixedScheduleSyncService:
+        return self._get_or_build(
+            "outlook_fixed_schedule_sync_service",
+            self._build_outlook_fixed_schedule_sync_service,
+        )
+
+    def set_outlook_fixed_schedule_sync_service(
+        self,
+        service: OutlookFixedScheduleSyncService | None,
+    ) -> None:
+        self._set_override("outlook_fixed_schedule_sync_service", service)
+
+    def get_outlook_fixed_schedule_repair_service(self) -> OutlookFixedScheduleRepairService:
+        return self._get_or_build(
+            "outlook_fixed_schedule_repair_service",
+            self._build_outlook_fixed_schedule_repair_service,
+        )
+
+    def set_outlook_fixed_schedule_repair_service(
+        self,
+        service: OutlookFixedScheduleRepairService | None,
+    ) -> None:
+        self._set_override("outlook_fixed_schedule_repair_service", service)
+
     def get_microsoft_todo_sync_service(self) -> MicrosoftTodoSyncService:
         return self._get_or_build(
             "microsoft_todo_sync_service",
@@ -185,6 +217,22 @@ class AppContainer:
     def _build_outlook_calendar_sync_service(self) -> OutlookCalendarSyncService:
         return build_outlook_calendar_sync_service(
             instances_repository=None,
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
+
+    def _build_outlook_fixed_schedule_sync_service(self) -> OutlookFixedScheduleSyncService:
+        schedule_service = self.get_schedule_service()
+        return build_outlook_fixed_schedule_sync_service(
+            schedule_repository=getattr(schedule_service, "repository", None),
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
+
+    def _build_outlook_fixed_schedule_repair_service(self) -> OutlookFixedScheduleRepairService:
+        schedule_service = self.get_schedule_service()
+        return build_outlook_fixed_schedule_repair_service(
+            schedule_repository=getattr(schedule_service, "repository", None),
             state_repository=self.get_microsoft_graph_state_repository(),
             auth_client=self.get_microsoft_oauth_client(),
         )

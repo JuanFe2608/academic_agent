@@ -38,9 +38,12 @@ from .block_operations import (
 from .extracurricular_state import (
     build_extracurricular_item_source_text,
     build_extracurricular_items_source_text,
-    build_extracurricular_reply_hint,
     coerce_extracurricular_pending_items,
     merge_extracurricular_items,
+)
+from .pending_extracurricular_support import (
+    build_extracurricular_pending_prompt,
+    build_extracurricular_reply_hint,
 )
 from .extracurricular_parsing import (
     complete_pending_extracurricular_item,
@@ -56,7 +59,18 @@ from .event_projection import (
     schedule_block_event_id,
     sync_schedule_block_events,
 )
-from .service import PersistScheduleResult, ScheduleService, build_schedule_service
+from .service import (
+    PersistScheduleResult,
+    ScheduleBlocksLookupResult,
+    ScheduleService,
+    build_schedule_service,
+)
+from .end_date_support import (
+    current_local_date,
+    format_schedule_end_date,
+    is_schedule_expired,
+    parse_schedule_end_date,
+)
 from .extracurricular_events import (
     build_fixed_events,
     build_tentative_events,
@@ -100,6 +114,7 @@ __all__ = [
     "NormalizedScheduleResult",
     "PersistScheduleResult",
     "SPANISH_TO_ENGLISH",
+    "ScheduleBlocksLookupResult",
     "ScheduleConflict",
     "ScheduleFlowState",
     "ScheduleService",
@@ -113,6 +128,8 @@ __all__ = [
     "blocks_to_schedule_events",
     "build_extracurricular_item_source_text",
     "build_extracurricular_items_source_text",
+    "current_local_date",
+    "build_extracurricular_pending_prompt",
     "build_extracurricular_reply_hint",
     "build_schedule_pending_prompt",
     "build_schedule_block_event",
@@ -128,8 +145,10 @@ __all__ = [
     "ensure_schedule_conflict",
     "ensure_weekly_block",
     "extract_natural_schedule_components",
+    "format_schedule_end_date",
     "generate_tentative_extracurricular",
     "is_ambiguous_time_range",
+    "is_schedule_expired",
     "merge_completed_fixed_section",
     "merge_completed_section_blocks",
     "merge_extracurricular_items",
@@ -146,6 +165,7 @@ __all__ = [
     "parse_extracurricular_items",
     "parse_extracurricular_items_with_context",
     "parse_extracurricular_text",
+    "parse_schedule_end_date",
     "parse_schedule_section_with_context",
     "parse_work_schedule_text",
     "normalize_day",

@@ -5,16 +5,21 @@ from __future__ import annotations
 from langchain_core.messages import HumanMessage
 
 from agents.support.dependencies import (
+    set_outlook_fixed_schedule_sync_service,
     set_personalization_service,
     set_schedule_service,
 )
-from agents.support.agent import _route_after_persist_schedule
+from agents.support.agent import (
+    _route_after_persist_schedule,
+    _route_after_schedule_sync,
+)
 from agents.support.nodes.collect_study_profile.node import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker.node import (
     collect_study_profile_tiebreaker,
 )
 from agents.support.nodes.persist_schedule.node import persist_schedule
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
+from agents.support.nodes.sync_fixed_schedule.node import sync_fixed_schedule
 from agents.support.state import AgentState
 from repositories.personalization.repository import InMemoryPersonalizationRepository
 from repositories.scheduling.repository import InMemoryScheduleRepository
@@ -53,6 +58,22 @@ def _add_user_message(state: AgentState, text: str) -> AgentState:
     return AgentState(**payload)
 
 
+class _FixedScheduleSyncServiceStub:
+    def sync_schedule_profile(
+        self,
+        *,
+        student_id: int | None,
+        schedule_profile_id: int | None,
+        calendar_state: dict | None = None,
+        calendar_id: str | None = None,
+    ):
+        class _Result:
+            synced = True
+            synced_event_map = {}
+
+        return _Result()
+
+
 def test_personalization_feature_flag_off_keeps_current_behavior(monkeypatch) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", raising=False)
@@ -67,8 +88,8 @@ def test_personalization_feature_flag_off_keeps_current_behavior(monkeypatch) ->
         update = persist_schedule(state)
         next_state = _apply_update(state, update)
 
-        assert update["phase"] == "sync"
-        assert _route_after_persist_schedule(next_state) == "end"
+        assert update["phase"] == "schedule_sync"
+        assert _route_after_persist_schedule(next_state) == "sync_fixed_schedule"
     finally:
         set_schedule_service(None)
 
@@ -77,6 +98,7 @@ def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypat
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
+    set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
     set_personalization_service(
         PersonalizationService(
             config=PersonalizationConfig(enabled=True),
@@ -92,15 +114,19 @@ def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypat
 
         update = persist_schedule(state)
         next_state = _apply_update(state, update)
+        sync_update = sync_fixed_schedule(next_state)
+        synced_state = _apply_update(next_state, sync_update)
 
-        assert _route_after_persist_schedule(next_state) == "collect_study_profile"
+        assert _route_after_persist_schedule(next_state) == "sync_fixed_schedule"
+        assert _route_after_schedule_sync(synced_state) == "collect_study_profile"
 
-        question_update = collect_study_profile(next_state)
+        question_update = collect_study_profile(synced_state)
 
         assert question_update["phase"] == "study_profile"
         assert "Reto 1/10" in question_update["messages"][0].content
         assert "Vamos a activar tu Radar de estudio" in question_update["messages"][0].content
     finally:
+        set_outlook_fixed_schedule_sync_service(None)
         set_schedule_service(None)
         set_personalization_service(None)
 
@@ -136,6 +162,7 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
+    set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
     personalization_repository = InMemoryPersonalizationRepository()
     set_personalization_service(
         PersonalizationService(
@@ -151,7 +178,9 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
         )
 
         state = _apply_update(state, persist_schedule(state))
-        assert _route_after_persist_schedule(state) == "collect_study_profile"
+        assert _route_after_persist_schedule(state) == "sync_fixed_schedule"
+        state = _apply_update(state, sync_fixed_schedule(state))
+        assert _route_after_schedule_sync(state) == "collect_study_profile"
 
         state = _apply_update(state, collect_study_profile(state))
         assert state.phase == "study_profile"
@@ -196,6 +225,7 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
         assert saved_profile["scores"][0]["max_score"] == 600
         assert saved_profile["scores"][0]["normalized_score"] == 1.0
     finally:
+        set_outlook_fixed_schedule_sync_service(None)
         set_schedule_service(None)
         set_personalization_service(None)
 
@@ -204,6 +234,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
+    set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
     personalization_repository = InMemoryPersonalizationRepository()
     set_personalization_service(
         PersonalizationService(
@@ -219,6 +250,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
         )
 
         state = _apply_update(state, persist_schedule(state))
+        state = _apply_update(state, sync_fixed_schedule(state))
         state = _apply_update(state, collect_study_profile(state))
 
         for answer in ["3", "3", "2", "2", "1", "1", "0", "3", "1", "1"]:
@@ -267,5 +299,6 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
             "repeticion_espaciada",
         ]
     finally:
+        set_outlook_fixed_schedule_sync_service(None)
         set_schedule_service(None)
         set_personalization_service(None)

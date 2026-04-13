@@ -2,40 +2,42 @@
 
 from dotenv import load_dotenv
 import os
-import base64
 from openai import AzureOpenAI
 
+# Cargar variables de entorno
 load_dotenv()
 
-def encode_image(image_path):
-    with open(image_path, "rb") as image_file:
-        return base64.b64encode(image_file.read()).decode("utf-8")
+# Validar variables necesarias
+required_vars = [
+    "AZURE_OPENAI_API_KEY",
+    "OPENAI_API_VERSION",
+    "AZURE_OPENAI_ENDPOINT",
+    "AZURE_OPENAI_DEPLOYMENT_NAME"
+]
 
-image_base64 = encode_image("prueba.png")
+for var in required_vars:
+    if not os.getenv(var):
+        raise ValueError(f"Falta la variable de entorno: {var}")
 
+# Crear cliente
 client = AzureOpenAI(
     api_key=os.getenv("AZURE_OPENAI_API_KEY"),
     api_version=os.getenv("AZURE_OPENAI_API_VERSION"),
     azure_endpoint=os.getenv("AZURE_OPENAI_ENDPOINT")
 )
 
+deployment_name = os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME")
+
+# Hacer la solicitud
 response = client.chat.completions.create(
-    model=os.getenv("AZURE_OPENAI_DEPLOYMENT_NAME"),
+    model=deployment_name,
     messages=[
-        {
-            "role": "user",
-            "content": [
-                {"type": "text", "text": "Que hay en este horario?"},
-                {
-                    "type": "image_url",
-                    "image_url": {
-                        "url": f"data:image/jpeg;base64,{image_base64}",
-                        "detail": "low"
-                    }
-                }
-            ]
-        }
-    ]
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": "I am going to Paris, what should I see?"}
+    ],
+    max_tokens=800,
+    temperature=0.7
 )
 
+# Imprimir respuesta
 print(response.choices[0].message.content)

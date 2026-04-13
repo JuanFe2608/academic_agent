@@ -7,6 +7,7 @@ import re
 from schemas.scheduling import ExtracurricularItem, PendingExtracurricularItem
 from services.scheduling.activity_matching import normalize_text
 from services.scheduling.ai_support import llm_normalize_extracurricular_items
+from services.scheduling.pending_completion_support import build_pending_completion_text
 from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     is_ambiguous_time_range,
@@ -221,20 +222,19 @@ def complete_pending_extracurricular_item(
         if isinstance(pending_item, PendingExtracurricularItem)
         else PendingExtracurricularItem(**pending_item)
     )
-    combined_text = " ".join(
-        part.strip()
-        for part in [str(pending.raw_text or ""), str(response_text or "")]
-        if str(part).strip()
+    resolution_text, used_full_replacement = build_pending_completion_text(
+        str(pending.raw_text or ""),
+        str(response_text or ""),
     )
     effective_is_variable = (
         expected_is_variable if expected_is_variable is not None else pending.es_variable
     )
     item, missing = parse_extracurricular_text(
-        combined_text,
+        resolution_text,
         expected_is_variable=effective_is_variable,
     )
     updates: dict[str, object] = {}
-    if pending.nombre.strip():
+    if pending.nombre.strip() and not used_full_replacement and not item.nombre.strip():
         updates["nombre"] = pending.nombre.strip()
     if not item.dias and pending.dias:
         updates["dias"] = list(pending.dias)

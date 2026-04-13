@@ -102,7 +102,9 @@ def test_parse_schedules_to_events_marks_missing_title_as_incomplete() -> None:
 
     assert update["phase"] == "schedules"
     assert update["awaiting_user_input"] is True
-    assert "nombre de la materia o actividad" in update["messages"][0].content.lower()
+    prompt = update["messages"][0].content.lower()
+    assert "necesito algunos datos para cerrar bien esta materia" in prompt
+    assert "nombre de la materia" in prompt
 
 
 def test_parse_schedules_to_events_accepts_military_time_from_university_email() -> None:

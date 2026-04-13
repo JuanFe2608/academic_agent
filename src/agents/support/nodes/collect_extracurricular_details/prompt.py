@@ -29,6 +29,8 @@ PROMPT_FLEXIBLE_DETAILS = (
 )
 
 PROMPT_MORE = (
-    "¿Quieres agregar más actividades o seguimos?\n"
-    "Si quieres agregar más, envíamelas ahora. Si ya terminaste, responde: seguimos."
+    "🎯 ¿Quieres agregar más actividades extracurriculares o continuamos?\n"
+    "(Escribe el número de la opción que quieres elegir)\n"
+    "1. Sí, quiero agregar más actividades\n"
+    "2. No, seguimos"
 )

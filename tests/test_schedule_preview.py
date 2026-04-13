@@ -13,12 +13,14 @@ def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp
     image_path.write_bytes(b"fake-png")
 
     monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node.render_recurring_schedule",
-        lambda _blocks, **_kwargs: str(image_path),
-    )
-    monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node._encode_image",
-        lambda _path: "data:image/png;base64,abc",
+        "agents.support.nodes.render_schedule_preview.node.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ],
+            str(image_path),
+        ),
     )
 
     blocks = [
@@ -55,6 +57,8 @@ def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp
     assert "- Lunes: Calculo" in text
     assert "- Martes: Trabajo" in text
     assert "¿Entendí bien tu horario?" in text
+    assert "escribe el número de la opción" in text.lower()
+    assert "1. Sí, está correcto" in text
     assert update["messages"][0].content[1]["image_url"]["url"] == "data:image/png;base64,abc"
 
 
@@ -63,12 +67,14 @@ def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_p
     image_path.write_bytes(b"fake-png")
 
     monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node.render_recurring_schedule",
-        lambda _blocks, **_kwargs: str(image_path),
-    )
-    monkeypatch.setattr(
-        "agents.support.nodes.render_schedule_preview.node._encode_image",
-        lambda _path: "data:image/png;base64,abc",
+        "agents.support.nodes.render_schedule_preview.node.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ],
+            str(image_path),
+        ),
     )
 
     blocks = [

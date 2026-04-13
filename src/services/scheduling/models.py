@@ -10,8 +10,11 @@ from pydantic import BaseModel, Field
 from .constants import (
     CorrectionTarget,
     DayOfWeek,
+    EditableScheduleField,
     ScheduleBlockType,
     ScheduleCaptureStage,
+    ScheduleRepairStage,
+    ScheduleRenewalStage,
     ScheduleReviewStage,
 )
 
@@ -87,10 +90,15 @@ class ScheduleFlowState(BaseModel):
     capture_target: Optional[ScheduleBlockType] = None
     capture_stage: ScheduleCaptureStage = "idle"
     correction_target: Optional[CorrectionTarget] = None
+    editing_block_id: Optional[str] = None
+    editing_field: Optional[EditableScheduleField] = None
     pending_correction_text: Optional[str] = None
     conflicts_accepted: bool = False
+    schedule_end_date: Optional[str] = None
     persisted_profile_id: Optional[int] = None
     persistence_error: Optional[str] = None
+    renewal_stage: ScheduleRenewalStage = "idle"
+    repair_stage: ScheduleRepairStage = "idle"
 
 
 def ensure_weekly_block(block: WeeklyScheduleBlock | dict) -> WeeklyScheduleBlock:

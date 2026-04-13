@@ -140,7 +140,7 @@ def test_parse_schedules_to_events_prompts_to_add_more_before_moving_on() -> Non
     assert update["schedule"]["capture_stage"] == "awaiting_more"
     prompt = update["messages"][0].content.lower()
     assert "agregar más materias" in prompt
-    assert "seguimos" in prompt
+    assert "escribe el número" in prompt
 
 
 def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -> None:
@@ -158,9 +158,110 @@ def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -
 
     assert update["phase"] == "schedules"
     assert update["awaiting_user_input"] is True
-    assert update["schedule"]["capture_target"] == "work"
+    assert update["schedule"]["capture_target"] == "academic"
+    assert update["schedule"]["review_stage"] == "section_awaiting_confirmation"
     prompt = update["messages"][0].content.lower()
-    assert "horario laboral" in prompt
+    assert "horario académico actual" in prompt
+    assert "está bien así" in prompt
+    assert "1. sí, está correcto" in prompt
+    assert "2. no, quiero cambiar algo" in prompt
+
+
+def test_request_schedules_section_confirmation_yes_moves_to_work_prompt() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "ambos"},
+        raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                }
+            ],
+            "capture_target": "academic",
+            "capture_stage": "idle",
+            "review_stage": "section_awaiting_confirmation",
+            "correction_target": "academic",
+        },
+        messages=[HumanMessage(content="1")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["phase"] == "schedules"
+    assert update["awaiting_user_input"] is True
+    assert update["schedule"]["capture_target"] == "work"
+    assert update["schedule"]["review_stage"] == "idle"
+    assert "horario laboral" in update["messages"][0].content.lower()
+
+
+def test_request_schedules_section_edit_revalidates_conflicts_after_change(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.section_confirmation_service.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+            ],
+            "tmp/schedule.png",
+        ),
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "ambos"},
+        raw_inputs={
+            "horario_academico_text": "Lunes 08:00-10:00 Algebra",
+            "horario_laboral_text": "Lunes 09:00-18:00",
+        },
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                    "block_id": "academic-1",
+                },
+                {
+                    "block_type": "work",
+                    "title": "Trabajo",
+                    "day_of_week": "monday",
+                    "start_time": "09:00",
+                    "end_time": "18:00",
+                    "source_text": "Lunes 09:00-18:00",
+                    "block_id": "work-1",
+                },
+            ],
+            "capture_target": "academic",
+            "capture_stage": "idle",
+            "review_stage": "section_awaiting_field_value",
+            "correction_target": "academic",
+            "editing_block_id": "academic-1",
+            "editing_field": "time_range",
+        },
+        messages=[HumanMessage(content="9:30 am a 10:30 am")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["phase"] == "schedules"
+    assert update["schedule"]["review_stage"] == "section_awaiting_item_confirmation"
+    assert len(update["schedule"]["conflicts"]) == 1
+    text = update["messages"][0].content[0]["text"].lower()
+    assert "genera un cruce" in text
+    assert "9:30" in text
+    assert update["messages"][0].content[1]["image_url"]["url"] == "data:image/png;base64,abc"
 
 
 def test_request_schedules_awaiting_more_accepts_new_academic_content_with_fisica() -> None:
@@ -182,6 +283,90 @@ def test_request_schedules_awaiting_more_accepts_new_academic_content_with_fisic
     assert "messages" not in update or not update["messages"]
 
 
+def test_request_schedules_awaiting_more_strips_option_text_from_inline_academic_payload() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Martes - Algebra - 08:00 a 10:00"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_more"},
+        messages=[
+            HumanMessage(
+                content="Sí, quiero agregar más materias\nLunes - Calulo - 7am a 9 am"
+            )
+        ],
+    )
+
+    update = request_schedules(state)
+
+    assert update["awaiting_user_input"] is False
+    raw_text = update["raw_inputs"]["horario_academico_text"]
+    assert "quiero agregar más materias" not in raw_text.lower()
+    assert raw_text.endswith("Lunes - Calulo - 7am a 9 am")
+
+
+def test_request_schedules_numeric_more_then_new_subject_keeps_original_and_adds_new_one() -> None:
+    initial_raw_text = "\n".join(
+        [
+            "Problem Discovery & Solution Design With Artificial Intelligence",
+            "Martes de 4:00 p.m. a 6:00 p.m.",
+        ]
+    )
+    first_state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": initial_raw_text},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_more"},
+        messages=[HumanMessage(content="1")],
+    )
+
+    first_update = request_schedules(first_state)
+
+    assert first_update["awaiting_user_input"] is True
+    assert first_update["schedule"]["capture_stage"] == "awaiting_input"
+
+    second_state = AgentState(
+        phase=first_update.get("phase", "schedules"),
+        awaiting_user_input=True,
+        user_message_count=1,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs=first_update["raw_inputs"],
+        schedule=first_update["schedule"],
+        messages=[HumanMessage(content="Lunes - Cálculo - 07:00 a 09:00")],
+    )
+
+    second_update = request_schedules(second_state)
+    parse_update = parse_node.parse_schedules_to_events(
+        AgentState(
+            phase=second_update.get("phase", "schedules"),
+            student_profile={"occupation": "solo_estudio"},
+            raw_inputs=second_update["raw_inputs"],
+            schedule=second_update["schedule"],
+        )
+    )
+
+    academic_blocks = [
+        block
+        for block in parse_update["schedule"]["blocks"]
+        if block.block_type == "academic"
+    ]
+    assert {
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in academic_blocks
+    } == {
+        (
+            "Problem Discovery & Solution Design With Artificial Intelligence",
+            "tuesday",
+            "16:00",
+            "18:00",
+        ),
+        ("Cálculo", "monday", "07:00", "09:00"),
+    }
+
+
 def test_request_schedules_awaiting_more_accepts_new_work_content() -> None:
     state = AgentState(
         phase="schedules",
@@ -199,6 +384,72 @@ def test_request_schedules_awaiting_more_accepts_new_work_content() -> None:
     assert update["awaiting_user_input"] is False
     assert "Sabado - Trabajo - 8 am a 12 pm" in update["raw_inputs"]["horario_laboral_text"]
     assert "messages" not in update or not update["messages"]
+
+
+def test_request_schedules_field_selection_includes_delete_option() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                    "block_id": "academic-1",
+                }
+            ],
+            "review_stage": "section_awaiting_item_selection",
+            "correction_target": "academic",
+        },
+        messages=[HumanMessage(content="1")],
+    )
+
+    update = request_schedules(state)
+
+    prompt = update["messages"][0].content.lower()
+    assert "escribe el número del cambio" in prompt
+    assert "3. horario" in prompt
+    assert "eliminar materia" in prompt
+
+
+def test_request_schedules_rejects_incoherent_time_range_in_shared_editor() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                    "block_id": "academic-1",
+                }
+            ],
+            "review_stage": "section_awaiting_field_value",
+            "correction_target": "academic",
+            "editing_block_id": "academic-1",
+            "editing_field": "time_range",
+        },
+        messages=[HumanMessage(content="10:30 am a 9:30 am")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["phase"] == "schedules"
+    assert update["awaiting_user_input"] is True
+    assert update["schedule"]["review_stage"] == "section_awaiting_field_value"
+    assert "inicio debe quedar antes" in update["messages"][0].content.lower()
 
 
 def test_request_schedules_option_three_closes_with_specialized_message() -> None:

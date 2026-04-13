@@ -4,10 +4,13 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
+import agents.support.agent as agent_module
 from agents.support.agent import (
+    _route_after_schedule_repair,
     _route_after_schedule_edit,
     _route_after_parse_schedules,
     _route_collect_profile,
+    _route_welcome,
     _route_validate,
     _should_wait,
 )
@@ -64,6 +67,12 @@ def test_route_validate_goes_to_schedule_edit_when_requested() -> None:
     assert _route_validate(state) == "apply_schedule_correction"
 
 
+def test_route_validate_goes_to_draft_rebuild_when_requested() -> None:
+    state = AgentState(phase="draft", awaiting_user_input=False)
+
+    assert _route_validate(state) == "build_draft_schedule"
+
+
 def test_route_collect_profile_stops_when_user_is_out_of_scope() -> None:
     state = AgentState(
         phase="end",
@@ -100,3 +109,40 @@ def test_route_after_parse_schedules_only_moves_to_extras_when_parse_completed()
     )
 
     assert _route_after_parse_schedules(state) == "ask_extracurricular"
+
+
+def test_route_welcome_reopens_with_schedule_renewal_when_expired_and_user_writes(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: True)
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=0,
+        messages=[HumanMessage(content="hola")],
+        student_profile={"persisted_student_id": 1},
+    )
+
+    assert _route_welcome(state) == "renew_fixed_schedule"
+
+
+def test_route_welcome_reopens_with_schedule_repair_when_drift_pending(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: True)
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=0,
+        messages=[HumanMessage(content="hola")],
+        student_profile={"persisted_student_id": 1},
+    )
+
+    assert _route_welcome(state) == "repair_fixed_schedule"
+
+
+def test_route_after_schedule_repair_can_restart_schedule_capture() -> None:
+    state = AgentState(phase="schedules", awaiting_user_input=False)
+
+    assert _route_after_schedule_repair(state) == "request_schedules"

@@ -23,12 +23,21 @@ from agents.support.nodes.persist_study_profile import persist_study_profile
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
 from agents.support.nodes.persist_schedule import persist_schedule
 from agents.support.nodes.render_schedule_preview import render_schedule_preview
+from agents.support.nodes.repair_fixed_schedule import repair_fixed_schedule
+from agents.support.nodes.renew_fixed_schedule import renew_fixed_schedule
 from agents.support.nodes.request_schedules import request_schedules
 from agents.support.nodes.send_email_verification import send_email_verification
+from agents.support.nodes.sync_fixed_schedule import sync_fixed_schedule
 from agents.support.nodes.validate_schedule import validate_schedule
 from agents.support.nodes.verify_email_code import verify_email_code
 from agents.support.nodes.welcome_consent import welcome_consent
 from agents.support.nodes.utils import detect_new_input
+from agents.support.flows.scheduling.fixed_schedule_renewal_service import (
+    requires_fixed_schedule_renewal,
+)
+from agents.support.flows.scheduling.fixed_schedule_repair_service import (
+    requires_fixed_schedule_repair,
+)
 from agents.support.onboarding.validators import (
     get_missing_profile_fields,
     profile_requires_email_verification,
@@ -70,6 +79,10 @@ def _route_welcome(state: AgentState) -> str:
         return "welcome_consent" if has_new_input else "end"
     if _should_wait(state):
         return "end"
+    if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_renewal(state):
+        return "renew_fixed_schedule"
+    if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_repair(state):
+        return "repair_fixed_schedule"
     if conversation.phase == "end":
         return "end"
     if conversation.phase != "consent":
@@ -111,6 +124,12 @@ def _route_from_phase(state: AgentState) -> str:
         return "apply_schedule_correction"
     if phase == "schedule_persist":
         return "persist_schedule"
+    if phase == "schedule_sync":
+        return "sync_fixed_schedule"
+    if phase == "schedule_renewal":
+        return "renew_fixed_schedule"
+    if phase == "schedule_repair":
+        return "repair_fixed_schedule"
     if phase == "sync":
         if is_personalization_enabled():
             if planning.study_profile.status != "completed":
@@ -290,6 +309,8 @@ def _route_validate(state: AgentState) -> str:
     if _should_wait(state):
         return "end"
     phase = state.conversation_state.phase
+    if phase == "draft":
+        return "build_draft_schedule"
     if phase == "schedule_edit":
         return "apply_schedule_correction"
     if phase == "schedule_persist":
@@ -308,7 +329,18 @@ def _route_after_schedule_edit(state: AgentState) -> str:
 
 
 def _route_after_persist_schedule(state: AgentState) -> str:
-    """Activa personalización opcional después de guardar el horario."""
+    """Resuelve el siguiente paso después de persistir el horario."""
+
+    if _should_wait(state):
+        return "end"
+    phase = state.conversation_state.phase
+    if phase == "schedule_sync":
+        return "sync_fixed_schedule"
+    return "end"
+
+
+def _route_after_schedule_sync(state: AgentState) -> str:
+    """Activa personalización opcional después del sync del horario."""
 
     if _should_wait(state):
         return "end"
@@ -322,6 +354,32 @@ def _route_after_persist_schedule(state: AgentState) -> str:
         return "collect_study_profile"
     if conversation.phase == "sync" and planning.study_profile.status != "completed":
         return "collect_study_profile"
+    return "end"
+
+
+def _route_after_schedule_renewal(state: AgentState) -> str:
+    """Continúa o cierra el subflujo de renovación del horario fijo."""
+
+    if _should_wait(state):
+        return "end"
+    phase = state.conversation_state.phase
+    if phase == "schedules":
+        return "request_schedules"
+    if phase == "schedule_renewal":
+        return "renew_fixed_schedule"
+    return "end"
+
+
+def _route_after_schedule_repair(state: AgentState) -> str:
+    """Continúa o cierra el subflujo de reparación del horario fijo."""
+
+    if _should_wait(state):
+        return "end"
+    phase = state.conversation_state.phase
+    if phase == "schedules":
+        return "request_schedules"
+    if phase == "schedule_repair":
+        return "repair_fixed_schedule"
     return "end"
 
 
@@ -405,6 +463,23 @@ def _has_block_type(blocks: list, block_type: str) -> bool:
     return False
 
 
+def _has_new_user_input(state: AgentState) -> bool:
+    """Detecta si el turno actual trae una entrada nueva del usuario."""
+
+    conversation = state.conversation_state
+    last_images = (
+        conversation.last_user_images if conversation.phase == "schedules" else None
+    )
+    has_new_input, _, _ = detect_new_input(
+        conversation.messages,
+        conversation.user_message_count,
+        conversation.awaiting_user_input,
+        conversation.last_user_text,
+        last_images,
+    )
+    return has_new_input
+
+
 def build_agent() -> StateGraph:
     """Construye el grafo de soporte hasta la validacion."""
     graph = StateGraph(AgentState)
@@ -424,6 +499,9 @@ def build_agent() -> StateGraph:
     graph.add_node("validate_schedule", validate_schedule)
     graph.add_node("apply_schedule_correction", apply_schedule_correction)
     graph.add_node("persist_schedule", persist_schedule)
+    graph.add_node("sync_fixed_schedule", sync_fixed_schedule)
+    graph.add_node("renew_fixed_schedule", renew_fixed_schedule)
+    graph.add_node("repair_fixed_schedule", repair_fixed_schedule)
     graph.add_node("collect_study_profile", collect_study_profile)
     graph.add_node("collect_study_profile_tiebreaker", collect_study_profile_tiebreaker)
     graph.add_node("persist_study_profile", persist_study_profile)
@@ -450,6 +528,9 @@ def build_agent() -> StateGraph:
             "validate_schedule": "validate_schedule",
             "apply_schedule_correction": "apply_schedule_correction",
             "persist_schedule": "persist_schedule",
+            "sync_fixed_schedule": "sync_fixed_schedule",
+            "renew_fixed_schedule": "renew_fixed_schedule",
+            "repair_fixed_schedule": "repair_fixed_schedule",
             "collect_study_profile": "collect_study_profile",
             "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
@@ -553,6 +634,7 @@ def build_agent() -> StateGraph:
         "validate_schedule",
         _route_validate,
         {
+            "build_draft_schedule": "build_draft_schedule",
             "apply_schedule_correction": "apply_schedule_correction",
             "persist_schedule": "persist_schedule",
             "end": END,
@@ -571,9 +653,35 @@ def build_agent() -> StateGraph:
         "persist_schedule",
         _route_after_persist_schedule,
         {
+            "sync_fixed_schedule": "sync_fixed_schedule",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "sync_fixed_schedule",
+        _route_after_schedule_sync,
+        {
             "collect_study_profile": "collect_study_profile",
             "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "renew_fixed_schedule",
+        _route_after_schedule_renewal,
+        {
+            "renew_fixed_schedule": "renew_fixed_schedule",
+            "request_schedules": "request_schedules",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "repair_fixed_schedule",
+        _route_after_schedule_repair,
+        {
+            "repair_fixed_schedule": "repair_fixed_schedule",
+            "request_schedules": "request_schedules",
             "end": END,
         },
     )

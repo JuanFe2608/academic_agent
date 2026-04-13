@@ -1,8 +1,14 @@
+#!/usr/bin/env python3
+
 """Imprime la URL OAuth de Microsoft para conectar un estudiante."""
 
 from __future__ import annotations
 
 import argparse
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from integrations.microsoft_graph.auth_client import build_microsoft_oauth_client_from_env
 

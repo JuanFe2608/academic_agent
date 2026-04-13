@@ -2,13 +2,11 @@
 
 from __future__ import annotations
 
-import base64
-
 from agents.support.nodes.utils import append_message
 from agents.support.scheduling import (
     build_conflict_message,
-    render_recurring_schedule,
 )
+from agents.support.scheduling.render import build_rendered_schedule_message_content
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
     update_schedule_flow_state,
@@ -30,8 +28,6 @@ def render_schedule_preview(state: AgentState) -> dict:
         or state.get("schedule_preview", {}).get("text")
         or ""
     ).strip()
-    image_path = render_recurring_schedule(blocks, timezone_name=timezone_name)
-    image_data_url = _encode_image(image_path)
 
     conflict_text = build_conflict_message(conflicts)
     review_stage = (
@@ -42,9 +38,19 @@ def render_schedule_preview(state: AgentState) -> dict:
     question = (
         conflict_text
         if conflict_text and not schedule_state.conflicts_accepted
-        else "✅ ¿Entendí bien tu horario?\nResponde: sí, está correcto o no, quiero corregirlo."
+        else (
+            "✅ ¿Entendí bien tu horario?\n"
+            "(Escribe el número de la opción que quieres elegir)\n"
+            "1. Sí, está correcto\n"
+            "2. No, quiero corregir algo"
+        )
     )
     text = f"{PROMPT}\n{summary_text}\n\n{question}".strip()
+    message_content, image_path = build_rendered_schedule_message_content(
+        text,
+        blocks,
+        timezone_name=timezone_name,
+    )
 
     replan = dict(state.get("replan", {}))
     replan["return_to_menu"] = None
@@ -59,15 +65,6 @@ def render_schedule_preview(state: AgentState) -> dict:
         "messages": append_message(
             state.get("messages", []),
             "assistant",
-            [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": image_data_url}},
-            ],
+            message_content,
         ),
     }
-
-
-def _encode_image(path: str) -> str:
-    with open(path, "rb") as file:
-        data = base64.b64encode(file.read()).decode("ascii")
-    return f"data:image/png;base64,{data}"

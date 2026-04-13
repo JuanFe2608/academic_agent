@@ -33,11 +33,31 @@ def test_welcome_consent_resets_state_after_out_of_scope() -> None:
     )
 
     update = welcome_consent(state)
-    prompt = update["messages"][0].content.lower()
+    messages = update["messages"]
+    prompt = messages[0].content.lower()
+    image_url = messages[1].content[0]["image_url"]["url"]
+    consent = messages[2].content.lower()
 
     assert update["user_status"] == "start"
     assert update["phase"] == "consent"
     assert update["awaiting_user_input"] is True
     assert update["student_profile"]["full_name"] is None
     assert update["raw_inputs"]["horario_academico_text"] is None
-    assert "soy tu asistente académico inteligente" in prompt
+    assert "soy lara, tu asistente académico inteligente" in prompt
+    assert image_url.startswith("data:image/png;base64,")
+    assert "autorización para el tratamiento de datos personales" in consent
+
+
+def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
+    state = AgentState()
+
+    update = welcome_consent(state)
+    messages = update["messages"]
+
+    assert len(messages) == 3
+    assert "Soy Lara" in messages[0].content
+    assert messages[1].content[0]["type"] == "image_url"
+    assert messages[1].content[0]["image_url"]["url"].startswith(
+        "data:image/png;base64,"
+    )
+    assert messages[2].content.startswith("AUTORIZACIÓN")

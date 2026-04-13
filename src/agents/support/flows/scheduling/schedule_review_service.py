@@ -7,7 +7,12 @@ observable por el usuario.
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import append_message, normalize_text, parse_yes_no
+from agents.support.nodes.utils import (
+    append_message,
+    normalize_text,
+    parse_numbered_option,
+    parse_yes_no,
+)
 from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.scheduling import (
     build_section_summary,
@@ -16,9 +21,11 @@ from agents.support.scheduling import (
 )
 from services.scheduling.extracurricular_state import (
     build_extracurricular_items_source_text,
-    build_extracurricular_reply_hint,
     coerce_extracurricular_pending_items,
     merge_extracurricular_items,
+)
+from services.scheduling.pending_extracurricular_support import (
+    build_extracurricular_reply_hint,
 )
 from agents.support.scheduling.pipeline import (
     parse_extracurricular_section,
@@ -43,8 +50,15 @@ from services.scheduling.extracurricular_parsing import (
     parse_extracurricular_items,
 )
 from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
+from services.scheduling import format_schedule_end_date, parse_schedule_end_date
 
 from .schedule_pending_resolution_service import coerce_schedule_pending_items
+from .section_confirmation_service import (
+    SectionReviewCompletion,
+    handle_section_review_turn,
+    has_active_section_review,
+    start_section_review,
+)
 
 
 def _build_schedule_review_update(
@@ -90,6 +104,35 @@ def handle_schedule_review_turn(
     conflicts = list(schedule_state.conflicts)
     correction_target = schedule_state.correction_target
 
+    if not has_new_input and stage in {
+        "awaiting_conflict_decision",
+        "awaiting_confirmation",
+        "awaiting_schedule_end_date",
+        "awaiting_correction_target",
+        "awaiting_correction_payload",
+    }:
+        return _build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(schedule_state),
+            phase="validate",
+            current_count=state.get("user_message_count", 0),
+            last_text=state.get("last_user_text"),
+            awaiting_user_input=True,
+        )
+
+    if has_active_section_review(state) and str(correction_target or "") in {
+        "academic",
+        "work",
+        "extracurricular",
+    }:
+        return handle_section_review_turn(
+            state,
+            has_new_input=has_new_input,
+            last_text=last_text,
+            current_count=current_count,
+            completion=_final_review_section_completion(),
+        )
+
     if stage == "awaiting_conflict_decision":
         decision = _parse_conflict_decision(last_text) if has_new_input else None
         if decision == "accept":
@@ -123,7 +166,10 @@ def handle_schedule_review_turn(
                 awaiting_user_input=True,
                 prompt=(
                     "Entendido. Dejaré esos cruces como aceptados conscientemente.\n"
-                    "✅ ¿El horario completo quedó correcto? Responde sí o no."
+                    "✅ ¿El horario completo quedó correcto?\n"
+                    "(Escribe el número de la opción que quieres elegir)\n"
+                    "1. Sí, está correcto\n"
+                    "2. No, quiero corregir algo"
                 ),
             )
         if decision == "correct":
@@ -139,28 +185,23 @@ def handle_schedule_review_turn(
             current_count,
             last_text,
             schedule_state,
-            "Si deseas mantener los cruces, responde: dejarlo así. "
-            "Si prefieres cambiarlos, responde: corregir.",
+            "⚠️ Elige una opción válida.\n"
+            "(Escribe el número de la opción que quieres elegir)\n"
+            "1. Sí, dejarlo así\n"
+            "2. No, quiero corregirlo",
         )
 
     if stage == "awaiting_correction_target":
         target = _parse_correction_target(last_text, state) if has_new_input else None
         if target:
-            return {
-                **_build_schedule_review_update(
-                    state,
-                    schedule=update_schedule_flow_state(
-                        schedule_state,
-                        review_stage="awaiting_correction_payload",
-                        correction_target=target,
-                    ),
-                    phase="validate",
-                    current_count=current_count,
-                    last_text=last_text,
-                    awaiting_user_input=True,
-                    prompt=_build_payload_prompt(target, schedule_state),
-                ),
-            }
+            return start_section_review(
+                state,
+                target=target,  # type: ignore[arg-type]
+                phase="validate",
+                current_count=current_count,
+                last_text=last_text,
+                initial_stage="section_awaiting_item_selection",
+            )
         return _prompt_correction_target(
             state,
             current_count,
@@ -191,6 +232,37 @@ def handle_schedule_review_turn(
             prompt="Perfecto. Voy a recalcular esa parte del horario.",
         )
 
+    if stage == "awaiting_schedule_end_date":
+        parsed_end_date = parse_schedule_end_date(
+            last_text,
+            timezone_name=state.get("timezone", "America/Bogota"),
+        ) if has_new_input else None
+        if parsed_end_date is None:
+            return _prompt_again(
+                state,
+                current_count,
+                last_text,
+                schedule_state,
+                _build_schedule_end_date_prompt(),
+            )
+        return _build_schedule_review_update(
+            state,
+            schedule=update_schedule_flow_state(
+                schedule_state,
+                schedule_end_date=parsed_end_date.isoformat(),
+                review_stage="idle",
+            ),
+            events_validated=True,
+            phase="schedule_persist",
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=False,
+            prompt=(
+                "📅 Perfecto. Voy a guardar tu horario semanal "
+                f"hasta el {format_schedule_end_date(parsed_end_date)}."
+            ),
+        )
+
     answer = _parse_confirmation_answer(last_text) if has_new_input else None
     if answer is True:
         updated_blocks = [
@@ -202,14 +274,14 @@ def handle_schedule_review_turn(
             schedule=update_schedule_flow_state(
                 schedule_state,
                 blocks=updated_blocks,
-                review_stage="idle",
+                review_stage="awaiting_schedule_end_date",
+                schedule_end_date=None,
             ),
-            events_validated=True,
-            phase="schedule_persist",
+            phase="validate",
             current_count=current_count,
             last_text=last_text,
-            awaiting_user_input=False,
-            prompt="Perfecto. Voy a guardar tu horario semanal.",
+            awaiting_user_input=True,
+            prompt=_build_schedule_end_date_prompt(),
         )
     if answer is False:
         return _prompt_correction_target(
@@ -225,7 +297,10 @@ def handle_schedule_review_turn(
         current_count,
         last_text,
         schedule_state,
-        "✅ ¿El horario está correcto? Responde sí o no.",
+        "✅ ¿El horario está correcto?\n"
+        "(Escribe el número de la opción que quieres elegir)\n"
+        "1. Sí, está correcto\n"
+        "2. No, quiero corregir algo",
     )
 
 
@@ -612,6 +687,11 @@ def _prompt_again(
 
 
 def _parse_conflict_decision(text: str | None) -> str | None:
+    option = parse_numbered_option(text)
+    if option == 1:
+        return "accept"
+    if option == 2:
+        return "correct"
     normalized = normalize_text(text or "")
     if not normalized:
         return None
@@ -629,6 +709,11 @@ def _parse_conflict_decision(text: str | None) -> str | None:
 
 
 def _parse_confirmation_answer(text: str | None) -> bool | None:
+    option = parse_numbered_option(text)
+    if option == 1:
+        return True
+    if option == 2:
+        return False
     normalized = normalize_text(text or "")
     if any(token in normalized for token in ("correcto", "esta correcto", "está correcto")):
         return True
@@ -705,3 +790,22 @@ def _build_extracurricular_correction_prompt(
     if pending_items:
         lines.append(build_extracurricular_reply_hint(pending_items[0]))
     return "\n".join(lines)
+
+
+def _build_schedule_end_date_prompt() -> str:
+    return (
+        "📅 Antes de guardarlo en Outlook, necesito la fecha límite de este horario fijo.\n"
+        "Escríbela en uno de estos formatos:\n"
+        "1. YYYY-MM-DD\n"
+        "2. DD/MM/YYYY\n"
+        "Ejemplo: 2026-06-30"
+    )
+
+
+def _final_review_section_completion() -> SectionReviewCompletion:
+    return SectionReviewCompletion(
+        phase="draft",
+        awaiting_user_input=False,
+        after_change_phase="draft",
+        after_change_awaiting_user_input=False,
+    )

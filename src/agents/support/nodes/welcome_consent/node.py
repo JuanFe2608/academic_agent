@@ -2,7 +2,12 @@
 
 from __future__ import annotations
 
+import base64
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
+
+from langchain_core.messages import AIMessage, BaseMessage
 
 from agents.support.nodes.utils import (
     append_message,
@@ -23,6 +28,13 @@ _GREETING_KEYWORDS = (
     "hey",
     "hello",
 )
+
+_PROJECT_ROOT = Path(__file__).resolve().parents[5]
+_WELCOME_IMAGE_PATH = (
+    _PROJECT_ROOT / "assets" / "whatsapp" / "saludando con un brazo cruzado.png"
+)
+_WELCOME_IMAGE_MIME_TYPE = "image/png"
+
 
 def welcome_consent(state: AgentState) -> dict:
     """Solicita consentimiento y actualiza el estado segun respuesta."""
@@ -51,9 +63,7 @@ def welcome_consent(state: AgentState) -> dict:
     updates: dict = {"phase": "consent"}
     if not has_new_input:
         if not state.get("welcome_sent", False):
-            updates["messages"] = append_message(
-                messages, "assistant", _welcome_with_consent()
-            )
+            updates["messages"] = _welcome_sequence()
             updates["welcome_sent"] = True
         else:
             updates["messages"] = append_message(messages, "assistant", CONSENT_PROMPT)
@@ -94,9 +104,7 @@ def welcome_consent(state: AgentState) -> dict:
 
     if _is_greeting(normalized):
         if not state.get("welcome_sent", False):
-            updates["messages"] = append_message(
-                messages, "assistant", _welcome_with_consent()
-            )
+            updates["messages"] = _welcome_sequence()
             updates["welcome_sent"] = True
         else:
             updates["messages"] = append_message(messages, "assistant", CONSENT_PROMPT)
@@ -114,8 +122,24 @@ def _is_greeting(text: str) -> bool:
     return any(keyword in text for keyword in _GREETING_KEYWORDS)
 
 
-def _welcome_with_consent() -> str:
-    return f"{WELCOME_MESSAGE}\n\n{CONSENT_PROMPT}"
+def _welcome_sequence() -> list[BaseMessage]:
+    """Construye mensajes separados para que WhatsApp los envie en orden."""
+    return [
+        AIMessage(content=WELCOME_MESSAGE),
+        AIMessage(content=[_welcome_image_block()]),
+        AIMessage(content=CONSENT_PROMPT),
+    ]
+
+
+def _welcome_image_block() -> dict[str, object]:
+    return {"type": "image_url", "image_url": {"url": _welcome_image_data_url()}}
+
+
+@lru_cache(maxsize=1)
+def _welcome_image_data_url() -> str:
+    with _WELCOME_IMAGE_PATH.open("rb") as image_file:
+        data = base64.b64encode(image_file.read()).decode("ascii")
+    return f"data:{_WELCOME_IMAGE_MIME_TYPE};base64,{data}"
 
 
 def _restart_after_out_of_scope(
@@ -129,7 +153,7 @@ def _restart_after_out_of_scope(
         return {"phase": "end", "awaiting_user_input": False}
 
     return state.restart_payload_for_new_attempt(
-        messages=append_message(messages, "assistant", _welcome_with_consent()),
+        messages=_welcome_sequence(),
         user_message_count=current_count,
         last_user_text=last_text,
     )

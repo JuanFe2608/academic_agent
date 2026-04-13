@@ -267,6 +267,21 @@ def parse_yes_no(text: str) -> Optional[bool]:
     return None
 
 
+def parse_numbered_option(text: str | None) -> int | None:
+    """Extrae una opción numérica simple al inicio de la respuesta."""
+
+    raw = str(text or "").strip()
+    if not raw:
+        return None
+
+    first_line = raw.splitlines()[0].strip()
+    normalized = normalize_text(first_line)
+    match = re.match(r"^(?:la\s+)?(?:opcion\s+)?(\d+)\b", normalized)
+    if match is None:
+        return None
+    return int(match.group(1))
+
+
 def contains_normalized_phrase(normalized_text: str, phrase: str) -> bool:
     normalized_phrase = normalize_text(phrase)
     if not normalized_text or not normalized_phrase:

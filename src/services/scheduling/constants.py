@@ -19,8 +19,24 @@ ScheduleReviewStage = Literal[
     "idle",
     "awaiting_conflict_decision",
     "awaiting_confirmation",
+    "awaiting_schedule_end_date",
     "awaiting_correction_target",
     "awaiting_correction_payload",
+    "section_awaiting_confirmation",
+    "section_awaiting_item_selection",
+    "section_awaiting_field_selection",
+    "section_awaiting_field_value",
+    "section_awaiting_item_confirmation",
+]
+ScheduleRenewalStage = Literal[
+    "idle",
+    "awaiting_decision",
+    "awaiting_end_date",
+    "awaiting_rebuild_timing",
+]
+ScheduleRepairStage = Literal[
+    "idle",
+    "awaiting_decision",
 ]
 ScheduleCaptureStage = Literal[
     "idle",
@@ -28,6 +44,7 @@ ScheduleCaptureStage = Literal[
     "awaiting_more",
 ]
 CorrectionTarget = Literal["academic", "work", "extracurricular"]
+EditableScheduleField = Literal["title", "day_of_week", "time_range", "start_time", "end_time"]
 
 DAY_ORDER: list[DayOfWeek] = [
     "monday",

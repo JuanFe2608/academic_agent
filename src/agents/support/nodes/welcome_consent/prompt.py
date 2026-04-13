@@ -2,7 +2,7 @@
 
 WELCOME_MESSAGE = (
     "¡Hola! 👋✨\n"
-    "Soy tu Asistente Académico Inteligente 🤖📚\n"
+    "Soy Lara, tu Asistente Académico Inteligente 🤖📚\n"
     "\n"
     "Estoy aquí para ayudarte a organizar tu tiempo, planificar tus actividades y "
     "recomendarte métodos de estudio personalizados según tu perfil y tus hábitos "

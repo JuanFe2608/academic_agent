@@ -73,10 +73,15 @@ def schedule_flow_state_to_update(schedule_state: ScheduleFlowState) -> dict[str
         "capture_target": schedule_state.capture_target,
         "capture_stage": schedule_state.capture_stage,
         "correction_target": schedule_state.correction_target,
+        "editing_block_id": schedule_state.editing_block_id,
+        "editing_field": schedule_state.editing_field,
         "pending_correction_text": schedule_state.pending_correction_text,
         "conflicts_accepted": schedule_state.conflicts_accepted,
+        "schedule_end_date": schedule_state.schedule_end_date,
         "persisted_profile_id": schedule_state.persisted_profile_id,
         "persistence_error": schedule_state.persistence_error,
+        "renewal_stage": schedule_state.renewal_stage,
+        "repair_stage": schedule_state.repair_stage,
     }
 
 
@@ -171,9 +176,14 @@ def reset_schedule_review_state(
         summary_text=None,
         review_stage="idle",
         correction_target=None,
+        editing_block_id=None,
+        editing_field=None,
         pending_correction_text=None,
         conflicts=[],
         conflicts_accepted=False,
+        schedule_end_date=None,
+        renewal_stage="idle",
+        repair_stage="idle",
     )
 
 

@@ -13,6 +13,7 @@ from services.scheduling.heuristic_schedule_parsing import (
     to_day_key,
 )
 from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
+from services.scheduling.pending_completion_support import build_pending_completion_text
 from services.scheduling.text_parser import (
     is_ambiguous_time_range,
     parse_work_schedule_text,
@@ -40,6 +41,7 @@ _ACTIVITY_SEPARATOR_PATTERN = re.compile(
     r"(?:\s*,\s*|\s+(?:y|e|luego|despues|después|ademas|además)\s+)",
     re.IGNORECASE,
 )
+_INLINE_TITLE_SEPARATOR_PATTERN = re.compile(r"(?:\s[-—–]\s|:\s)")
 
 _ENGLISH_TO_SPANISH = {
     "monday": "Lunes",
@@ -80,21 +82,20 @@ def complete_pending_schedule_item(
         if isinstance(pending_item, PendingScheduleItem)
         else PendingScheduleItem(**pending_item)
     )
-    combined_text = " ".join(
-        part.strip()
-        for part in [str(pending.raw_text or ""), str(response_text or "")]
-        if str(part).strip()
+    resolution_text, used_full_replacement = build_pending_completion_text(
+        str(pending.raw_text or ""),
+        str(response_text or ""),
     )
 
     blocks, clarifications, pending_items = parse_schedule_section_with_context(
-        combined_text,
+        resolution_text,
         pending.schedule_type,
         timezone=timezone,
     )
     if pending_items:
         updated = pending_items[0]
         updates: dict[str, object] = {}
-        if pending.title.strip():
+        if pending.title.strip() and not used_full_replacement and not updated.title.strip():
             updates["title"] = pending.title.strip()
         if not updated.days and pending.days:
             updates["days"] = list(pending.days)
@@ -212,7 +213,7 @@ def _parse_academic_chunk(
     if not raw:
         return [], None
 
-    title = inherited_title.strip() or infer_title(raw, default_title="")
+    title = _resolve_academic_chunk_title(raw, inherited_title)
     days = extract_days_from_text(raw) or list(inherited_days)
     missing = _describe_missing_schedule_fields(
         raw,
@@ -248,6 +249,29 @@ def _parse_academic_chunk(
         for day_of_week in days
     ]
     return blocks, None
+
+
+def _resolve_academic_chunk_title(raw: str, inherited_title: str) -> str:
+    inherited = inherited_title.strip()
+    explicit = infer_title(raw, default_title="").strip()
+    if explicit and _has_explicit_inline_academic_title(raw):
+        return explicit
+    return inherited or explicit
+
+
+def _has_explicit_inline_academic_title(text: str) -> bool:
+    raw = str(text or "").strip()
+    if not raw:
+        return False
+
+    explicit = infer_title(raw, default_title="").strip()
+    if not explicit:
+        return False
+
+    leading = raw.lstrip()
+    if _DAY_TOKEN_PATTERN.match(leading):
+        return bool(_INLINE_TITLE_SEPARATOR_PATTERN.search(leading))
+    return True
 
 
 def _describe_missing_schedule_fields(

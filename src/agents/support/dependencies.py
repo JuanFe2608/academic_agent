@@ -138,6 +138,34 @@ def set_outlook_calendar_sync_service(
     get_app_container().set_outlook_calendar_sync_service(service)
 
 
+def get_outlook_fixed_schedule_sync_service() -> OutlookFixedScheduleSyncService:
+    """Retorna el servicio reusable de sincronización del horario fijo."""
+
+    return get_app_container().get_outlook_fixed_schedule_sync_service()
+
+
+def set_outlook_fixed_schedule_sync_service(
+    service: OutlookFixedScheduleSyncService | None,
+) -> None:
+    """Permite inyectar el sync service del horario fijo en pruebas."""
+
+    get_app_container().set_outlook_fixed_schedule_sync_service(service)
+
+
+def get_outlook_fixed_schedule_repair_service() -> OutlookFixedScheduleRepairService:
+    """Retorna el servicio reusable de reparación del horario fijo en Outlook."""
+
+    return get_app_container().get_outlook_fixed_schedule_repair_service()
+
+
+def set_outlook_fixed_schedule_repair_service(
+    service: OutlookFixedScheduleRepairService | None,
+) -> None:
+    """Permite inyectar el repair service del horario fijo en pruebas."""
+
+    get_app_container().set_outlook_fixed_schedule_repair_service(service)
+
+
 def get_microsoft_todo_sync_service() -> MicrosoftTodoSyncService:
     """Retorna el servicio reusable de Microsoft To Do."""
 
@@ -158,6 +186,8 @@ __all__ = [
     "get_microsoft_todo_sync_service",
     "get_onboarding_service",
     "get_outlook_calendar_sync_service",
+    "get_outlook_fixed_schedule_repair_service",
+    "get_outlook_fixed_schedule_sync_service",
     "get_personalization_service",
     "get_reminders_service",
     "get_schedule_service",
@@ -169,6 +199,8 @@ __all__ = [
     "set_microsoft_todo_sync_service",
     "set_onboarding_service",
     "set_outlook_calendar_sync_service",
+    "set_outlook_fixed_schedule_repair_service",
+    "set_outlook_fixed_schedule_sync_service",
     "set_personalization_service",
     "set_reminders_service",
     "set_schedule_service",

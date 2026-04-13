@@ -2,7 +2,11 @@
 
 from __future__ import annotations
 
+from collections import defaultdict
+
 from schemas.scheduling import ExtracurricularItem, PendingExtracurricularItem
+from services.scheduling.constants import DAY_LABELS, DAY_ORDER
+from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
 from services.scheduling.activity_matching import normalize_text
 
 
@@ -70,19 +74,47 @@ def build_extracurricular_items_source_text(
     return "\n".join(line for line in lines if line)
 
 
-def build_extracurricular_reply_hint(item: PendingExtracurricularItem) -> str:
-    """Construye la guía mínima para completar un pendiente extracurricular."""
+def build_extracurricular_items_from_blocks(
+    blocks: list[WeeklyScheduleBlock] | list[dict],
+) -> list[ExtracurricularItem]:
+    """Reconstruye actividades extracurriculares a partir de bloques fijos."""
 
-    missing_text = ", ".join(item.missing_fields) if item.missing_fields else ""
-    if missing_text == "hora de inicio y fin":
-        return "Puedes responder solo con lo que falta. Ejemplo: de 7 am a 8 am."
-    return "Si prefieres, envíala completa en formato: Actividad dia(s) de HH:MM a HH:MM."
+    grouped: dict[tuple[str, str, str], list[WeeklyScheduleBlock]] = defaultdict(list)
+    for raw_block in blocks:
+        block = ensure_weekly_block(raw_block)
+        if block.block_type != "extracurricular":
+            continue
+        grouped[(block.title, block.start_time, block.end_time)].append(block)
+
+    items: list[ExtracurricularItem] = []
+    for (title, start_time, end_time), grouped_blocks in grouped.items():
+        ordered_blocks = sorted(
+            grouped_blocks,
+            key=lambda item: DAY_ORDER.index(item.day_of_week),
+        )
+        spanish_days = [DAY_LABELS[item.day_of_week] for item in ordered_blocks]
+        detail = (
+            f"{', '.join(spanish_days)} {start_time}-{end_time}"
+            if spanish_days
+            else f"{start_time}-{end_time}"
+        )
+        items.append(
+            ExtracurricularItem(
+                nombre=title,
+                es_variable=False,
+                detalle=detail,
+                dias=spanish_days,
+                hora_inicio=start_time,
+                hora_fin=end_time,
+            )
+        )
+    return items
 
 
 __all__ = [
+    "build_extracurricular_items_from_blocks",
     "build_extracurricular_item_source_text",
     "build_extracurricular_items_source_text",
-    "build_extracurricular_reply_hint",
     "coerce_extracurricular_pending_items",
     "merge_extracurricular_items",
 ]

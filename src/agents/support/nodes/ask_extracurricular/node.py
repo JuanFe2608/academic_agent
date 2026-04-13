@@ -5,6 +5,7 @@ from __future__ import annotations
 from agents.support.nodes.utils import (
     append_message,
     detect_new_input,
+    parse_numbered_option,
     parse_yes_no,
 )
 from agents.support.state import AgentState
@@ -23,8 +24,9 @@ def ask_extracurricular(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     answer = parse_yes_no(last_text) if has_new_input else None
+    numeric_choice = parse_numbered_option(last_text) if has_new_input else None
 
-    if answer is True:
+    if answer is True or numeric_choice == 1:
         return {
             "extras_has_any": True,
             "extras_collect_stage": "awaiting_details",
@@ -41,7 +43,7 @@ def ask_extracurricular(state: AgentState) -> dict:
             ),
         }
 
-    if answer is False:
+    if answer is False or numeric_choice == 2:
         return {
             "extras_has_any": False,
             "extras_collect_stage": "done",

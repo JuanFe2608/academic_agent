@@ -1,6 +1,9 @@
 """Prompt base para consultar actividades extracurriculares."""
 
 PROMPT = (
-    "🏃 ¿Realizas actividades extracurriculares?\n"
-    "Si sí, las voy a registrar como parte de tu horario semanal."
+    "🏃‍♂️ ¿Tienes actividades extracurriculares durante la semana?\n"
+    "Por ejemplo: deporte, gimnasio, cursos, semilleros, reuniones o cualquier otra actividad fija.\n"
+    "(Escribe el número de la opción que quieres elegir)\n"
+    "1. Sí, tengo actividades extracurriculares\n"
+    "2. No, continuemos"
 )

@@ -9,7 +9,9 @@ from ._clients_impl import (
     MicrosoftTodoTaskList,
     MicrosoftTodoTaskUpsert,
     OutlookCalendarClient,
+    OutlookCalendarEventSnapshot,
     OutlookCalendarEventUpsert,
+    OutlookEventRecurrence,
     UpsertedMicrosoftTodoTask,
     UpsertedOutlookCalendarEvent,
 )
@@ -23,7 +25,9 @@ __all__ = [
     "MicrosoftTodoTaskList",
     "MicrosoftTodoTaskUpsert",
     "OutlookCalendarClient",
+    "OutlookCalendarEventSnapshot",
     "OutlookCalendarEventUpsert",
+    "OutlookEventRecurrence",
     "UpsertedMicrosoftTodoTask",
     "UpsertedOutlookCalendarEvent",
 ]

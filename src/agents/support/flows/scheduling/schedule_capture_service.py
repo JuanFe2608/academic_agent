@@ -32,6 +32,12 @@ from .schedule_pending_resolution_service import (
     has_block_type,
     resolve_capture_pending_reply,
 )
+from .section_confirmation_service import (
+    SectionReviewCompletion,
+    handle_section_review_turn,
+    has_active_section_review,
+    start_section_review,
+)
 
 
 @dataclass(frozen=True)
@@ -63,6 +69,26 @@ _CONTINUE_TOKENS = {
 _DAY_HINT_PATTERN = re.compile(
     r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabado|sábado|domingo|lun|mar|mie|jue|vie|sab|dom)\b",
     re.IGNORECASE,
+)
+_MORE_ACADEMIC_INLINE_PREFIXES = (
+    re.compile(
+        r"^\s*(?:1(?:[\).\:-]?\s*)?)?(?:(?:si|sí)\s*,?\s*)?quiero\s+agregar\s+m[aá]s\s+materias[\s:,\-]+(?P<content>.+)$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^\s*(?:1(?:[\).\:-]?\s*)?)?agregar\s+m[aá]s\s+materias[\s:,\-]+(?P<content>.+)$",
+        re.IGNORECASE,
+    ),
+)
+_MORE_WORK_INLINE_PREFIXES = (
+    re.compile(
+        r"^\s*(?:1(?:[\).\:-]?\s*)?)?(?:(?:si|sí)\s*,?\s*)?quiero\s+agregar\s+m[aá]s\s+horarios?(?:\s+de\s+trabajo)?[\s:,\-]+(?P<content>.+)$",
+        re.IGNORECASE,
+    ),
+    re.compile(
+        r"^\s*(?:1(?:[\).\:-]?\s*)?)?agregar\s+m[aá]s\s+horarios?(?:\s+de\s+trabajo)?[\s:,\-]+(?P<content>.+)$",
+        re.IGNORECASE,
+    ),
 )
 
 
@@ -140,6 +166,22 @@ def handle_schedule_capture_turn(
     )
     capture_stage = str(schedule_state.capture_stage or "idle")
 
+    if has_active_section_review(state) and str(schedule_state.correction_target or "") in {
+        "academic",
+        "work",
+    }:
+        return handle_section_review_turn(
+            state,
+            has_new_input=has_new_input,
+            last_text=last_text,
+            current_count=current_count,
+            completion=_section_review_completion(
+                occupation=occupation,
+                target=str(schedule_state.correction_target or ""),
+                prompts=prompts,
+            ),
+        )
+
     if occupation_reply_consumed:
         return _prompt_for_section_input(
             state,
@@ -199,18 +241,17 @@ def handle_schedule_capture_turn(
         if has_new_input and schedule_input_text:
             decision = _parse_more_decision(schedule_input_text)
             if decision == "continue":
-                return _advance_after_section(
+                return start_section_review(
                     state,
-                    occupation=occupation,
-                    current_target=capture_target,
-                    raw_inputs=raw_inputs,
-                    schedule_state=schedule_state,
-                    academic_pending_items=academic_pending_items,
-                    work_pending_items=work_pending_items,
+                    target=capture_target,  # type: ignore[arg-type]
+                    phase="schedules",
                     current_count=current_count,
                     last_text=last_text,
-                    prompts=prompts,
                 )
+            content_payload = _extract_schedule_content_from_more_reply(
+                schedule_input_text,
+                target=capture_target,
+            )
             if decision == "more" and not _looks_like_schedule_content(schedule_input_text):
                 return _prompt_for_section_input(
                     state,
@@ -229,7 +270,7 @@ def handle_schedule_capture_turn(
                 schedule_input_text
             ):
                 raw_inputs = _append_schedule_text(
-                    raw_inputs, capture_target, schedule_input_text
+                    raw_inputs, capture_target, content_payload or schedule_input_text
                 )
                 return _build_schedule_update(
                     state,
@@ -334,57 +375,6 @@ def _prompt_for_section_input(
     )
 
 
-def _advance_after_section(
-    state: AgentState,
-    *,
-    occupation: str,
-    current_target: str,
-    raw_inputs: dict,
-    schedule_state: object,
-    academic_pending_items: list[PendingScheduleItem],
-    work_pending_items: list[PendingScheduleItem],
-    current_count: int,
-    last_text: str | None,
-    prompts: ScheduleCapturePrompts,
-    ) -> dict:
-    next_target = _next_section_target(current_target, occupation)
-    if next_target is None:
-        return _build_schedule_update(
-            state,
-            profile=dict(state.get("student_profile", {})),
-            raw_inputs=raw_inputs,
-            schedule_state=update_schedule_flow_state(
-                schedule_state,
-                capture_target=None,
-                capture_stage="idle",
-            ),
-            academic_pending_items=academic_pending_items,
-            work_pending_items=work_pending_items,
-            phase="extras",
-            awaiting_user_input=False,
-            current_count=current_count,
-            last_text=last_text,
-        )
-
-    return _build_schedule_update(
-        state,
-        profile=dict(state.get("student_profile", {})),
-        raw_inputs=raw_inputs,
-        schedule_state=update_schedule_flow_state(
-            schedule_state,
-            capture_target=next_target,
-            capture_stage="awaiting_input",
-        ),
-        academic_pending_items=academic_pending_items,
-        work_pending_items=work_pending_items,
-        phase="schedules",
-        awaiting_user_input=True,
-        current_count=current_count,
-        last_text=last_text,
-        prompt=_prompt_for_target(next_target, occupation, prompts),
-    )
-
-
 def _append_schedule_text(raw_inputs: dict, target: str, text: str) -> dict:
     return append_schedule_input_text(raw_inputs, target, text)  # type: ignore[arg-type]
 
@@ -433,12 +423,6 @@ def _prompt_for_target(
 
 def _prompt_for_more(target: str, prompts: ScheduleCapturePrompts) -> str:
     return prompts.more_work if target == "work" else prompts.more_academic
-
-
-def _next_section_target(current_target: str, occupation: str) -> str | None:
-    if current_target == "academic" and occupation == "ambos":
-        return "work"
-    return None
 
 
 def _parse_occupation(text: str) -> str | None:
@@ -506,6 +490,11 @@ def _matches_occupation_choice(
 
 def _parse_more_decision(text: str | None) -> str | None:
     normalized = normalize_text(text or "")
+    option = _parse_binary_more_option(text)
+    if option == 1:
+        return "more"
+    if option == 2:
+        return "continue"
     if not normalized:
         return None
     if normalized in _CONTINUE_TOKENS or any(
@@ -518,6 +507,86 @@ def _parse_more_decision(text: str | None) -> str | None:
     ):
         return "more"
     return None
+
+
+def _parse_binary_more_option(text: str | None) -> int | None:
+    clean = str(text or "").strip()
+    if not clean:
+        return None
+    first_line = normalize_text(clean.splitlines()[0].strip())
+    if first_line.startswith("1"):
+        return 1
+    if first_line.startswith("2"):
+        return 2
+    return None
+
+
+def _extract_schedule_content_from_more_reply(
+    text: str,
+    *,
+    target: str,
+) -> str:
+    raw = str(text or "").strip()
+    if not raw:
+        return raw
+
+    lines = [line.strip() for line in raw.splitlines() if line.strip()]
+    if len(lines) > 1 and _parse_more_decision(lines[0]) == "more":
+        remainder = "\n".join(lines[1:]).strip()
+        if remainder and _looks_like_schedule_content(remainder):
+            return remainder
+
+    prefix_patterns = (
+        _MORE_WORK_INLINE_PREFIXES if target == "work" else _MORE_ACADEMIC_INLINE_PREFIXES
+    )
+    for pattern in prefix_patterns:
+        match = pattern.match(raw)
+        if match is None:
+            continue
+        candidate = str(match.group("content") or "").strip()
+        if candidate and _looks_like_schedule_content(candidate):
+            return candidate
+
+    if _parse_more_decision(raw) == "more":
+        match = _DAY_HINT_PATTERN.search(raw)
+        if match is not None and match.start() > 0:
+            candidate = raw[match.start() :].strip(" \n\t,;:-")
+            if candidate and _looks_like_schedule_content(candidate):
+                return candidate
+
+    return raw
+
+
+def _section_review_completion(
+    *,
+    occupation: str,
+    target: str,
+    prompts: ScheduleCapturePrompts,
+) -> SectionReviewCompletion:
+    if target == "academic" and occupation == "ambos":
+        return SectionReviewCompletion(
+            phase="schedules",
+            awaiting_user_input=True,
+            prompt=prompts.work,
+            schedule_changes={
+                "capture_target": "work",
+                "capture_stage": "awaiting_input",
+            },
+        )
+    if target in {"academic", "work"}:
+        return SectionReviewCompletion(
+            phase="extras",
+            awaiting_user_input=False,
+            schedule_changes={
+                "capture_target": None,
+                "capture_stage": "idle",
+            },
+        )
+    return SectionReviewCompletion(
+        phase="schedules",
+        awaiting_user_input=True,
+        prompt=_prompt_for_target("academic", occupation, prompts),
+    )
 
 
 def _looks_like_schedule_content(text: str | None) -> bool:

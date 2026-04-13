@@ -25,6 +25,20 @@ def test_ask_extracurricular_yes_moves_to_type_stage() -> None:
     assert update["awaiting_user_input"] is True
 
 
+def test_ask_extracurricular_accepts_numeric_yes() -> None:
+    state = AgentState(
+        phase="extras",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="1")],
+    )
+
+    update = ask_extracurricular(state)
+
+    assert update["extras_collect_stage"] == "awaiting_details"
+    assert update["awaiting_user_input"] is True
+
+
 def test_collect_extracurricular_requests_free_text_details() -> None:
     state = AgentState(
         phase="extras",
@@ -146,6 +160,108 @@ def test_collect_extracurricular_awaiting_more_accepts_new_activity_content_dire
     )
     prompt = update["messages"][0].content.lower()
     assert "agregar más actividades" in prompt
+
+
+def test_collect_extracurricular_awaiting_more_strips_option_text_from_inline_payload() -> None:
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_more",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[
+            HumanMessage(
+                content="1\nVoy a gimnasio los martes de 3 pm a 5 pm"
+            )
+        ],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    assert update["phase"] == "extras"
+    assert [item.nombre for item in update["extracurricular"]] == ["Gimnasio"]
+
+
+def test_collect_extracurricular_opens_section_review_before_draft() -> None:
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_more",
+        extracurricular=[
+            {
+                "nombre": "Gimnasio",
+                "es_variable": False,
+                "detalle": "Martes 19:00-20:30",
+                "dias": ["Martes"],
+                "hora_inicio": "19:00",
+                "hora_fin": "20:30",
+            }
+        ],
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "extracurricular",
+                    "title": "Gimnasio",
+                    "day_of_week": "tuesday",
+                    "start_time": "19:00",
+                    "end_time": "20:30",
+                    "source_text": "Martes 19:00-20:30 Gimnasio",
+                }
+            ]
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="2")],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    assert update["phase"] == "extras"
+    assert update["awaiting_user_input"] is True
+    assert update["schedule"]["review_stage"] == "section_awaiting_confirmation"
+    prompt = update["messages"][0].content.lower()
+    assert "horario extracurricular actual" in prompt
+    assert "está bien así" in prompt
+    assert "escribe el número de la opción" in prompt
+
+
+def test_collect_extracurricular_section_confirmation_yes_moves_to_draft() -> None:
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_more",
+        extracurricular=[
+            {
+                "nombre": "Gimnasio",
+                "es_variable": False,
+                "detalle": "Martes 19:00-20:30",
+                "dias": ["Martes"],
+                "hora_inicio": "19:00",
+                "hora_fin": "20:30",
+            }
+        ],
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "extracurricular",
+                    "title": "Gimnasio",
+                    "day_of_week": "tuesday",
+                    "start_time": "19:00",
+                    "end_time": "20:30",
+                    "source_text": "Martes 19:00-20:30 Gimnasio",
+                }
+            ],
+            "review_stage": "section_awaiting_confirmation",
+            "correction_target": "extracurricular",
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="1")],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    assert update["phase"] == "draft"
+    assert update["awaiting_user_input"] is False
+    assert update["extras_collect_stage"] == "done"
+    assert "resumen" in update["messages"][0].content.lower()
 
 
 def test_collect_extracurricular_details_keeps_valid_items_and_requests_only_missing_data() -> None:

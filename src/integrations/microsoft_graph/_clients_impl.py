@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from typing import Any, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
+
+from zoneinfo import ZoneInfo
 
 _DEFAULT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
@@ -34,8 +36,24 @@ class OutlookCalendarEventUpsert:
     timezone: str
     categories: tuple[str, ...] = field(default_factory=tuple)
     metadata: dict[str, object] = field(default_factory=dict)
+    recurrence: "OutlookEventRecurrence | None" = None
+    use_local_timezone: bool = False
     existing_external_event_id: str | None = None
     existing_change_key: str | None = None
+
+
+@dataclass(frozen=True)
+class OutlookEventRecurrence:
+    """Recurrencia Outlook Calendar compatible con Microsoft Graph."""
+
+    pattern_type: str
+    interval: int
+    days_of_week: tuple[str, ...]
+    start_date: date
+    range_type: str = "noEnd"
+    first_day_of_week: str = "monday"
+    end_date: date | None = None
+    number_of_occurrences: int | None = None
 
 
 @dataclass(frozen=True)
@@ -45,6 +63,20 @@ class UpsertedOutlookCalendarEvent:
     external_key: str
     external_event_id: str
     external_change_key: str | None = None
+
+
+@dataclass(frozen=True)
+class OutlookCalendarEventSnapshot:
+    """Lectura resumida de un evento ya existente en Outlook."""
+
+    external_event_id: str
+    subject: str
+    start: dict[str, str]
+    end: dict[str, str]
+    recurrence: dict[str, Any] | None = None
+    external_change_key: str | None = None
+    is_cancelled: bool = False
+    web_link: str | None = None
 
 
 @dataclass(frozen=True)
@@ -127,6 +159,14 @@ class OutlookCalendarClient(Protocol):
         external_event_ids: list[str],
     ) -> list[str]: ...
 
+    def get_event(
+        self,
+        *,
+        access_token: str,
+        calendar_id: str | None,
+        external_event_id: str,
+    ) -> OutlookCalendarEventSnapshot | None: ...
+
 
 class MicrosoftTodoClient(Protocol):
     """Contrato para sincronización con Microsoft To Do."""
@@ -182,6 +222,18 @@ class DisabledOutlookCalendarClient:
         calendar_id: str | None,
         external_event_ids: list[str],
     ) -> list[str]:
+        raise MicrosoftGraphClientError(
+            error_code="outlook_client_not_configured",
+            detail="OutlookCalendarClient no configurado. Falta adapter real de Microsoft Graph.",
+        )
+
+    def get_event(
+        self,
+        *,
+        access_token: str,
+        calendar_id: str | None,
+        external_event_id: str,
+    ) -> OutlookCalendarEventSnapshot | None:
         raise MicrosoftGraphClientError(
             error_code="outlook_client_not_configured",
             detail="OutlookCalendarClient no configurado. Falta adapter real de Microsoft Graph.",
@@ -373,6 +425,45 @@ class GraphOutlookCalendarClient:
             deleted.append(external_event_id)
         return deleted
 
+    def get_event(
+        self,
+        *,
+        access_token: str,
+        calendar_id: str | None,
+        external_event_id: str,
+    ) -> OutlookCalendarEventSnapshot | None:
+        try:
+            response = self.transport.request_json(
+                method="GET",
+                url=(
+                    f"{self.graph_base_url}/me/events/"
+                    f"{quote(str(external_event_id), safe='')}"
+                    "?$select=id,subject,start,end,recurrence,changeKey,isCancelled,webLink"
+                ),
+                access_token=access_token,
+            )
+        except MicrosoftGraphClientError as exc:
+            if _is_missing_graph_resource_error(exc):
+                return None
+            raise
+        event_id = _optional_str(response.get("id"))
+        if not event_id:
+            return None
+        return OutlookCalendarEventSnapshot(
+            external_event_id=event_id,
+            subject=str(response.get("subject") or "").strip(),
+            start=_coerce_graph_datetime_dict(response.get("start")),
+            end=_coerce_graph_datetime_dict(response.get("end")),
+            recurrence=(
+                dict(response.get("recurrence"))
+                if isinstance(response.get("recurrence"), dict)
+                else None
+            ),
+            external_change_key=_optional_str(response.get("changeKey")),
+            is_cancelled=bool(response.get("isCancelled")),
+            web_link=_optional_str(response.get("webLink")),
+        )
+
 
 class GraphMicrosoftTodoClient:
     """Adapter real para Microsoft To Do sobre Microsoft Graph."""
@@ -554,10 +645,20 @@ def _outlook_event_payload(
             "contentType": "Text",
             "content": event.body_preview,
         },
-        "start": _graph_datetime_payload(event.starts_at),
-        "end": _graph_datetime_payload(event.ends_at),
+        "start": _graph_datetime_payload(
+            event.starts_at,
+            timezone_name=event.timezone,
+            use_local_timezone=event.use_local_timezone,
+        ),
+        "end": _graph_datetime_payload(
+            event.ends_at,
+            timezone_name=event.timezone,
+            use_local_timezone=event.use_local_timezone,
+        ),
         "categories": list(event.categories),
     }
+    if event.recurrence is not None:
+        payload["recurrence"] = _graph_recurrence_payload(event.recurrence)
     if include_transaction_id:
         payload["transactionId"] = event.external_key[:255]
     return payload
@@ -576,8 +677,20 @@ def _todo_task_payload(task: MicrosoftTodoTaskUpsert) -> dict[str, Any]:
     return payload
 
 
-def _graph_datetime_payload(value: datetime) -> dict[str, str]:
+def _graph_datetime_payload(
+    value: datetime,
+    *,
+    timezone_name: str = "UTC",
+    use_local_timezone: bool = False,
+) -> dict[str, str]:
     normalized = value if value.tzinfo is not None else value.replace(tzinfo=timezone.utc)
+    if use_local_timezone:
+        zone = ZoneInfo(timezone_name)
+        local_value = normalized.astimezone(zone).replace(microsecond=0)
+        return {
+            "dateTime": local_value.replace(tzinfo=None).isoformat(),
+            "timeZone": timezone_name,
+        }
     utc_value = normalized.astimezone(timezone.utc).replace(microsecond=0)
     return {
         "dateTime": utc_value.isoformat().replace("+00:00", "Z"),
@@ -585,11 +698,50 @@ def _graph_datetime_payload(value: datetime) -> dict[str, str]:
     }
 
 
+def _graph_recurrence_payload(recurrence: OutlookEventRecurrence) -> dict[str, Any]:
+    payload: dict[str, Any] = {
+        "pattern": {
+            "type": recurrence.pattern_type,
+            "interval": recurrence.interval,
+            "daysOfWeek": list(recurrence.days_of_week),
+            "firstDayOfWeek": recurrence.first_day_of_week,
+        },
+        "range": {
+            "type": recurrence.range_type,
+            "startDate": recurrence.start_date.isoformat(),
+        },
+    }
+    if recurrence.end_date is not None:
+        payload["range"]["endDate"] = recurrence.end_date.isoformat()
+    if recurrence.number_of_occurrences is not None:
+        payload["range"]["numberOfOccurrences"] = recurrence.number_of_occurrences
+    return payload
+
+
 def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     normalized = str(value).strip()
     return normalized or None
+
+
+def _coerce_graph_datetime_dict(value: Any) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {"dateTime": "", "timeZone": ""}
+    return {
+        "dateTime": str(value.get("dateTime") or "").strip(),
+        "timeZone": str(value.get("timeZone") or "").strip(),
+    }
+
+
+def _is_missing_graph_resource_error(exc: MicrosoftGraphClientError) -> bool:
+    error_code = str(getattr(exc, "error_code", "") or "").strip().lower()
+    return error_code in {
+        "erroritemnotfound",
+        "itemnotfound",
+        "errorresourcenotfound",
+        "microsoft_graph_http_404",
+    }
 
 
 def _graph_error_from_http_error(exc: HTTPError) -> MicrosoftGraphClientError:
