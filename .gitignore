@@ -8,5 +8,18 @@ wheels/
 
 # Virtual environments
 .venv
+
+# Local agent/runtime state
+.codex
 .langgraph_api
+.langgraph_api.bak*/
+.langgraph_media
+
+# Local secrets and deployment credentials
 *.env
+.env.*
+!.env.example
+!.env.sample
+*.pem
+*.key
+*.secret

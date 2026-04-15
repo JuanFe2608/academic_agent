@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from langchain_core.messages import HumanMessage
 
 import agents.support.nodes.parse_schedules_to_events.node as parse_node
@@ -261,7 +263,9 @@ def test_request_schedules_section_edit_revalidates_conflicts_after_change(monke
     text = update["messages"][0].content[0]["text"].lower()
     assert "genera un cruce" in text
     assert "9:30" in text
-    assert update["messages"][0].content[1]["image_url"]["url"] == "data:image/png;base64,abc"
+    rendered_image = update["messages"][0].content[1]["image_url"]["url"]
+    assert not rendered_image.startswith("data:image")
+    assert Path(rendered_image).exists()
 
 
 def test_request_schedules_awaiting_more_accepts_new_academic_content_with_fisica() -> None:
@@ -477,6 +481,69 @@ def test_parse_schedules_to_events_rejects_academic_image_only_input() -> None:
     assert update["phase"] == "schedules"
     assert update["awaiting_user_input"] is True
     assert "horario académico por escrito" in update["messages"][0].content.lower()
+
+
+def test_request_schedules_extracts_academic_schedule_from_student_image(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.schedule_capture_service.llm_extract_schedule_from_image",
+        lambda image_ref, schedule_hint=None: {
+            "is_schedule": True,
+            "schedule_type": schedule_hint,
+            "extracted_text": "Lunes 08:00-10:00 Algebra",
+        },
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+        messages=[
+            HumanMessage(
+                content=[
+                    {"type": "input_image", "image_url": {"url": "data:image/png;base64,abc"}}
+                ]
+            )
+        ],
+    )
+
+    update = request_schedules(state)
+
+    image_ref = update["raw_inputs"]["horario_academico_img"]
+    assert update["awaiting_user_input"] is False
+    assert update["raw_inputs"]["horario_academico_text"] == "Lunes 08:00-10:00 Algebra"
+    assert not image_ref.startswith("data:image")
+    assert Path(image_ref).exists()
+    assert update["last_user_images"] == [image_ref]
+
+
+def test_request_schedules_keeps_student_image_as_file_when_unreadable(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.schedule_capture_service.llm_extract_schedule_from_image",
+        lambda image_ref, schedule_hint=None: None,
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+        messages=[
+            HumanMessage(
+                content=[
+                    {"type": "input_image", "image_url": {"url": "data:image/png;base64,abc"}}
+                ]
+            )
+        ],
+    )
+
+    update = request_schedules(state)
+
+    image_ref = update["raw_inputs"]["horario_academico_img"]
+    assert update["awaiting_user_input"] is True
+    assert "puedo recibir imagenes" in update["messages"][0].content.lower()
+    assert not image_ref.startswith("data:image")
+    assert Path(image_ref).exists()
 
 
 def test_parse_schedules_to_events_accepts_work_schedule_without_meridiem_as_military_time() -> None:

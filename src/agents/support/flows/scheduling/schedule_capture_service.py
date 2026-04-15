@@ -16,8 +16,10 @@ from agents.support.nodes.utils import (
     has_time_range,
     normalize_text,
 )
+from agents.support.media import materialize_image_reference
 from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.state import AgentState
+from services.scheduling.ai_support import llm_extract_schedule_from_image
 from schemas.scheduling import PendingScheduleItem
 
 from agents.support.scheduling.state_helpers import (
@@ -97,6 +99,7 @@ def handle_schedule_capture_turn(
     *,
     has_new_input: bool,
     last_text: str | None,
+    last_images: list[str] | None = None,
     current_count: int,
     prompts: ScheduleCapturePrompts,
 ) -> dict:
@@ -113,6 +116,7 @@ def handle_schedule_capture_turn(
         state.get("work_pending_items", [])
     )
     schedule_input_text = last_text
+    image_refs = _sanitize_image_refs(last_images or [])
     occupation_reply_consumed = False
 
     if not occupation and has_new_input and last_text:
@@ -137,6 +141,7 @@ def handle_schedule_capture_turn(
                 current_count if has_new_input else state.get("user_message_count", 0)
             ),
             last_text=last_text if has_new_input else state.get("last_user_text"),
+            last_images=image_refs if has_new_input else None,
             prompt=prompts.occupation,
         )
 
@@ -154,6 +159,7 @@ def handle_schedule_capture_turn(
                 current_count if has_new_input else state.get("user_message_count", 0)
             ),
             last_text=last_text if has_new_input else state.get("last_user_text"),
+            last_images=image_refs if has_new_input else None,
             prompt=prompts.none,
         )
 
@@ -194,6 +200,7 @@ def handle_schedule_capture_turn(
             work_pending_items=work_pending_items,
             current_count=current_count,
             last_text=last_text,
+            last_images=image_refs if has_new_input else None,
             prompts=prompts,
         )
 
@@ -215,6 +222,7 @@ def handle_schedule_capture_turn(
                 current_count if has_new_input else state.get("user_message_count", 0)
             ),
             last_text=last_text if has_new_input else state.get("last_user_text"),
+            last_images=image_refs if has_new_input else None,
         )
 
     if has_new_input and schedule_input_text and (
@@ -236,6 +244,35 @@ def handle_schedule_capture_turn(
         if pending_update is not None:
             pending_update["student_profile"] = profile
             return pending_update
+
+    if has_new_input and image_refs and capture_target in {"academic", "work"}:
+        raw_inputs = _store_schedule_image(raw_inputs, capture_target, image_refs[-1])
+        if not schedule_input_text or not _looks_like_schedule_content(schedule_input_text):
+            extracted_text = _extract_schedule_text_from_image(
+                image_refs[-1],
+                target=capture_target,
+            )
+            if extracted_text:
+                schedule_input_text = extracted_text
+            else:
+                return _build_schedule_update(
+                    state,
+                    profile=profile,
+                    raw_inputs=raw_inputs,
+                    schedule_state=update_schedule_flow_state(
+                        schedule_state,
+                        capture_target=capture_target,
+                        capture_stage="awaiting_input",
+                    ),
+                    academic_pending_items=academic_pending_items,
+                    work_pending_items=work_pending_items,
+                    phase="schedules",
+                    awaiting_user_input=True,
+                    current_count=current_count,
+                    last_text=last_text,
+                    last_images=image_refs,
+                    prompt=_image_unreadable_prompt(capture_target),
+                )
 
     if capture_stage == "awaiting_more":
         if has_new_input and schedule_input_text:
@@ -264,6 +301,7 @@ def handle_schedule_capture_turn(
                     work_pending_items=work_pending_items,
                     current_count=current_count,
                     last_text=last_text,
+                    last_images=image_refs if has_new_input else None,
                     prompts=prompts,
                 )
             if decision in {"more", None} and _looks_like_schedule_content(
@@ -305,6 +343,7 @@ def handle_schedule_capture_turn(
                 current_count if has_new_input else state.get("user_message_count", 0)
             ),
             last_text=last_text if has_new_input else state.get("last_user_text"),
+            last_images=image_refs if has_new_input else None,
             prompt=_prompt_for_more(capture_target, prompts),
         )
 
@@ -325,6 +364,7 @@ def handle_schedule_capture_turn(
             awaiting_user_input=False,
             current_count=current_count,
             last_text=last_text,
+            last_images=image_refs if has_new_input else None,
         )
 
     return _prompt_for_section_input(
@@ -338,6 +378,7 @@ def handle_schedule_capture_turn(
         work_pending_items=work_pending_items,
         current_count=state.get("user_message_count", 0),
         last_text=state.get("last_user_text"),
+        last_images=None,
         prompts=prompts,
     )
 
@@ -354,6 +395,7 @@ def _prompt_for_section_input(
     work_pending_items: list[PendingScheduleItem],
     current_count: int,
     last_text: str | None,
+    last_images: list[str] | None,
     prompts: ScheduleCapturePrompts,
 ) -> dict:
     return _build_schedule_update(
@@ -371,12 +413,45 @@ def _prompt_for_section_input(
         awaiting_user_input=True,
         current_count=current_count,
         last_text=last_text,
+        last_images=last_images,
         prompt=_prompt_for_target(target, occupation, prompts),
     )
 
 
 def _append_schedule_text(raw_inputs: dict, target: str, text: str) -> dict:
     return append_schedule_input_text(raw_inputs, target, text)  # type: ignore[arg-type]
+
+
+def _sanitize_image_refs(image_refs: list[str]) -> list[str]:
+    return [
+        materialize_image_reference(str(image_ref))
+        for image_ref in image_refs
+        if str(image_ref or "").strip()
+    ]
+
+
+def _store_schedule_image(raw_inputs: dict, target: str, image_ref: str) -> dict:
+    updated = dict(raw_inputs)
+    field_name = "horario_laboral_img" if target == "work" else "horario_academico_img"
+    updated[field_name] = materialize_image_reference(image_ref)
+    return updated
+
+
+def _extract_schedule_text_from_image(image_ref: str, *, target: str) -> str:
+    schedule_hint = "laboral" if target == "work" else "academico"
+    result = llm_extract_schedule_from_image(image_ref, schedule_hint)
+    if not result or not result.get("is_schedule"):
+        return ""
+    return str(result.get("extracted_text") or "").strip()
+
+
+def _image_unreadable_prompt(target: str) -> str:
+    label = "laboral" if target == "work" else "academico"
+    return (
+        f"Puedo recibir imagenes, pero no logre leer ese horario {label}. "
+        "Enviamelo por texto con dias y horas, por ejemplo: "
+        "Lunes 08:00-10:00 Calculo."
+    )
 
 
 def _resolve_capture_target(
@@ -608,6 +683,7 @@ def _build_schedule_update(
     awaiting_user_input: bool,
     current_count: int,
     last_text: str | None,
+    last_images: list[str] | None = None,
     prompt: str | None = None,
 ) -> dict:
     conversation_changes: dict[str, object] = {
@@ -616,6 +692,8 @@ def _build_schedule_update(
         "last_user_text": last_text,
         "awaiting_user_input": awaiting_user_input,
     }
+    if last_images is not None:
+        conversation_changes["last_user_images"] = list(last_images)
     if prompt:
         conversation_changes["messages"] = append_message(
             state.get("messages", []),

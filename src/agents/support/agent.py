@@ -18,6 +18,7 @@ from agents.support.nodes.collect_extracurricular_details import (
 )
 from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
+from agents.support.nodes.handle_academic_update import handle_academic_update
 from agents.support.nodes.persist_profile import persist_profile
 from agents.support.nodes.persist_study_profile import persist_study_profile
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
@@ -44,6 +45,7 @@ from agents.support.onboarding.validators import (
 )
 from agents.support.state import AgentState
 from services.personalization import is_personalization_enabled
+from services.priorities import is_academic_update_message
 
 
 def _should_wait(state: AgentState) -> bool:
@@ -83,6 +85,9 @@ def _route_welcome(state: AgentState) -> str:
         return "renew_fixed_schedule"
     if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_repair(state):
         return "repair_fixed_schedule"
+    if conversation.phase == "end" and _has_new_user_input(state):
+        if is_academic_update_message(_current_user_text(state)):
+            return "handle_academic_update"
     if conversation.phase == "end":
         return "end"
     if conversation.phase != "consent":
@@ -145,6 +150,8 @@ def _route_from_phase(state: AgentState) -> str:
         return "collect_priorities"
     if phase == "study_plan":
         return "build_study_plan"
+    if phase == "running":
+        return "handle_academic_update"
     return "welcome_consent"
 
 
@@ -453,6 +460,16 @@ def _route_build_study_plan(state: AgentState) -> str:
     return "end"
 
 
+def _route_handle_academic_update(state: AgentState) -> str:
+    """Encadena actualizaciones puntuales con replanning ligero si aplica."""
+
+    if _should_wait(state):
+        return "end"
+    if state.conversation_state.phase == "study_plan":
+        return "build_study_plan"
+    return "end"
+
+
 def _has_block_type(blocks: list, block_type: str) -> bool:
     """Comprueba si una colección de bloques contiene un tipo específico."""
 
@@ -478,6 +495,19 @@ def _has_new_user_input(state: AgentState) -> bool:
         last_images,
     )
     return has_new_input
+
+
+def _current_user_text(state: AgentState) -> str:
+    """Devuelve el ultimo texto real del usuario en este turno."""
+
+    conversation = state.conversation_state
+    _, last_text, _ = detect_new_input(
+        conversation.messages,
+        conversation.user_message_count,
+        conversation.awaiting_user_input,
+        conversation.last_user_text,
+    )
+    return last_text
 
 
 def build_agent() -> StateGraph:
@@ -507,6 +537,7 @@ def build_agent() -> StateGraph:
     graph.add_node("persist_study_profile", persist_study_profile)
     graph.add_node("collect_priorities", collect_priorities)
     graph.add_node("build_study_plan", build_study_plan)
+    graph.add_node("handle_academic_update", handle_academic_update)
 
     graph.set_entry_point("welcome_consent")
 
@@ -536,6 +567,7 @@ def build_agent() -> StateGraph:
             "persist_study_profile": "persist_study_profile",
             "collect_priorities": "collect_priorities",
             "build_study_plan": "build_study_plan",
+            "handle_academic_update": "handle_academic_update",
             "end": END,
         },
     )
@@ -730,6 +762,14 @@ def build_agent() -> StateGraph:
         _route_build_study_plan,
         {
             "collect_priorities": "collect_priorities",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "handle_academic_update",
+        _route_handle_academic_update,
+        {
+            "build_study_plan": "build_study_plan",
             "end": END,
         },
     )

@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import base64
 from dataclasses import dataclass
 from datetime import datetime
 
@@ -15,7 +14,7 @@ from services.scheduling.models import WeeklyScheduleBlock
 @dataclass(frozen=True)
 class RenderedSchedulePreview:
     image_path: str
-    image_data_url: str
+    image_ref: str
 
 
 def blocks_to_events(blocks: list[WeeklyScheduleBlock]) -> list[Event]:
@@ -52,7 +51,7 @@ def render_schedule_preview_image(
     image_path = render_recurring_schedule(blocks, timezone_name=timezone_name)
     return RenderedSchedulePreview(
         image_path=image_path,
-        image_data_url=_encode_image(image_path),
+        image_ref=image_path,
     )
 
 
@@ -68,13 +67,7 @@ def build_rendered_schedule_message_content(
     return (
         [
             {"type": "text", "text": text},
-            {"type": "image_url", "image_url": {"url": preview.image_data_url}},
+            {"type": "image_url", "image_url": {"url": preview.image_ref}},
         ],
         preview.image_path,
     )
-
-
-def _encode_image(path: str) -> str:
-    with open(path, "rb") as file:
-        data = base64.b64encode(file.read()).decode("ascii")
-    return f"data:image/png;base64,{data}"

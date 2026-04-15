@@ -7,7 +7,7 @@ de aplicación de scheduling.
 
 from __future__ import annotations
 
-from agents.support.nodes.utils import detect_new_input
+from agents.support.nodes.utils import detect_new_input, get_last_user_images
 from agents.support.flows.scheduling.schedule_capture_service import (
     ScheduleCapturePrompts,
     handle_schedule_capture_turn,
@@ -33,7 +33,9 @@ def request_schedules(state: AgentState) -> dict:
         state.get("user_message_count", 0),
         state.get("awaiting_user_input", False),
         state.get("last_user_text"),
+        state.get("last_user_images", []),
     )
+    last_images = get_last_user_images(messages)
     prompts = ScheduleCapturePrompts(
         occupation=PROMPT_OCCUPATION,
         academic=PROMPT_ACADEMICO,
@@ -46,6 +48,7 @@ def request_schedules(state: AgentState) -> dict:
         state,
         has_new_input=has_new_input,
         last_text=last_text,
+        last_images=last_images,
         current_count=current_count,
         prompts=prompts,
     )

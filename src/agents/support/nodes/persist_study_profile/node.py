@@ -131,17 +131,21 @@ def _primary_technique_id(study_profile: dict) -> str | None:
 
 
 def _needs_priorities_capture(subjects: list) -> bool:
-    """Indica si aún faltan urgencia o carga explícita por materia."""
+    """Indica si falta un snapshot semanal confirmado."""
 
     if not subjects:
         return True
     for item in subjects:
-        urgency = item.get("urgencia") if isinstance(item, dict) else getattr(item, "urgencia", None)
         load = (
             item.get("carga_semanal_min")
             if isinstance(item, dict)
             else getattr(item, "carga_semanal_min", None)
         )
-        if urgency is None or load is None:
+        confirmed = (
+            item.get("is_priority_confirmed")
+            if isinstance(item, dict)
+            else getattr(item, "is_priority_confirmed", False)
+        )
+        if load is None or not confirmed:
             return True
     return False

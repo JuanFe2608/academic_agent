@@ -11,7 +11,7 @@ class PrioritiesConfig:
     """Parámetros configurables del subflujo de prioridades."""
 
     enabled: bool = False
-    prompt_version: str = "v1"
+    prompt_version: str = "v2"
 
 
 def load_priorities_config() -> PrioritiesConfig:
@@ -19,8 +19,8 @@ def load_priorities_config() -> PrioritiesConfig:
 
     return PrioritiesConfig(
         enabled=_env_bool("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", False),
-        prompt_version=os.getenv("ACADEMIC_AGENT_PRIORITIES_PROMPT_VERSION", "v1").strip()
-        or "v1",
+        prompt_version=os.getenv("ACADEMIC_AGENT_PRIORITIES_PROMPT_VERSION", "v2").strip()
+        or "v2",
     )
 
 

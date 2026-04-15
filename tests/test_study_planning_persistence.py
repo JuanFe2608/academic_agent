@@ -194,6 +194,14 @@ def test_postgres_study_planning_repository_persists_profiles_subjects_and_event
                 urgencia="alta",
                 carga_semanal_min=240,
                 origen="manual",
+                importance_rank_selected_by_student=1,
+                perceived_difficulty=4,
+                urgency_type="parcial",
+                urgency_due_at="2026-04-17T23:59:00-05:00",
+                computed_priority_score=0.82,
+                priority_source="weekly_flow",
+                is_priority_confirmed=True,
+                updated_from_flow_at="2026-04-13T08:00:00-05:00",
             ),
             SubjectItem(
                 nombre="Programacion",
@@ -242,6 +250,10 @@ def test_postgres_study_planning_repository_persists_profiles_subjects_and_event
     ]
 
     assert len(priority_subject_params) == 2
+    assert priority_subject_params[0][8] == 1
+    assert priority_subject_params[0][10] == "parcial"
+    assert priority_subject_params[0][12] == 0.82
+    assert priority_subject_params[0][14] is True
     assert len(plan_event_params) == 1
     assert plan_profile_params[0][3] == 31
     assert len(priority_payload_update_params) == 1

@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from langchain_core.messages import HumanMessage
 
 from agents.support.nodes.utils import detect_new_input, get_last_user_images
+from agents.support.state import AgentState
 
 
 def test_get_last_user_images_accepts_input_image_block() -> None:
@@ -18,7 +21,11 @@ def test_get_last_user_images_accepts_input_image_block() -> None:
         )
     ]
 
-    assert get_last_user_images(messages) == ["data:image/png;base64,abc"]
+    images = get_last_user_images(messages)
+
+    assert len(images) == 1
+    assert not images[0].startswith("data:image")
+    assert Path(images[0]).exists()
 
 
 def test_get_last_user_images_accepts_source_base64_block() -> None:
@@ -39,7 +46,11 @@ def test_get_last_user_images_accepts_source_base64_block() -> None:
         }
     ]
 
-    assert get_last_user_images(messages) == ["data:image/png;base64,abc123"]
+    images = get_last_user_images(messages)
+
+    assert len(images) == 1
+    assert not images[0].startswith("data:image")
+    assert Path(images[0]).exists()
 
 
 def test_get_last_user_images_accepts_image_url_in_text() -> None:
@@ -111,3 +122,19 @@ def test_detect_new_input_ignores_images_when_not_tracking_previous() -> None:
 
     assert has_new is False
     assert current_count == 1
+
+
+def test_agent_state_materializes_message_images_before_persistence() -> None:
+    state = AgentState(
+        messages=[
+            HumanMessage(
+                content=[
+                    {"type": "input_image", "image_url": {"url": "data:image/png;base64,abc"}}
+                ]
+            )
+        ]
+    )
+
+    image_url = state.messages[0].content[0]["image_url"]["url"]
+    assert not image_url.startswith("data:image")
+    assert Path(image_url).exists()

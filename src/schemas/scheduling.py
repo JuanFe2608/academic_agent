@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from typing import Literal, Optional
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
+from utils.media_artifacts import materialize_image_reference
 from .common import BaseSchemaModel, Prioridad
 
 EventType = Literal["confirmado", "tentativo"]
@@ -38,6 +39,13 @@ class RawInputs(BaseSchemaModel):
     horario_laboral_text: Optional[str] = None
     horario_laboral_img: Optional[str] = None
     extras: list[str] = Field(default_factory=list)
+
+    @field_validator("horario_academico_img", "horario_laboral_img", mode="before")
+    @classmethod
+    def _sanitize_image_reference(cls, value: object) -> object:
+        if value is None:
+            return None
+        return materialize_image_reference(str(value))
 
 
 class ExtracurricularItem(BaseSchemaModel):

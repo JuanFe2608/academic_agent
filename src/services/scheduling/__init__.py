@@ -9,6 +9,7 @@ from .activity_matching import resolve_best_title_key, suggest_similar_titles
 from .ai_support import (
     llm_extract_json,
     llm_extract_schedule_blocks,
+    llm_extract_schedule_from_image,
     llm_normalize_extracurricular_items,
     llm_normalize_schedule,
 )
@@ -155,6 +156,7 @@ __all__ = [
     "merge_section_blocks",
     "llm_extract_json",
     "llm_extract_schedule_blocks",
+    "llm_extract_schedule_from_image",
     "llm_normalize_extracurricular_items",
     "llm_normalize_schedule",
     "normalize_schedule_title",

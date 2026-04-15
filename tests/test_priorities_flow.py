@@ -42,6 +42,12 @@ def _apply_update(state: AgentState, update: dict) -> AgentState:
     return AgentState(**payload)
 
 
+def _with_user_message(state: AgentState, text: str) -> AgentState:
+    payload = state.model_dump()
+    payload["messages"] = list(state.get("messages", [])) + [HumanMessage(content=text)]
+    return AgentState(**payload)
+
+
 def _completed_profile_payload() -> dict[str, object]:
     repository = InMemoryPersonalizationRepository()
     service = PersonalizationService(
@@ -91,8 +97,12 @@ def test_priorities_feature_flag_routes_after_persist_study_profile(monkeypatch)
         assert prompt_update["phase"] == "priorities"
         assert prompt_update["awaiting_user_input"] is True
         prompt = prompt_update["messages"][0].content
-        assert "usar horario" in prompt
+        assert "Sí, actualizarlas" in prompt
+        assert "Después" in prompt
+        assert "usar horario" not in prompt
+        assert "omitir" not in prompt
         assert "Calculo" in prompt
+        assert "120 min/semana" in prompt
     finally:
         set_personalization_service(None)
 
@@ -165,3 +175,94 @@ def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
     assert plan_update["phase"] == "end"
     assert plan_update["study_plan"]["rules"]["subjects_source"] == "state.subjects"
     assert plan_update["study_plan"]["rules"]["spacing_days"] == 2
+
+
+def test_collect_priorities_supports_visible_later_option(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
+    state = AgentState(
+        phase="priorities",
+        awaiting_user_input=True,
+        user_message_count=0,
+        priorities={"status": "collecting", "source": "derived_from_schedule"},
+        schedule={
+            "blocks": [
+                _academic_block("monday", "Calculo"),
+                _academic_block("wednesday", "Programacion"),
+            ]
+        },
+        study_profile={"top_techniques": ["repeticion_espaciada"]},
+        messages=[HumanMessage(content="Después")],
+    )
+
+    update = collect_priorities(state)
+    next_state = _apply_update(state, update)
+
+    assert update["phase"] == "study_plan"
+    assert len(update["subjects"]) == 2
+    assert update["priorities"]["status"] == "completed"
+    assert _route_collect_priorities(next_state) == "build_study_plan"
+
+
+def test_collect_priorities_guides_weekly_snapshot_until_confirmation(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
+    state = AgentState(
+        phase="priorities",
+        awaiting_user_input=False,
+        user_message_count=0,
+        priorities={"status": "collecting", "source": "derived_from_schedule"},
+        schedule={
+            "blocks": [
+                _academic_block("monday", "Calculo"),
+                _academic_block("wednesday", "Programacion"),
+                _academic_block("friday", "Fisica"),
+            ]
+        },
+        study_profile={"top_techniques": ["pomodoro", "feynman"]},
+        messages=[],
+    )
+
+    update = collect_priorities(state)
+    state = _apply_update(state, update)
+    assert update["priorities"]["capture_stage"] == "ask_update"
+    assert "prioridades de esta semana" in update["messages"][0].content
+    assert "120 min/semana" in update["messages"][0].content
+
+    update = collect_priorities(_with_user_message(state, "si"))
+    state = _apply_update(_with_user_message(state, "si"), update)
+    assert update["priorities"]["capture_stage"] == "ask_top3"
+
+    update = collect_priorities(_with_user_message(state, "3,1,2"))
+    state = _apply_update(_with_user_message(state, "3,1,2"), update)
+    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
+    assert update["priorities"]["draft"]["importance_order"] == [3, 1, 2]
+    assert "Materia 1 de 3" in update["messages"][0].content
+
+    update = collect_priorities(_with_user_message(state, "no"))
+    state = _apply_update(_with_user_message(state, "no"), update)
+    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
+    assert update["priorities"]["draft"]["urgency_subject_index"] == 2
+    assert "Materia 2 de 3" in update["messages"][0].content
+
+    update = collect_priorities(_with_user_message(state, "parcial viernes"))
+    state = _apply_update(_with_user_message(state, "parcial viernes"), update)
+    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
+    assert update["priorities"]["draft"]["urgency_subject_index"] == 3
+    assert update["priorities"]["draft"]["urgency_details"][0]["subject_number"] == 2
+
+    update = collect_priorities(_with_user_message(state, "no"))
+    state = _apply_update(_with_user_message(state, "no"), update)
+    assert update["priorities"]["capture_stage"] == "ask_difficult_subjects"
+
+    update = collect_priorities(_with_user_message(state, "2,3"))
+    state = _apply_update(_with_user_message(state, "2,3"), update)
+    assert update["priorities"]["capture_stage"] == "confirm_summary"
+    assert any(subject.computed_priority_score is not None for subject in update["subjects"])
+    assert "prioridad semanal" in update["messages"][0].content
+
+    update = collect_priorities(_with_user_message(state, "confirmar"))
+    next_state = _apply_update(_with_user_message(state, "confirmar"), update)
+
+    assert update["phase"] == "study_plan"
+    assert update["priorities"]["status"] == "completed"
+    assert update["priorities"]["capture_stage"] is None
+    assert _route_collect_priorities(next_state) == "build_study_plan"

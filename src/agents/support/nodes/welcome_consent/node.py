@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-import base64
 from datetime import datetime, timezone
-from functools import lru_cache
 from pathlib import Path
 
 from langchain_core.messages import AIMessage, BaseMessage
@@ -33,8 +31,6 @@ _PROJECT_ROOT = Path(__file__).resolve().parents[5]
 _WELCOME_IMAGE_PATH = (
     _PROJECT_ROOT / "assets" / "whatsapp" / "saludando con un brazo cruzado.png"
 )
-_WELCOME_IMAGE_MIME_TYPE = "image/png"
-
 
 def welcome_consent(state: AgentState) -> dict:
     """Solicita consentimiento y actualiza el estado segun respuesta."""
@@ -132,14 +128,7 @@ def _welcome_sequence() -> list[BaseMessage]:
 
 
 def _welcome_image_block() -> dict[str, object]:
-    return {"type": "image_url", "image_url": {"url": _welcome_image_data_url()}}
-
-
-@lru_cache(maxsize=1)
-def _welcome_image_data_url() -> str:
-    with _WELCOME_IMAGE_PATH.open("rb") as image_file:
-        data = base64.b64encode(image_file.read()).decode("ascii")
-    return f"data:{_WELCOME_IMAGE_MIME_TYPE};base64,{data}"
+    return {"type": "image_url", "image_url": {"url": str(_WELCOME_IMAGE_PATH)}}
 
 
 def _restart_after_out_of_scope(

@@ -1,5 +1,11 @@
 """Servicios del dominio de planificación académica."""
 
+from .daily_accompaniment_service import (
+    DailyCompletionParseResult,
+    DailyFocusResult,
+    build_daily_focus,
+    parse_daily_completion_response,
+)
 from .materialization_service import (
     MaterializeStudyPlanInstancesResult,
     StudyPlanMaterializationService,
@@ -27,6 +33,8 @@ from .tracking_service import (
 )
 
 __all__ = [
+    "DailyCompletionParseResult",
+    "DailyFocusResult",
     "MaterializeStudyPlanInstancesResult",
     "MarkMissedStudySessionsResult",
     "PersistStudyPlanningSnapshotResult",
@@ -35,6 +43,7 @@ __all__ = [
     "StudyPlanningPersistenceService",
     "StudySessionTrackingService",
     "TrackStudySessionResult",
+    "build_daily_focus",
     "build_initial_study_plan",
     "build_study_plan_materialization_service",
     "build_study_planning_persistence_service",
@@ -44,5 +53,6 @@ __all__ = [
     "ensure_study_profile",
     "study_plan_state_to_update",
     "sync_subjects_and_study_plan",
+    "parse_daily_completion_response",
     "update_study_plan_state",
 ]

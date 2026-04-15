@@ -90,6 +90,15 @@ class InMemoryStudyPlanningRepository:
             "status": normalized_priorities.status,
             "source": normalized_priorities.source,
             "prompt_version": normalized_priorities.prompt_version,
+            "week_start": normalized_priorities.week_start,
+            "week_end": normalized_priorities.week_end,
+            "snapshot_kind": _snapshot_kind(normalized_priorities),
+            "confirmed_at": (
+                normalized_subjects[0].updated_from_flow_at
+                if normalized_priorities.status == "completed" and normalized_subjects
+                else None
+            ),
+            "update_reason": _update_reason(normalized_priorities),
             "result_payload": _payload_with_persistence_metadata(
                 normalized_priorities,
                 persisted_profile_id=priority_profile_id,
@@ -215,10 +224,15 @@ class PostgresStudyPlanningRepository:
                     status,
                     source,
                     prompt_version,
+                    week_start,
+                    week_end,
+                    snapshot_kind,
+                    confirmed_at,
+                    update_reason,
                     result_payload,
                     is_current
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s::jsonb, TRUE
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s::jsonb, TRUE
                 )
                 RETURNING id, version_number
                 """,
@@ -230,6 +244,15 @@ class PostgresStudyPlanningRepository:
                     normalized_priorities.status,
                     normalized_priorities.source,
                     normalized_priorities.prompt_version,
+                    normalized_priorities.week_start,
+                    normalized_priorities.week_end,
+                    _snapshot_kind(normalized_priorities),
+                    (
+                        normalized_subjects[0].updated_from_flow_at
+                        if normalized_priorities.status == "completed" and normalized_subjects
+                        else None
+                    ),
+                    _update_reason(normalized_priorities),
                     json.dumps(
                         _payload_with_persistence_metadata(
                             normalized_priorities,
@@ -274,8 +297,16 @@ class PostgresStudyPlanningRepository:
                         difficulty,
                         urgency,
                         weekly_load_min,
-                        origin
-                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        origin,
+                        importance_rank_selected_by_student,
+                        perceived_difficulty,
+                        urgency_type,
+                        urgency_due_at,
+                        computed_priority_score,
+                        priority_source,
+                        is_priority_confirmed,
+                        updated_from_flow_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """,
                     (
                         priority_profile_id,
@@ -286,6 +317,14 @@ class PostgresStudyPlanningRepository:
                         subject.urgencia,
                         subject.carga_semanal_min,
                         subject.origen,
+                        subject.importance_rank_selected_by_student,
+                        subject.perceived_difficulty,
+                        subject.urgency_type,
+                        subject.urgency_due_at,
+                        subject.computed_priority_score,
+                        subject.priority_source,
+                        subject.is_priority_confirmed,
+                        subject.updated_from_flow_at,
                     ),
                 )
 
@@ -459,6 +498,26 @@ def _payload_with_persistence_metadata(
             "version_number": version_number,
         }
     ).model_dump(mode="python")
+
+
+def _snapshot_kind(priorities: PrioritiesState) -> str:
+    source = str(priorities.source or "")
+    if source == "event_update":
+        return "event_update"
+    if source == "legacy_manual":
+        return "legacy"
+    if source in {"derived_from_schedule", "fallback"}:
+        return "schedule_base"
+    return "weekly"
+
+
+def _update_reason(priorities: PrioritiesState) -> str | None:
+    draft = dict(priorities.draft or {})
+    event_update = draft.get("event_update")
+    if isinstance(event_update, dict):
+        trigger = event_update.get("trigger")
+        return str(trigger) if trigger else None
+    return None
 
 
 def ensure_subject_item(raw_item: SubjectItem | dict) -> SubjectItem:

@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from langchain_core.messages import HumanMessage
 
 from agents.support.agent import _route_welcome
@@ -44,7 +46,8 @@ def test_welcome_consent_resets_state_after_out_of_scope() -> None:
     assert update["student_profile"]["full_name"] is None
     assert update["raw_inputs"]["horario_academico_text"] is None
     assert "soy lara, tu asistente académico inteligente" in prompt
-    assert image_url.startswith("data:image/png;base64,")
+    assert not image_url.startswith("data:image")
+    assert Path(image_url).exists()
     assert "autorización para el tratamiento de datos personales" in consent
 
 
@@ -57,7 +60,7 @@ def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
     assert len(messages) == 3
     assert "Soy Lara" in messages[0].content
     assert messages[1].content[0]["type"] == "image_url"
-    assert messages[1].content[0]["image_url"]["url"].startswith(
-        "data:image/png;base64,"
-    )
+    image_url = messages[1].content[0]["image_url"]["url"]
+    assert not image_url.startswith("data:image")
+    assert Path(image_url).exists()
     assert messages[2].content.startswith("AUTORIZACIÓN")

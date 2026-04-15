@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from agents.support.nodes.render_schedule_preview.node import render_schedule_preview
 from agents.support.scheduling.formatter import build_schedule_summary
 from agents.support.state import AgentState
@@ -59,7 +61,9 @@ def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp
     assert "¿Entendí bien tu horario?" in text
     assert "escribe el número de la opción" in text.lower()
     assert "1. Sí, está correcto" in text
-    assert update["messages"][0].content[1]["image_url"]["url"] == "data:image/png;base64,abc"
+    rendered_image = update["messages"][0].content[1]["image_url"]["url"]
+    assert not rendered_image.startswith("data:image")
+    assert Path(rendered_image).exists()
 
 
 def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_path) -> None:

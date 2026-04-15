@@ -22,6 +22,7 @@ from repositories.scheduling.repository import (
     RecurringScheduleBlockSyncUpdate,
 )
 from services.scheduling import ScheduleService, WeeklyScheduleBlock
+import services.sync.fixed_schedule_outlook_projection as fixed_schedule_projection_module
 import services.sync.outlook_fixed_schedule_sync_service as fixed_schedule_sync_module
 from services.sync.outlook_fixed_schedule_sync_service import (
     OutlookFixedScheduleSyncService,
@@ -98,6 +99,11 @@ def _oauth_client(state_repository: InMemoryMicrosoftGraphStateRepository) -> Mi
     return client
 
 
+def _freeze_sync_now(monkeypatch) -> None:
+    monkeypatch.setattr(fixed_schedule_sync_module, "datetime", _FrozenDateTime)
+    monkeypatch.setattr(fixed_schedule_projection_module, "datetime", _FrozenDateTime)
+
+
 def _block(
     *,
     block_id: str,
@@ -120,7 +126,7 @@ def _block(
 
 
 def test_outlook_fixed_schedule_sync_service_upserts_recurring_blocks(monkeypatch) -> None:
-    monkeypatch.setattr(fixed_schedule_sync_module, "datetime", _FrozenDateTime)
+    _freeze_sync_now(monkeypatch)
     repository = InMemoryScheduleRepository()
     schedule_service = ScheduleService(repository=repository)
     persist_result = schedule_service.persist_schedule(
@@ -183,7 +189,7 @@ def test_outlook_fixed_schedule_sync_service_upserts_recurring_blocks(monkeypatc
 def test_outlook_fixed_schedule_sync_service_deletes_superseded_schedule_blocks(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(fixed_schedule_sync_module, "datetime", _FrozenDateTime)
+    _freeze_sync_now(monkeypatch)
     repository = InMemoryScheduleRepository()
     schedule_service = ScheduleService(repository=repository)
     state_repository = InMemoryMicrosoftGraphStateRepository()
@@ -266,7 +272,7 @@ def test_outlook_fixed_schedule_sync_service_deletes_superseded_schedule_blocks(
 def test_outlook_fixed_schedule_sync_service_marks_stale_missing_blocks_deleted(
     monkeypatch,
 ) -> None:
-    monkeypatch.setattr(fixed_schedule_sync_module, "datetime", _FrozenDateTime)
+    _freeze_sync_now(monkeypatch)
     repository = InMemoryScheduleRepository()
     schedule_service = ScheduleService(repository=repository)
     state_repository = InMemoryMicrosoftGraphStateRepository()

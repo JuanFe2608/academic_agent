@@ -194,6 +194,7 @@ def _to_prioritized_subject(
         dificultad=int(subject.dificultad),
         urgencia=subject.urgencia,
         carga_semanal_min=carga,
+        computed_priority_score=subject.computed_priority_score,
     )
     return PrioritizedSubject(
         nombre=subject.nombre.strip(),
@@ -267,7 +268,10 @@ def _planning_score(
     dificultad: int,
     urgencia: Prioridad | None,
     carga_semanal_min: int | None,
+    computed_priority_score: float | None = None,
 ) -> int:
+    if computed_priority_score is not None:
+        return int(round(max(0.0, min(float(computed_priority_score), 1.0)) * 1000))
     carga_score = min(int((carga_semanal_min or 0) / 30), 20)
     return (
         PRIORITY_WEIGHT[prioridad] * 100

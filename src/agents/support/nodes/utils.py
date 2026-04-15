@@ -7,6 +7,11 @@ import unicodedata
 from typing import Any, Optional
 
 from langchain_core.messages import AIMessage, BaseMessage, HumanMessage
+from agents.support.media import (
+    materialize_base64_image,
+    materialize_image_reference,
+    sanitize_message_content,
+)
 from services.scheduling.text_parser import is_ambiguous_time_range
 
 _YES_TOKENS = {
@@ -152,7 +157,7 @@ def _extract_images(content: object) -> list[str]:
         if not text:
             return images
         if text.startswith("data:image") or text.startswith(("http://", "https://")):
-            images.append(text)
+            images.append(materialize_image_reference(text))
             return images
         images.extend(_URL_PATTERN.findall(text))
     if images:
@@ -164,27 +169,30 @@ def _image_from_dict(item: dict) -> str:
     if "image_url" in item:
         image_url = item.get("image_url")
         if isinstance(image_url, dict):
-            return str(image_url.get("url") or "")
-        return str(image_url)
+            return materialize_image_reference(str(image_url.get("url") or ""))
+        return materialize_image_reference(str(image_url))
     if item.get("type") in {"input_image", "image", "image_url"}:
         url = str(item.get("url") or "").strip()
         if url:
             return url
     if "image" in item:
-        return str(item.get("image") or "")
+        return materialize_image_reference(str(item.get("image") or ""))
     source = item.get("source")
     if isinstance(source, dict):
         source_url = str(source.get("url") or "").strip()
         if source_url:
-            return source_url
+            return materialize_image_reference(source_url)
+        source_path = str(source.get("path") or source.get("file") or "").strip()
+        if source_path:
+            return source_path
         source_data = str(source.get("data") or source.get("base64") or "").strip()
         if source_data:
             media_type = str(source.get("media_type") or source.get("mime_type") or "image/png")
-            return _build_data_url(source_data, media_type)
+            return materialize_base64_image(source_data, mime_type=media_type)
     raw_data = str(item.get("data") or item.get("base64") or "").strip()
     if raw_data:
         media_type = str(item.get("media_type") or item.get("mime_type") or "image/png")
-        return _build_data_url(raw_data, media_type)
+        return materialize_base64_image(raw_data, mime_type=media_type)
     if "file" in item:
         return str(item.get("file") or "")
     if "url" in item and str(item.get("url", "")).startswith(
@@ -199,11 +207,11 @@ def _build_data_url(data: str, media_type: str) -> str:
     if not raw_data:
         return ""
     if raw_data.startswith("data:image"):
-        return raw_data
+        return materialize_image_reference(raw_data)
     mime = str(media_type or "image/png").strip() or "image/png"
     if not mime.startswith("image/"):
         mime = "image/png"
-    return f"data:{mime};base64,{raw_data}"
+    return materialize_base64_image(raw_data, mime_type=mime)
 
 
 def count_user_messages(messages: list[BaseMessage] | list) -> int:
@@ -231,9 +239,10 @@ def append_message(
     content: str | list[dict[str, Any]],
 ) -> list[BaseMessage]:
     """Retorna el/los mensajes nuevos para ser agregados por el reducer."""
+    sanitized_content = sanitize_message_content(content)
     if role in ("user", "human"):
-        return [HumanMessage(content=content)]
-    return [AIMessage(content=content)]
+        return [HumanMessage(content=sanitized_content)]
+    return [AIMessage(content=sanitized_content)]
 
 
 def copy_onboarding_state(state: Any) -> dict[str, Any]:
@@ -315,7 +324,12 @@ def detect_new_input(
         and awaiting_user_input
         and last_user_images is not None
     ):
-        if current_images != (last_user_images or []):
+        previous_images = [
+            materialize_image_reference(str(image))
+            for image in (last_user_images or [])
+            if str(image or "").strip()
+        ]
+        if current_images != previous_images:
             has_new_input = True
     return has_new_input, last_text, current_count
 

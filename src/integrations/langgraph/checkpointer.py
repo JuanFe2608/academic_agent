@@ -25,6 +25,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from bootstrap.settings import checkpoint_database_url_from_env as _checkpoint_database_url_from_env
+from utils.message_sanitizer import sanitize_persisted_payload
 
 _CHECKPOINTS_TABLE = "langgraph_thread_checkpoints"
 _WRITES_TABLE = "langgraph_checkpoint_writes"
@@ -200,7 +201,7 @@ class PostgresLangGraphCheckpointer(BaseCheckpointSaver[str]):
     ) -> RunnableConfig:
         del new_versions
         thread_id, checkpoint_ns, _ = self._config_parts(config)
-        checkpoint_to_store = checkpoint.copy()
+        checkpoint_to_store = sanitize_persisted_payload(checkpoint.copy())
         checkpoint_to_store["id"] = str(checkpoint_to_store["id"])
         checkpoint_type, checkpoint_payload = self.serde.dumps_typed(checkpoint_to_store)
         metadata_json = get_checkpoint_metadata(config, metadata)
@@ -256,7 +257,9 @@ class PostgresLangGraphCheckpointer(BaseCheckpointSaver[str]):
 
         rows: list[tuple[Any, ...]] = []
         for idx, (channel, value) in enumerate(writes):
-            value_type, value_payload = self.serde.dumps_typed(value)
+            value_type, value_payload = self.serde.dumps_typed(
+                sanitize_persisted_payload(value)
+            )
             rows.append(
                 (
                     thread_id,

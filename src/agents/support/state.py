@@ -14,9 +14,9 @@ from __future__ import annotations
 from typing import Annotated, ClassVar, Literal
 
 from langchain_core.messages import BaseMessage
-from langgraph.graph.message import add_messages
-from pydantic import Field
+from pydantic import Field, field_validator
 
+from agents.support.media import add_sanitized_messages, materialize_image_reference, sanitize_messages
 from schemas.common import BaseSchemaModel as _BaseSchemaModel
 from schemas.microsoft_graph import CalendarState as _CalendarState
 from schemas.onboarding import (
@@ -77,7 +77,7 @@ _UserStatus = Literal["start", "valid", "out_of_scope"]
 class _ConversationState(_BaseSchemaModel):
     """Vista tipada del estado conversacional y de runtime."""
 
-    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)
+    messages: Annotated[list[BaseMessage], add_sanitized_messages] = Field(default_factory=list)
     phase: Phase = "consent"
     errors: list[str] = Field(default_factory=list)
     timezone: str = "America/Bogota"
@@ -88,6 +88,16 @@ class _ConversationState(_BaseSchemaModel):
     profile_edit_target: str | None = None
     user_message_count: int = 0
     awaiting_user_input: bool = False
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _sanitize_conversation_messages(cls, value: object) -> object:
+        return sanitize_messages(value)
+
+    @field_validator("last_user_images", mode="before")
+    @classmethod
+    def _sanitize_conversation_image_refs(cls, value: object) -> object:
+        return _sanitize_image_ref_list(value)
 
 
 class _OnboardingDomainState(_BaseSchemaModel):
@@ -201,7 +211,7 @@ class AgentState(_BaseSchemaModel):
         "extras_has_any": "Hoy resume una decisión conversacional; a futuro puede derivarse de `extracurricular` y del subflujo de extras.",
     }
 
-    messages: Annotated[list[BaseMessage], add_messages] = Field(default_factory=list)
+    messages: Annotated[list[BaseMessage], add_sanitized_messages] = Field(default_factory=list)
     phase: Phase = "consent"
     errors: list[str] = Field(default_factory=list)
     timezone: str = "America/Bogota"
@@ -235,6 +245,16 @@ class AgentState(_BaseSchemaModel):
     replan: _ReplanState = Field(default_factory=_ReplanState)
     reminders: _RemindersState = Field(default_factory=_RemindersState)
     constraints: _Constraints = Field(default_factory=_Constraints)
+
+    @field_validator("messages", mode="before")
+    @classmethod
+    def _sanitize_messages(cls, value: object) -> object:
+        return sanitize_messages(value)
+
+    @field_validator("last_user_images", mode="before")
+    @classmethod
+    def _sanitize_image_refs(cls, value: object) -> object:
+        return _sanitize_image_ref_list(value)
 
     @classmethod
     def field_groups(cls) -> dict[str, tuple[str, ...]]:
@@ -354,6 +374,16 @@ def make_initial_state(*, timezone: str = "America/Bogota") -> AgentState:
     """Construye el AgentState inicial con valores coherentes."""
 
     return AgentState(timezone=timezone)
+
+
+def _sanitize_image_ref_list(value: object) -> object:
+    if value is None:
+        return []
+    if isinstance(value, str):
+        return [materialize_image_reference(value)]
+    if isinstance(value, (list, tuple)):
+        return [materialize_image_reference(str(item)) for item in value if str(item or "").strip()]
+    return value
 
 
 __all__ = [
