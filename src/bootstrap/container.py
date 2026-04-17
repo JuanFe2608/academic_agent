@@ -32,6 +32,10 @@ from services.reminders.service import (
     build_study_plan_reminders_service,
 )
 from services.scheduling.service import ScheduleService, build_schedule_service
+from services.study_recommendations.service import (
+    StudyRecommendationService,
+    build_study_recommendation_service,
+)
 from services.sync.outlook_calendar_sync_service import (
     OutlookCalendarSyncService,
     build_outlook_calendar_sync_service,
@@ -129,6 +133,18 @@ class AppContainer:
 
     def set_tracking_service(self, service: StudySessionTrackingService | None) -> None:
         self._set_override("tracking_service", service)
+
+    def get_study_recommendation_service(self) -> StudyRecommendationService:
+        return self._get_or_build(
+            "study_recommendation_service",
+            build_study_recommendation_service,
+        )
+
+    def set_study_recommendation_service(
+        self,
+        service: StudyRecommendationService | None,
+    ) -> None:
+        self._set_override("study_recommendation_service", service)
 
     def get_microsoft_graph_state_repository(self) -> MicrosoftGraphStateRepository:
         return self._get_or_build(

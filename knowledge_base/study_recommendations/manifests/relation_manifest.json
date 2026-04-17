@@ -1,0 +1,5723 @@
+{
+  "corpus_name": "study_recommendations",
+  "corpus_version": "phase_a_v1",
+  "relations": [
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.000b5bdfd83c6d39",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.00491a433c0ad718",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "pomodoro",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.016d2054a928d569",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.01b975c3a48f99a6",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.03b405a91a1b61c1",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.044462e4fe1c966f",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.05c16137e353a43a",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "analisis_de_examenes_anteriores",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.09dc45cdfc985ffd",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "analisis_de_examenes_anteriores",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.0adf9a942a14c984",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.0b24d2fff0a7f3d8",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell + active_recall",
+      "metadata": {
+        "combination": [
+          "cornell",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.0b4fb7a910172298",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.0b5090fa3226c920",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.0bc34737dab3b6b3",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.0d9057e05fbf1808",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.108b050ba2446de2",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.108f48e84a7f4c49",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_unico_metodo_para_tareas_de_aplicacion_compleja",
+      "metadata": {
+        "combination": [
+          "uso_como_unico_metodo_para_tareas_de_aplicacion_compleja"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.10efd1422f5d2911",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "uso_como_unico_metodo_para_tareas_de_aplicacion_compleja",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoexplicacion",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.147181ef7e344d63",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "memorizacion_sin_aplicacion",
+      "metadata": {
+        "combination": [
+          "memorizacion_sin_aplicacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.1508fcf51d519591",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "memorizacion_sin_aplicacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.1525cf53ab9e14cd",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.15e0b30221b8d89d",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "demasiadas tecnicas simultaneas",
+      "metadata": {
+        "combination": [
+          "demasiadas_tecnicas_simultaneas"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.17a086e1e7d544e5",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "demasiadas_tecnicas_simultaneas",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "active_recall",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.191931eea784f41f",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_pasiva_sin_recuperacion",
+      "metadata": {
+        "combination": [
+          "relectura_pasiva_sin_recuperacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.1959ae1158fe83cf",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "relectura_pasiva_sin_recuperacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.1b039324f9d92684",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.1b426437a3fd05f6",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.1c8f949c2cd68813",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "copia_literal_sin_revision",
+      "metadata": {
+        "combination": [
+          "copia_literal_sin_revision"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.1dadfc377a0c124d",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "copia_literal_sin_revision",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.20dbac3888ee42e8",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.218fd611a3bbe02c",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.21b51204c447df53",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.2200f6ef05a5debe",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.2256e327fb450601",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.22b4aeb41d9a73af",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_como_estrategia_principal",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.22ec179fa6eaad36",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "relectura_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "evaluacion_de_la_practica",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.234841f7b215f473",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.24c46018913d8264",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.24c4a0547eb54133",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.2662bfbcd10dfd4a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.26ca904e944cea6e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.2706d731ac72228e",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.278ae43c0b46b232",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.27d85e5d51b0f808",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.27e792bbbbe53939",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.28d857fdf77b5a0c",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + mapas_conceptuales",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "mapas_conceptuales"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.298a018aaa787cb7",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "distraction",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.29a90d084c72b597",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "distraction",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.2b1f853eb86e7453",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.2cb24b3f117dd022",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_sin_resumen_ni_preguntas",
+      "metadata": {
+        "combination": [
+          "uso_sin_resumen_ni_preguntas"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.2e12c5f9772b2d1d",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "uso_sin_resumen_ni_preguntas",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_pasiva_como_estrategia_principal",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.2ece10eef8acc9b3",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "relectura_pasiva_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.2f5f94cd7f4ef749",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.300142a32b75b430",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.315de64a1c270bec",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.321209d1ab7b9e02",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.32cdb891e88c68d2",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_espaciada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.3314b36e1ffa53a0",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.340bd88f0a52f32f",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.34dad057c2f8895a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.34ffe131901eccda",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "active_recall sin retroalimentacion",
+      "metadata": {
+        "combination": [
+          "active_recall_sin_retroalimentacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.351afaa767b6ec38",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall_sin_retroalimentacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.351b03e23acb2487",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.35d317bc1525703c",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.37794938c9f1439e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.38421a1a1ec763e5",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.38c395b68076e071",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.39011af50c95fda4",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.3983efb753bfaf6b",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "ejemplos_resueltos + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "ejemplos_resueltos",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.39b95e4cf2f8fe9e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.3a0521fe8c68dce4",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.3c7416ac45a245e0",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.3ca2329ed3356b93",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "subrayado_como_estrategia_principal",
+      "metadata": {
+        "combination": [
+          "subrayado_como_estrategia_principal"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.3cb7fcd47710d9f5",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "subrayado_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.3cf0efada19835e7",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "pomodoro",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.3e1ff6ea38e66a82",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.3eee060a62855ae8",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "prelectura",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.3efd2bbec426456b",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "prelectura",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.3f583598e6836ff3",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.3f9a5819bafa7655",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.3fe048fa876c51e0",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapa_conceptual",
+      "metadata": {
+        "combination": [
+          "mapas_conceptuales"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.417f2f936fd9039a",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_rigido_en_tareas_de_alta_continuidad",
+      "metadata": {
+        "combination": [
+          "uso_rigido_en_tareas_de_alta_continuidad"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.41841383dbad5260",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "uso_rigido_en_tareas_de_alta_continuidad",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.419441e819884a94",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.41b9651f7a821868",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "distraction",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.4205cbab334b21f6",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "distraction",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.42bf3cafb9ede1a2",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.42ff3860472005fd",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "esquema",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.4361ac50dd1aca54",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "esquema",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.4503d26d72b53f2d",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.4611625e194b9fb8",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.464f4379402f24e9",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.47d32ca16b911217",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.494c11619149465c",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + mapas_conceptuales",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "mapas_conceptuales"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.49546ea754af9b7a",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.4aa18b152f17f2be",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.4ab51073fd36799c",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.4b1a485b04666694",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "aplicacion_activa",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.4ca9761eab476c72",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "aplicacion_activa",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "taller",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.4cecc8105e50bce1",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "taller",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.4cef91a8fa18aa31",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.4d9008c8f895a6b9",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.4d9329b087823512",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.4eed7bc9046cc9d7",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_como_estrategia_principal",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.4f184ee5c0222159",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "relectura_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.4f50bcbb91629ef4",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_pasiva_como_sustituto",
+      "metadata": {
+        "combination": [
+          "relectura_pasiva_como_sustituto"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.4fd2d279c8c3a351",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "relectura_pasiva_como_sustituto",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.500b12fe6211c003",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + active_recall",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.50fa1581e1189b18",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.5116c727125efbd6",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.516060ecd234b6d7",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.51adbf8d128bf09c",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "distraction",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.5255543fe8a24808",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "distraction",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura_por_fases",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.52d7124581a6a512",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "lectura_por_fases",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.56e2b78e3ff40c11",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_pasiva_sin_recuperacion",
+      "metadata": {
+        "combination": [
+          "relectura_pasiva_sin_recuperacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.56fde375c633ba90",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "relectura_pasiva_sin_recuperacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.573ab89a7c0b9959",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.5782d94b56c0a628",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.57ebc5074f080007",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.5832c9c9e12d8a2c",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.595cf81d5e06a73d",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.5961e53fcbd69b8b",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_solo_al_final",
+      "metadata": {
+        "combination": [
+          "repaso_solo_al_final"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.5a3f827e655e1162",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "repaso_solo_al_final",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "sq3r",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.5ba24a8359e2e163",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "sq3r",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.5cdc41621612894d",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "retroalimentacion",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.5d4001fdf5576912",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "retroalimentacion",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "asociaciones_poco_distintivas",
+      "metadata": {
+        "combination": [
+          "asociaciones_poco_distintivas"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.5d780d825c0c398d",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "asociaciones_poco_distintivas",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cuadro_comparativo",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.5e059156d9053cb1",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "cuadro_comparativo",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.5ef52435e4fd7327",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "solo_relectura",
+      "metadata": {
+        "combination": [
+          "solo_relectura"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.60ef75d814de6256",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "solo_relectura",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "Marco de decisión: técnica vs método de estudio",
+      "metadata": {
+        "inferred_from": "framework_id"
+      },
+      "relation_id": "rel.627f8453a2976a07",
+      "relation_type": "routes_to",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "technique",
+      "target_type": "knowledge_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.62b44efe0efdd5e8",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.63c95dad105aecfc",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.65b7a90d0b542977",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.65df61d2eb5d54f8",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.65e7c4527baddac6",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.66f73451787fce0d",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.68f2c94ebd8ba833",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.69130ec6c65e70b0",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.69fc04db78a62426",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "intercalar_materias_sin_relacion",
+      "metadata": {
+        "combination": [
+          "intercalar_materias_sin_relacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.6a87a564ceb99c6d",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "intercalar_materias_sin_relacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.6baaa24468b353a1",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + retroalimentacion",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "retroalimentacion"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.6ceb236eb796a6f1",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.6cf68ea2d739cbcf",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.6d2da40a1d121640",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "empolle_ultimo_dia",
+      "metadata": {
+        "combination": [
+          "empolle_ultimo_dia"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.6e048227bd4dd052",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "empolle_ultimo_dia",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_como_estrategia_principal",
+      "metadata": {
+        "combination": [
+          "relectura_como_estrategia_principal"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.6eac04cceaae84ef",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "relectura_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.6eb5b1fe72088fb7",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.6f4561a19936dd1e",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.6f461bf64cad9952",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.70c6d1302e50bdf6",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.71067e4bd6da307e",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.71bd714e76ff1f54",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.71e272a30d6783e0",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_como_estrategia_principal",
+      "metadata": {
+        "combination": [
+          "relectura_como_estrategia_principal"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.7237234caa831dbc",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "relectura_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "Marco conceptual: técnica de estudio vs método de estudio",
+      "metadata": {
+        "inferred_from": "framework_id"
+      },
+      "relation_id": "rel.7276f051625bfd96",
+      "relation_type": "routes_to",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "study_method",
+      "target_type": "knowledge_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "evaluacion_de_la_practica",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.72932d46ecdba4bc",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.7298e9284d0afc21",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.743732c27fc8d848",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.74c6ff461ada7282",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.757c40722066c752",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.7636fcc5d5bbc03e",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.7637a4c7ec5f1252",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "ejemplos_resueltos",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.778d660d31417217",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "ejemplos_resueltos",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rubrica_de_revision",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.77d6c4fe418ebdff",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "rubrica_de_revision",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.77f8b6fbc7580043",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "empolle_ultimo_dia",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.785d9bd3e805de9f",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "empolle_ultimo_dia",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.79dab892e6fa042a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.7a58fd54b4fbf150",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.7a73b3f74c1e75dd",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving_demasiado_pronto",
+      "metadata": {
+        "combination": [
+          "interleaving_demasiado_pronto"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.7ce7da04d95130a3",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "interleaving_demasiado_pronto",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "combination": [
+          "feynman"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.7de632d08930b387",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion_con_material",
+      "metadata": {
+        "combination": [
+          "practica_de_recuperacion_con_material"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.7df3b5b26708db1b",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "practica_de_recuperacion_con_material",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.7e01d36888d7cc6b",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.7ef5838b33f2b0ad",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "sintesis",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.80f409aa38333cbb",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "sintesis",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapa_mental",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.80fb2a70edca44ad",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "mapa_mental",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.83e7d488d63f5054",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.83f6fedc41de3bbe",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.84b149ace4d19e63",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.8568c11fd093b461",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.858b1e3223e457dc",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "ejemplos_resueltos_lejanos_al_tipo_de_problema",
+      "metadata": {
+        "combination": [
+          "ejemplos_resueltos_lejanos_al_tipo_de_problema"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.85f90b2973370656",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "ejemplos_resueltos_lejanos_al_tipo_de_problema",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.86aa708b2578fd3e",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.873817f40f067850",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.878dafd0cbd63b9f",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.88846670191b352d",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.8949ebd71c59f555",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.89c4c648cf675c85",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.8a4ae10388f439b6",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.8b7d0cd1ea757eca",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion_sin_feedback",
+      "metadata": {
+        "combination": [
+          "practica_de_recuperacion_sin_feedback"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.8c96f3f84c2cff57",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "practica_de_recuperacion_sin_feedback",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapas_conceptuales",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.8d799613ffd1286d",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.8e00ddcc456362c5",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro + tecnica_objetivo",
+      "metadata": {
+        "combination": [
+          "pomodoro",
+          "tecnica_objetivo"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.8f29f0c393ded5f4",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_sin_feedback",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.8f3b1c7a358e45a6",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "practica_sin_feedback",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.944111b7430fc450",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "difficulty_switching_topics",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.944e8ed36fb44c0a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "difficulty_switching_topics",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.966ccfb8090a8a6c",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "falta_de_verificacion_de_respuestas",
+      "metadata": {
+        "combination": [
+          "falta_de_verificacion_de_respuestas"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.96ac2e235b093ac0",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "falta_de_verificacion_de_respuestas",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion_sin_correccion",
+      "metadata": {
+        "combination": [
+          "autoevaluacion_sin_correccion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.96f439e9c0478e24",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "autoevaluacion_sin_correccion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "distraction",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.974ea290b7b77c08",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "distraction",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_pasiva_como_estrategia_principal",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.97ff0cafe73d3b64",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "relectura_pasiva_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapa_conceptual",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.99f7808854dc31e2",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.9a656389e188f37c",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell + active_recall",
+      "metadata": {
+        "combination": [
+          "cornell",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.9b73bc733733dae7",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "relectura_masiva_sin_autoevaluacion",
+      "metadata": {
+        "combination": [
+          "relectura_masiva_sin_autoevaluacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.9bf4eb112b2c323e",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "relectura_masiva_sin_autoevaluacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.9c0608c932ee4d73",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.9d84a9cbbcc4f26a",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.9e4504f7dac308ce",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.9e4f6e4ced4d3899",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.a02f04ff706d245a",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "sintesis_estructurada + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "sintesis_estructurada",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.a076117aaa6c2507",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell",
+      "metadata": {
+        "field": "included_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.a0f498bd11ca7874",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.a17860311286515a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.a19f6b38475c207b",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.a23071758a046a34",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.a44670d23aaded74",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "difficulty_switching_topics",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.a498fe5a47e8d5f9",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "difficulty_switching_topics",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.a4f74a535af0dd2a",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.a5d61e00781de86c",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell",
+      "metadata": {
+        "combination": [
+          "cornell"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.a7f1e12e26c54b47",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell + active_recall",
+      "metadata": {
+        "combination": [
+          "cornell",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.a81b1e96b491a59d",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.a864c378f6011bd6",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.a928c4be81cb6d40",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.ab2032ccfda989de",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.ab9adf4fb91f5153",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.ac086e5dd7de71ae",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "evaluacion_de_la_practica",
+      "metadata": {
+        "combination": [
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.ace6117b5cb4d79e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.ad2c88c368904092",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "multitarea_durante_el_pomodoro",
+      "metadata": {
+        "combination": [
+          "multitarea_durante_el_pomodoro"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.ad6cbb31ef2901c1",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "multitarea_durante_el_pomodoro",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.ad7d07c94d215911",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_mirando_apuntes",
+      "metadata": {
+        "combination": [
+          "practica_mirando_apuntes"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.af40a276060824ec",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "practica_mirando_apuntes",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.af4583098dfe1c98",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "saturar_una_hoja_con_temas_demasiado_amplios",
+      "metadata": {
+        "combination": [
+          "saturar_una_hoja_con_temas_demasiado_amplios"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.b09a8f4e91a2babc",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "saturar_una_hoja_con_temas_demasiado_amplios",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "memorizacion_masiva_sin_distribucion",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.b208b5e5789ae774",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "memorizacion_masiva_sin_distribucion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.b2154bd1519053e2",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.b3fb2630b83b69cc",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.b6d3e0e8b1caceed",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.b798601ac26da557",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_masivo_al_final",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.b7d1e206b7d4e2a1",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "repaso_masivo_al_final",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.b83653b32817102a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.b85e223e7fb999a7",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "descansos_con_scroll_infinito",
+      "metadata": {
+        "combination": [
+          "descansos_con_scroll_infinito"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.b9fb8be1210b8ff1",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "descansos_con_scroll_infinito",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.ba59ab3b8cd7cd29",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.bc12a0ea8b6af7e2",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.bc41a83c47b2a49b",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "linea_del_tiempo",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.bc518f92cf88eb2e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "linea_del_tiempo",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.bcddeff906913d0a",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.bd09ad30bebec359",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.bd5f84922c7a066e",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.be59531c5e94cff9",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.be9571cfee09a08f",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_unico_metodo_para_tareas_formales_sin_verificacion",
+      "metadata": {
+        "combination": [
+          "uso_como_unico_metodo_para_tareas_formales_sin_verificacion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.bf1bd0ac6a627d48",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "uso_como_unico_metodo_para_tareas_formales_sin_verificacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.bf3a4a04e719147c",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "revision_de_examenes_anteriores",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.bfb0986e17296581",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "revision_de_examenes_anteriores",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "Marco conceptual: técnica de estudio vs método de estudio",
+      "metadata": {
+        "inferred_from": "framework_id"
+      },
+      "relation_id": "rel.bfd2cb39e1f5f650",
+      "relation_type": "routes_to",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "technique",
+      "target_type": "knowledge_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations",
+        "inferred_pair": true
+      },
+      "relation_id": "rel.c0b086807624a08a",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "proyecto",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.c12ab18cc6710f88",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "proyecto",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.c192198dc6f338fd",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.c1a115931ec0b751",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia + active_recall + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "mnemotecnia",
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.c29f3017eecc4c2a",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.c2e98b36722c1581",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "mnemotecnia",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.c44cbba89df0a9a0",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.c51f503db3b4893c",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.c53b6406727e8e3b",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_distribuida",
+      "metadata": {
+        "combination": [
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.c5f0b1e2ab1a82af",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "subrayado_como_estrategia_principal",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.c68588f7d780ebac",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "subrayado_como_estrategia_principal",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "subrayado_sin_autoevaluacion",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.c69cbb1447c12776",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "subrayado_sin_autoevaluacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.c7e7d391653c460a",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.c891ace4bf0d053f",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "subrayado_sin_recuperacion",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.c8939ba831da9dd8",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "subrayado_sin_recuperacion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.c8b94d53312a4637",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.cb8fdfbc58dfc787",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.cbebcb41cb630b56",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.cc363da6dc0832a3",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.cc5ae66301a1b391",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.cc86e95e439311d9",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "preguntas_de_respuesta_corta",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.cd3b4fdfde6da914",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "preguntas_de_respuesta_corta",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.ce87ac7615d662bb",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "sintesis_estructurada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.cfc3c83c1c92e5b5",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "sintesis_estructurada",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_sustituto_de_practica_aplicada",
+      "metadata": {
+        "combination": [
+          "uso_como_sustituto_de_practica_aplicada"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.cfd0aafab86164fb",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "uso_como_sustituto_de_practica_aplicada",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_sobre_temas_totalmente_nuevos",
+      "metadata": {
+        "combination": [
+          "uso_sobre_temas_totalmente_nuevos"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.cfd7245fa4b3c676",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "uso_sobre_temas_totalmente_nuevos",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.d045a17d7f4c55fc",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + active_recall",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.d07e9ef62018f0be",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.d0df2538a1d3546c",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d18df43a6d5d6e0c",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d287e390a25b03a4",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_unico_metodo_para_tareas_puramente_procedimentales",
+      "metadata": {
+        "combination": [
+          "uso_como_unico_metodo_para_tareas_puramente_procedimentales"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.d2c9bd6d42ac3c38",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "uso_como_unico_metodo_para_tareas_puramente_procedimentales",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "exposicion",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.d2e5a01915914fc9",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "exposicion",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada + simulacion",
+      "metadata": {
+        "combination": [
+          "repeticion_espaciada",
+          "simulacion"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.d39f74f6e93f7c56",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "taller",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.d3c460544c08b813",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "taller",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura_activa",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.d3d779be9ba98950",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "lectura_activa",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "explanation_gap",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d47df27517c0ec7b",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "explanation_gap",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion_sin_feedback",
+      "metadata": {
+        "combination": [
+          "practica_de_recuperacion_sin_feedback"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.d481168aeb7f0605",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "practica_de_recuperacion_sin_feedback",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "distraction",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d4842f87cebd8904",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "source_type": "study_framework",
+      "target_id": "distraction",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_sin_intermedios",
+      "metadata": {
+        "combination": [
+          "repaso_sin_intermedios"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.d5d91b4bb74cb006",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "repaso_sin_intermedios",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_masivo_de_ultima_hora",
+      "metadata": {
+        "combination": [
+          "repaso_masivo_de_ultima_hora"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.d60c0bfa658c7153",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "repaso_masivo_de_ultima_hora",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d68c1d7ac969fdb9",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "memorizacion_literal_sin_comprension",
+      "metadata": {
+        "combination": [
+          "memorizacion_literal_sin_comprension"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.d691f8afa609fa63",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.feynman",
+      "source_id": "feynman",
+      "source_type": "technique",
+      "target_id": "memorizacion_literal_sin_comprension",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.d8dfa1dcdbcac40a",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "fichas",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.d9babb47f79b91e6",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "fichas",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.d9cf3f4cf96f9aa5",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "passive_review_dependence",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.d9e11c0fc44cfda4",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "passive_review_dependence",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.dbb7404954c00472",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.dd5c5a3cc46d4b48",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.pomodoro",
+      "source_id": "pomodoro",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "notas_cornell",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.dd7d129b8f0111bd",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.de03f508dba7ec75",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + active_recall",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.dfaeba5150c2ccdf",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "flujograma",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.dfcabfbce34c0ac5",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "flujograma",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mezcla_aleatoria_sin_criterio",
+      "metadata": {
+        "combination": [
+          "mezcla_aleatoria_sin_criterio"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.e06c95149865d60f",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "mezcla_aleatoria_sin_criterio",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.e0d96b51ca37dfc4",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "recite",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.e10205dfd68d7d71",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "recite",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "diagnostico_de_senales",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.e228ccd445f229c6",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "diagnostico_de_senales",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_evaluacion_punitiva",
+      "metadata": {
+        "combination": [
+          "uso_como_evaluacion_punitiva"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.e24bbb315860fd8b",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "uso_como_evaluacion_punitiva",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.e2eef8dac483ef07",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resolucion_de_problemas",
+      "metadata": {
+        "field": "not_ideal_for_activity_types"
+      },
+      "relation_id": "rel.e66ceeb8ef3c76a2",
+      "relation_type": "not_ideal_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "resolucion_de_problemas",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "uso_como_unico_metodo_para_temas_complejos",
+      "metadata": {
+        "combination": [
+          "uso_como_unico_metodo_para_temas_complejos"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.e70e645c34684652",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mnemotecnia",
+      "source_id": "mnemotecnia",
+      "source_type": "technique",
+      "target_id": "uso_como_unico_metodo_para_temas_complejos",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "difficulty_switching_topics",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.e7892337809f1bcc",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "difficulty_switching_topics",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "procrastination",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.e79aa16205c9886c",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "procrastination",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "ausencia_de_feedback",
+      "metadata": {
+        "combination": [
+          "ausencia_de_feedback"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.e8748fda2e3f1455",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "ausencia_de_feedback",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman + mapas_conceptuales",
+      "metadata": {
+        "combination": [
+          "feynman",
+          "mapas_conceptuales"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.e88d73d54015e160",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mapa_conceptual",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.e8a17e0d820f1ed8",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "mapas_conceptuales",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "rapid_forgetting",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.e8a1c446799996c2",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "rapid_forgetting",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "note_organization",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.e944c95cbfd8463b",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "note_organization",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "Marco de decisión: técnica vs método de estudio",
+      "metadata": {
+        "inferred_from": "framework_id"
+      },
+      "relation_id": "rel.e9825bd9e9155a82",
+      "relation_type": "routes_to",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "study_method",
+      "target_type": "knowledge_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving sin revision",
+      "metadata": {
+        "combination": [
+          "interleaving_sin_revision"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.e982d315662e8e6b",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "interleaving_sin_revision",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "cornell",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.ebf897506e1897cd",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "cornell",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "difficulty_switching_topics",
+      "metadata": {
+        "field": "best_for_signals"
+      },
+      "relation_id": "rel.ec349f68c719a5ab",
+      "relation_type": "supports_signal",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "difficulty_switching_topics",
+      "target_type": "student_signal",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "feynman",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.ed9cf521f79932ba",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "feynman",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.edc1c2b4797c8d48",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "intercalado",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.ee6dd01fcc54e10e",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_repaso_semanal",
+      "source_id": "metodo_repaso_semanal",
+      "source_type": "study_method",
+      "target_id": "interleaving",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "simulacion_cronometrada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.ef47871d17a0b393",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "simulacion_cronometrada",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repaso_semanal",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.ef877aefa85e7b92",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "repaso_semanal",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "pomodoro + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "pomodoro",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.effef397eaa67e94",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "pomodoro",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "lectura",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.f0630f50d0cdb489",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "lectura",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.f08ac4022a33b488",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion_con_material",
+      "metadata": {
+        "field": "excluded_techniques"
+      },
+      "relation_id": "rel.f1cf15fb5b922f83",
+      "relation_type": "excludes",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "practica_de_recuperacion_con_material",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_masiva_sin_distribucion",
+      "metadata": {
+        "combination": [
+          "practica_masiva_sin_distribucion"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.f1f65fef80c2a211",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "practica_masiva_sin_distribucion",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.f4f991fafa7fae58",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "laboratorio",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.f531ce520820bde4",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.interleaving",
+      "source_id": "interleaving",
+      "source_type": "technique",
+      "target_id": "laboratorio",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "repeticion_espaciada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.f5804892c7c361be",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "source_id": "metodo_evaluacion_numerica_breve",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "interleaving + practica_de_recuperacion",
+      "metadata": {
+        "combination": [
+          "interleaving",
+          "active_recall"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.f5f9f4c729d654c0",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "mnemotecnia como eje de comprension",
+      "metadata": {
+        "combination": [
+          "mnemotecnia_como_eje_de_comprension"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.f6dbf8406e79d93d",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "source_type": "technique_combination_matrix",
+      "target_id": "mnemotecnia_como_eje_de_comprension",
+      "target_type": "concept",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "quiz",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.f7f062c74b49e251",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.repeticion_espaciada",
+      "source_id": "repeticion_espaciada",
+      "source_type": "technique",
+      "target_id": "quiz",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "taller",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.f8d127f1f5ffa132",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "taller",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "toma_de_apuntes",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.fa4ebfd6e50d5324",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.cornell",
+      "source_id": "cornell",
+      "source_type": "technique",
+      "target_id": "toma_de_apuntes",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "resumen",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.fb624818a9b34740",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "resumen",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "sintesis_estructurada",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.fc3f44ed611e9f96",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "sintesis_estructurada",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "autoevaluacion",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.fc8cc7fa62fdc995",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "source_id": "marco_decision_tecnica_vs_metodo",
+      "source_type": "study_framework",
+      "target_id": "active_recall",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "simulacion",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.fd52d21dce3389a9",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "simulacion",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "parcial",
+      "metadata": {
+        "field": "best_for_activity_types"
+      },
+      "relation_id": "rel.fdeafa921aefb901",
+      "relation_type": "best_for_activity",
+      "source_chunk_id": null,
+      "source_document_id": "technique.active_recall",
+      "source_id": "active_recall",
+      "source_type": "technique",
+      "target_id": "parcial",
+      "target_type": "activity_type",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "preguntas_guia",
+      "metadata": {
+        "field": "component_techniques",
+        "optional": false
+      },
+      "relation_id": "rel.fea6f913f92d7cc8",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "preguntas_guia",
+      "target_type": "component",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_distribuida",
+      "metadata": {
+        "field": "optional_techniques",
+        "optional": true
+      },
+      "relation_id": "rel.fead0444d07950aa",
+      "relation_type": "uses_component",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_lectura_y_sintesis",
+      "source_id": "metodo_lectura_y_sintesis",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "practica_de_recuperacion + repeticion_espaciada",
+      "metadata": {
+        "combination": [
+          "active_recall",
+          "repeticion_espaciada"
+        ],
+        "field": "recommended_combinations"
+      },
+      "relation_id": "rel.ff2321835cb87f43",
+      "relation_type": "recommended_with",
+      "source_chunk_id": null,
+      "source_document_id": "study_method.metodo_parcial_teorico",
+      "source_id": "metodo_parcial_teorico",
+      "source_type": "study_method",
+      "target_id": "repeticion_espaciada",
+      "target_type": "technique",
+      "weight": 1.0
+    },
+    {
+      "evidence_text": "memorizacion_mecanica_sin_relaciones",
+      "metadata": {
+        "combination": [
+          "memorizacion_mecanica_sin_relaciones"
+        ],
+        "field": "contraindicated_combinations"
+      },
+      "relation_id": "rel.ffcb554f61845b7b",
+      "relation_type": "contraindicated_with",
+      "source_chunk_id": null,
+      "source_document_id": "technique.mapas_conceptuales",
+      "source_id": "mapas_conceptuales",
+      "source_type": "technique",
+      "target_id": "memorizacion_mecanica_sin_relaciones",
+      "target_type": "concept",
+      "weight": 1.0
+    }
+  ],
+  "relations_count": 355
+}

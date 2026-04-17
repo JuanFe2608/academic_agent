@@ -2,7 +2,10 @@
 
 from __future__ import annotations
 
-from agents.support.dependencies import get_personalization_service
+from agents.support.dependencies import (
+    get_personalization_service,
+    get_study_recommendation_service,
+)
 from agents.support.flows.planning.persistence_support import (
     persist_planning_snapshot_for_update,
 )
@@ -56,7 +59,7 @@ def persist_study_profile(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                build_personalization_summary(study_profile),
+                _build_personalization_summary_with_rag(study_profile),
             ),
         }
         return persist_planning_snapshot_for_update(state, update)
@@ -128,6 +131,52 @@ def _primary_technique_id(study_profile: dict) -> str | None:
 
     techniques = list(study_profile.get("top_techniques") or [])
     return str(techniques[0]) if techniques else None
+
+
+def _build_personalization_summary_with_rag(study_profile: dict) -> str:
+    """Enriquece el cierre del Radar sin depender operacionalmente del RAG."""
+
+    base_summary = build_personalization_summary(study_profile)
+    primary_technique = _primary_technique_id(study_profile)
+    if not primary_technique:
+        return base_summary
+
+    try:
+        recommendation_service = get_study_recommendation_service()
+        if not recommendation_service.status.ready:
+            return base_summary
+        result = recommendation_service.recommend_for_student(
+            student_signals=list(study_profile.get("weakness_tags") or []),
+            top_techniques=list(study_profile.get("top_techniques") or []),
+            max_chunks=3,
+        )
+    except Exception:
+        return base_summary
+
+    if not result.source_chunks or not result.answer.strip():
+        return base_summary
+
+    lines = [
+        base_summary,
+        "",
+        "Complemento pedagógico con fuentes internas:",
+        _compact_rag_answer(result.answer),
+    ]
+    if result.cautions:
+        lines.append(f"Cuidado: {_compact_rag_answer(result.cautions[0], max_chars=240)}")
+    return "\n".join(lines).strip()
+
+
+def _compact_rag_answer(text: str, *, max_chars: int = 520) -> str:
+    """Mantiene el cierre del Radar breve para canales conversacionales."""
+
+    cleaned = " ".join(str(text or "").split())
+    if len(cleaned) <= max_chars:
+        return cleaned
+    cutoff = cleaned.rfind(".", 0, max_chars)
+    if cutoff < int(max_chars * 0.55):
+        cutoff = max_chars
+    return cleaned[:cutoff].rstrip(" .,;:") + "..."
 
 
 def _needs_priorities_capture(subjects: list) -> bool:

@@ -7,7 +7,10 @@ from agents.support.dependencies import (
     set_schedule_service,
 )
 from bootstrap.container import AppContainer, get_app_container, reset_app_container
-from bootstrap.settings import database_url_from_env as bootstrap_database_url_from_env
+from bootstrap.settings import (
+    database_url_from_env as bootstrap_database_url_from_env,
+    load_rag_settings,
+)
 from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
 from repositories.scheduling.repository import InMemoryScheduleRepository
 from services.planning import StudySessionTrackingService
@@ -26,6 +29,35 @@ def test_bootstrap_settings_database_url_from_env_uses_env(monkeypatch) -> None:
         bootstrap_database_url_from_env()
         == "postgresql://app:secret@localhost:5432/academic_agent_db"
     )
+
+
+def test_rag_settings_defaults_and_env_overrides(monkeypatch) -> None:
+    monkeypatch.setenv("RAG_ENABLED", "true")
+    monkeypatch.setenv("RAG_EMBEDDING_PROVIDER", "openai")
+    monkeypatch.setenv("RAG_EMBEDDING_MODEL", "text-embedding-3-small")
+    monkeypatch.setenv("RAG_EMBEDDING_DIMENSIONS", "1536")
+    monkeypatch.setenv("RAG_TOP_K_FINAL", "7")
+
+    settings = load_rag_settings()
+
+    assert settings.enabled is True
+    assert settings.corpus_name == "study_recommendations"
+    assert settings.embedding_provider == "openai"
+    assert settings.embedding_model == "text-embedding-3-small"
+    assert settings.embedding_dimensions == 1536
+    assert settings.top_k_final == 7
+
+
+def test_rag_settings_infers_azure_embeddings_provider(monkeypatch) -> None:
+    monkeypatch.delenv("RAG_EMBEDDING_PROVIDER", raising=False)
+    monkeypatch.delenv("RAG_EMBEDDING_MODEL", raising=False)
+    monkeypatch.setenv("AZURE_OPENAI_API_KEY_EMBEDDINGS", "secret")
+    monkeypatch.setenv("AZURE_OPENAI_DEPLOYMENT_NAME_EMBEDDINGS", "embeddings-3-small")
+
+    settings = load_rag_settings()
+
+    assert settings.embedding_provider == "azure_openai"
+    assert settings.embedding_model == "embeddings-3-small"
 
 
 def test_agent_dependencies_delegate_to_container_override() -> None:

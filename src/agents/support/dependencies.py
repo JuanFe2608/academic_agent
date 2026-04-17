@@ -98,6 +98,20 @@ def set_tracking_service(service: StudySessionTrackingService | None) -> None:
     get_app_container().set_tracking_service(service)
 
 
+def get_study_recommendation_service() -> StudyRecommendationService:
+    """Retorna el servicio reusable de recomendaciones de estudio."""
+
+    return get_app_container().get_study_recommendation_service()
+
+
+def set_study_recommendation_service(
+    service: StudyRecommendationService | None,
+) -> None:
+    """Permite inyectar recomendaciones de estudio durante pruebas."""
+
+    get_app_container().set_study_recommendation_service(service)
+
+
 def get_microsoft_graph_state_repository() -> MicrosoftGraphStateRepository:
     """Retorna el repositorio durable de conexiones y links Microsoft."""
 
@@ -193,6 +207,7 @@ __all__ = [
     "get_schedule_service",
     "get_study_plan_materialization_service",
     "get_study_planning_persistence_service",
+    "get_study_recommendation_service",
     "get_tracking_service",
     "set_microsoft_graph_state_repository",
     "set_microsoft_oauth_client",
@@ -206,5 +221,6 @@ __all__ = [
     "set_schedule_service",
     "set_study_plan_materialization_service",
     "set_study_planning_persistence_service",
+    "set_study_recommendation_service",
     "set_tracking_service",
 ]

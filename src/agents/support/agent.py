@@ -10,6 +10,7 @@ from agents.support.nodes.collect_study_profile import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker import (
     collect_study_profile_tiebreaker,
 )
+from agents.support.nodes.answer_study_recommendation import answer_study_recommendation
 from agents.support.nodes.apply_schedule_correction import apply_schedule_correction
 from agents.support.nodes.ask_extracurricular import ask_extracurricular
 from agents.support.nodes.build_draft_schedule import build_draft_schedule
@@ -46,6 +47,7 @@ from agents.support.onboarding.validators import (
 from agents.support.state import AgentState
 from services.personalization import is_personalization_enabled
 from services.priorities import is_academic_update_message
+from services.study_recommendations import is_study_recommendation_message
 
 
 def _should_wait(state: AgentState) -> bool:
@@ -88,6 +90,8 @@ def _route_welcome(state: AgentState) -> str:
     if conversation.phase == "end" and _has_new_user_input(state):
         if is_academic_update_message(_current_user_text(state)):
             return "handle_academic_update"
+        if is_study_recommendation_message(_current_user_text(state)):
+            return "answer_study_recommendation"
     if conversation.phase == "end":
         return "end"
     if conversation.phase != "consent":
@@ -538,6 +542,7 @@ def build_agent() -> StateGraph:
     graph.add_node("collect_priorities", collect_priorities)
     graph.add_node("build_study_plan", build_study_plan)
     graph.add_node("handle_academic_update", handle_academic_update)
+    graph.add_node("answer_study_recommendation", answer_study_recommendation)
 
     graph.set_entry_point("welcome_consent")
 
@@ -568,6 +573,7 @@ def build_agent() -> StateGraph:
             "collect_priorities": "collect_priorities",
             "build_study_plan": "build_study_plan",
             "handle_academic_update": "handle_academic_update",
+            "answer_study_recommendation": "answer_study_recommendation",
             "end": END,
         },
     )
@@ -773,6 +779,7 @@ def build_agent() -> StateGraph:
             "end": END,
         },
     )
+    graph.add_edge("answer_study_recommendation", END)
 
     return graph.compile()
 

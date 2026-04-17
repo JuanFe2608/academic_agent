@@ -12,3 +12,4 @@ Subcapas reservadas:
 - `ingestion/`: carga, chunking, embeddings y versionado de conocimiento.
 - `retrieval/`: búsqueda, ranking y composición de contexto.
 - `prompting/`: plantillas y ensamblaje grounded para consumo desde servicios.
+- `evaluation/`: evaluaciones offline, métricas y hardening del RAG.

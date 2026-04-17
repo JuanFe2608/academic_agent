@@ -18,5 +18,29 @@ dependencies = [
 [dependency-groups]
 dev = [
     "ipykernel>=7.2.0",
-    "langgraph-cli[inmem]>=0.4.12",
+    "langgraph-api>=0.8.0",
+    "langgraph-cli>=0.4.22",
+]
+
+[build-system]
+requires = ["setuptools>=80.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+py-modules = ["project_env"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+namespaces = true
+include = [
+    "agents*",
+    "auth*",
+    "bootstrap*",
+    "integrations*",
+    "rag*",
+    "repositories*",
+    "schemas*",
+    "services*",
+    "utils*",
 ]

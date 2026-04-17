@@ -42,4 +42,17 @@ def build_study_plan_summary(
         lines.extend(["", "Ya quedó una base semanal lista para la siguiente iteración del plan."])
     else:
         lines.extend(["", "Todavía no pude ubicar sesiones válidas con las restricciones actuales."])
+    raw_guidance = rules.get("rag_session_guidance") or {}
+    guidance = dict(raw_guidance) if isinstance(raw_guidance, dict) else {}
+    if guidance.get("answer"):
+        lines.extend(
+            [
+                "",
+                "Guía sugerida para la primera sesión:",
+                str(guidance["answer"]),
+            ]
+        )
+        cautions = list(guidance.get("cautions") or [])
+        if cautions:
+            lines.append(f"Cuidado: {cautions[0]}")
     return "\n".join(lines)

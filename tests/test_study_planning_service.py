@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
-from agents.support.dependencies import set_personalization_service
+from types import SimpleNamespace
+
+from agents.support.dependencies import (
+    set_personalization_service,
+    set_study_recommendation_service,
+)
+from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
 from agents.support.state import AgentState
 from repositories.personalization.repository import InMemoryPersonalizationRepository
 from schemas.planning import SubjectItem
+from schemas.rag import StudyRecommendationResult
 from services.personalization import (
     PersonalizationConfig,
     PersonalizationService,
@@ -101,6 +108,38 @@ def _completed_profile_payload() -> dict[str, object]:
     return payload
 
 
+class _StudyRecommendationServiceStub:
+    def __init__(self, *, ready: bool = True) -> None:
+        self.status = SimpleNamespace(ready=ready)
+        self.calls: list[dict[str, object]] = []
+
+    def recommend_for_student(self, **kwargs):
+        self.calls.append(dict(kwargs))
+        return StudyRecommendationResult(
+            answer=(
+                "Pomodoro puede ayudarte a empezar en bloques cortos y sostener la atencion "
+                "cuando hay procrastinacion o distraccion."
+            ),
+            recommended_techniques=["pomodoro"],
+            source_chunks=["technique.pomodoro::answer"],
+            confidence="media",
+            groundedness_notes=["sources:cited"],
+        )
+
+    def recommend_for_session(self, **kwargs):
+        self.calls.append({"method": "recommend_for_session", **dict(kwargs)})
+        return StudyRecommendationResult(
+            answer=(
+                "Empieza la sesion con una meta concreta, trabaja en un bloque breve y cierra "
+                "verificando que puedes recordar o aplicar lo estudiado."
+            ),
+            recommended_techniques=[str(kwargs.get("technique_id") or "pomodoro")],
+            source_chunks=["technique.pomodoro::session"],
+            confidence="media",
+            groundedness_notes=["sources:cited"],
+        )
+
+
 def test_build_initial_study_plan_derives_subjects_from_schedule() -> None:
     blocks = [
         _academic_block("monday", "08:00", "10:00", "Calculo"),
@@ -188,6 +227,82 @@ def test_persist_study_profile_generates_study_plan_without_breaking_flow(
     )
     set_personalization_service(personalization_service)
     try:
+        study_profile = _completed_profile_payload()
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=study_profile,
+        )
+
+        update = persist_study_profile(state)
+
+        assert update["phase"] == "end"
+        assert "subjects" in update
+        assert "study_plan" in update
+        assert update["subjects"][0].nombre == "Calculo"
+        assert update["study_plan"]["rules"]["primary_technique_id"] == "pomodoro"
+        assert len(update["study_plan"]["plan_events"]) >= 1
+        assert "Radar de estudio completado" in update["messages"][0].content
+    finally:
+        set_personalization_service(None)
+
+
+def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    recommendation_service = _StudyRecommendationServiceStub(ready=True)
+    set_personalization_service(personalization_service)
+    set_study_recommendation_service(recommendation_service)
+    try:
+        study_profile = _completed_profile_payload()
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=study_profile,
+        )
+
+        update = persist_study_profile(state)
+
+        final_message = update["messages"][0].content
+        assert "Radar de estudio completado" in final_message
+        assert "Complemento pedagógico con fuentes internas:" in final_message
+        assert "Pomodoro puede ayudarte" in final_message
+        assert recommendation_service.calls[0]["top_techniques"] == study_profile["top_techniques"]
+        assert "procrastination" in recommendation_service.calls[0]["student_signals"]
+    finally:
+        set_personalization_service(None)
+        set_study_recommendation_service(None)
+
+
+def test_persist_study_profile_keeps_base_summary_when_rag_service_is_not_ready(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    recommendation_service = _StudyRecommendationServiceStub(ready=False)
+    set_personalization_service(personalization_service)
+    set_study_recommendation_service(recommendation_service)
+    try:
         state = AgentState(
             phase="study_profile_persist",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
@@ -202,12 +317,52 @@ def test_persist_study_profile_generates_study_plan_without_breaking_flow(
 
         update = persist_study_profile(state)
 
-        assert update["phase"] == "end"
-        assert "subjects" in update
-        assert "study_plan" in update
-        assert update["subjects"][0].nombre == "Calculo"
-        assert update["study_plan"]["rules"]["primary_technique_id"] == "pomodoro"
-        assert len(update["study_plan"]["plan_events"]) >= 1
-        assert "Radar de estudio completado" in update["messages"][0].content
+        final_message = update["messages"][0].content
+        assert "Radar de estudio completado" in final_message
+        assert "Complemento pedagógico con fuentes internas:" not in final_message
+        assert recommendation_service.calls == []
     finally:
         set_personalization_service(None)
+        set_study_recommendation_service(None)
+
+
+def test_build_study_plan_adds_rag_session_guidance_when_service_is_ready() -> None:
+    recommendation_service = _StudyRecommendationServiceStub(ready=True)
+    set_study_recommendation_service(recommendation_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            study_profile={
+                "top_techniques": ["pomodoro", "feynman"],
+                "weakness_tags": ["procrastination", "distraction"],
+            },
+            schedule={
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    is_priority_confirmed=True,
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        guidance = update["study_plan"]["rules"]["rag_session_guidance"]
+        assert guidance["primary_technique_id"] == "pomodoro"
+        assert guidance["subject_name"] == "Calculo"
+        assert guidance["source_chunks"] == ["technique.pomodoro::session"]
+        assert "Guía sugerida para la primera sesión:" in update["messages"][0].content
+        assert "Empieza la sesion" in update["messages"][0].content
+        assert recommendation_service.calls[0]["method"] == "recommend_for_session"
+        assert recommendation_service.calls[0]["student_signals"] == [
+            "procrastination",
+            "distraction",
+        ]
+    finally:
+        set_study_recommendation_service(None)

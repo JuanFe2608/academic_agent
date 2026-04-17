@@ -10,6 +10,16 @@ from .onboarding import (
 )
 from .personalization import StudyProfile
 from .planning import Constraints, PrioritiesState, ReplanState, StudyPlanState, SubjectItem
+from .rag import (
+    NormalizedRagDocument,
+    RagChunk,
+    RagCorpusBuildResult,
+    RagDocumentMetadata,
+    RagRelation,
+    RagValidationIssue,
+    StudyRecommendationQuery,
+    StudyRecommendationResult,
+)
 from .reminders import RemindersState
 from .scheduling import (
     Event,
@@ -41,6 +51,12 @@ __all__ = [
     "PendingScheduleItem",
     "Prioridad",
     "PrioritiesState",
+    "NormalizedRagDocument",
+    "RagChunk",
+    "RagCorpusBuildResult",
+    "RagDocumentMetadata",
+    "RagRelation",
+    "RagValidationIssue",
     "RawInputs",
     "RemindersState",
     "ReplanState",
@@ -48,6 +64,8 @@ __all__ = [
     "SchedulePreview",
     "StudentProfile",
     "StudyPlanState",
+    "StudyRecommendationQuery",
+    "StudyRecommendationResult",
     "StudyProfile",
     "SubjectItem",
 ]

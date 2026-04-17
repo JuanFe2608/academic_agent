@@ -14,6 +14,7 @@ wheels/
 .langgraph_api
 .langgraph_api.bak*/
 .langgraph_media
+knowledge_base/study_recommendations/processed/evals/reports/
 
 # Local secrets and deployment credentials
 *.env

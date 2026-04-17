@@ -1,0 +1,5102 @@
+{
+  "corpus_name": "study_recommendations",
+  "corpus_version": "phase_a_v1",
+  "documents": [
+    {
+      "aliases": [],
+      "aliases_normalized": [],
+      "checksum": "358ce9c8d02862964a196e9390f7f198ce4737e57235c1a8bae123b58ed66e04",
+      "document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "document_type": "marco_conceptual",
+      "entity_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+      "knowledge_type": "study_framework",
+      "name": "Marco conceptual: técnica de estudio vs método de estudio",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "alcance_del_problema",
+          "necesidad_de_secuencia",
+          "numero_de_tecnicas_implicadas",
+          "necesidad_de_planificacion",
+          "grado_de_desorganizacion_del_estudiante"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "lectura",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals_normalized": [
+          "rapid_forgetting",
+          "distraction",
+          "explanation_gap",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "desorganizado",
+          "procrastinador",
+          "orientado_a_memoria",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques_normalized": [],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          []
+        ],
+        "core_concepts": [
+          "tecnica_de_estudio",
+          "metodo_de_estudio",
+          "estrategia",
+          "combinacion",
+          "secuencia",
+          "problema_local",
+          "problema_sistemico"
+        ],
+        "decision_scope": "Distinguir entre técnica aislada y método completo; orientar la clasificación conceptual del conocimiento; mejorar la decisión del agente al recomendar intervenciones proporcionales al problema.",
+        "develops": [
+          "comprension_profunda",
+          "organizacion",
+          "transferencia"
+        ],
+        "difficulty_level": [],
+        "document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
+        "document_type": "marco_conceptual",
+        "entity_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 60,
+        "estimated_session_minutes_min": 30,
+        "evidence_level": "mixto",
+        "excluded_techniques_normalized": [],
+        "framework_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+        "id_key": "framework_id",
+        "is_operational_method": false,
+        "knowledge_type": "study_framework",
+        "name": "Marco conceptual: técnica de estudio vs método de estudio",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals_normalized": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "transferencia"
+        ],
+        "optional_techniques_normalized": [],
+        "primary_sources": [
+          {
+            "author": "Real Academia Española",
+            "source_type": "diccionario",
+            "title": "Diccionario académico: técnica",
+            "url_or_reference": "Definición general de técnica como conjunto de reglas y procedimientos.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Real Academia Española",
+            "source_type": "diccionario",
+            "title": "Diccionario académico: método",
+            "url_or_reference": "Definición general de método como modo ordenado de actuar.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Centro Virtual Cervantes",
+            "source_type": "marco_didactico",
+            "title": "Definición didáctica de método y técnica",
+            "url_or_reference": "Método como conjunto de procedimientos desde un enfoque; técnica como uso de procedimientos para un objetivo preciso.",
+            "year": "no especificado"
+          },
+          {
+            "author": "COIE-UNED",
+            "source_type": "guia_institucional",
+            "title": "Técnicas de estudio",
+            "url_or_reference": "Guía institucional sobre selección y adaptación de técnicas de estudio; incluye técnicas de síntesis y referencia a SQ3R.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Antioquia",
+            "source_type": "trabajo_academico",
+            "title": "Trabajo universitario sobre métodos y técnicas de estudio",
+            "url_or_reference": "Discusión sobre flexibilidad, adaptación e incorporación de métodos y técnicas a rutinas de estudio.",
+            "year": 2024
+          },
+          {
+            "author": "UNAD",
+            "source_type": "material_academico",
+            "title": "Documento académico sobre técnicas, estrategias y método de estudio",
+            "url_or_reference": "Relación entre técnicas, estrategias y definición de un método propio de estudio.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía sobre práctica espaciada",
+            "url_or_reference": "Definición operativa de práctica espaciada frente a práctica masiva.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Recuperación mediante pruebas y su relación con retención a largo plazo.",
+            "year": "no especificado"
+          }
+        ],
+        "raw_entity_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+        "recommended_combinations_normalized": [
+          [
+            "tecnicas_documentadas_por_separado"
+          ],
+          [
+            "metodos_documentados_por_separado"
+          ],
+          [
+            "reglas_de_recomendacion_del_agente"
+          ],
+          [
+            "ejemplos_aplicados_por_materia"
+          ]
+        ],
+        "related_concepts": [
+          "planificacion",
+          "repaso",
+          "autoevaluacion",
+          "sintesis",
+          "comprension_lectora",
+          "recomendacion_academica",
+          "chunking",
+          "metadata_rag"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": false,
+        "source_path": "raw/frameworks/marco_conceptual_tecnica_vs_metodo_de_estudio.md",
+        "status": "final",
+        "tags": [
+          "marco_conceptual",
+          "tecnica_de_estudio",
+          "metodo_de_estudio",
+          "estudio_universitario",
+          "recomendacion_academica",
+          "clasificacion_conceptual",
+          "rag",
+          "grounding",
+          "chunking"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "alcance_del_problema",
+          "necesidad_de_secuencia",
+          "numero_de_tecnicas_implicadas",
+          "necesidad_de_planificacion",
+          "grado_de_desorganizacion_del_estudiante"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "lectura",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals": [
+          "olvida_rapido",
+          "se_distrae_facil",
+          "no_puede_explicar",
+          "procrastina",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "desorganizado",
+          "procrastinador",
+          "orientado_a_memoria",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques": [],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "no especificado"
+        ],
+        "core_concepts": [
+          "tecnica_de_estudio",
+          "metodo_de_estudio",
+          "estrategia",
+          "combinacion",
+          "secuencia",
+          "problema_local",
+          "problema_sistemico"
+        ],
+        "decision_scope": "Distinguir entre técnica aislada y método completo; orientar la clasificación conceptual del conocimiento; mejorar la decisión del agente al recomendar intervenciones proporcionales al problema.",
+        "develops": [
+          "comprension_profunda",
+          "organizacion",
+          "transferencia"
+        ],
+        "difficulty_level": [],
+        "document_type": "marco_conceptual",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 60,
+        "estimated_session_minutes_min": 30,
+        "evidence_level": "mixto",
+        "excluded_techniques": [],
+        "framework_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
+        "is_operational_method": false,
+        "knowledge_type": "study_framework",
+        "name": "Marco conceptual: técnica de estudio vs método de estudio",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "transferencia"
+        ],
+        "optional_techniques": [],
+        "primary_sources": [
+          {
+            "author": "Real Academia Española",
+            "source_type": "diccionario",
+            "title": "Diccionario académico: técnica",
+            "url_or_reference": "Definición general de técnica como conjunto de reglas y procedimientos.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Real Academia Española",
+            "source_type": "diccionario",
+            "title": "Diccionario académico: método",
+            "url_or_reference": "Definición general de método como modo ordenado de actuar.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Centro Virtual Cervantes",
+            "source_type": "marco_didactico",
+            "title": "Definición didáctica de método y técnica",
+            "url_or_reference": "Método como conjunto de procedimientos desde un enfoque; técnica como uso de procedimientos para un objetivo preciso.",
+            "year": "no especificado"
+          },
+          {
+            "author": "COIE-UNED",
+            "source_type": "guia_institucional",
+            "title": "Técnicas de estudio",
+            "url_or_reference": "Guía institucional sobre selección y adaptación de técnicas de estudio; incluye técnicas de síntesis y referencia a SQ3R.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Antioquia",
+            "source_type": "trabajo_academico",
+            "title": "Trabajo universitario sobre métodos y técnicas de estudio",
+            "url_or_reference": "Discusión sobre flexibilidad, adaptación e incorporación de métodos y técnicas a rutinas de estudio.",
+            "year": 2024
+          },
+          {
+            "author": "UNAD",
+            "source_type": "material_academico",
+            "title": "Documento académico sobre técnicas, estrategias y método de estudio",
+            "url_or_reference": "Relación entre técnicas, estrategias y definición de un método propio de estudio.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía sobre práctica espaciada",
+            "url_or_reference": "Definición operativa de práctica espaciada frente a práctica masiva.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Recuperación mediante pruebas y su relación con retención a largo plazo.",
+            "year": "no especificado"
+          }
+        ],
+        "recommended_combinations": [
+          "tecnicas documentadas por separado",
+          "metodos documentados por separado",
+          "reglas de recomendacion del agente",
+          "ejemplos aplicados por materia"
+        ],
+        "related_concepts": [
+          "planificacion",
+          "repaso",
+          "autoevaluacion",
+          "sintesis",
+          "comprension_lectora",
+          "recomendacion_academica",
+          "chunking",
+          "metadata_rag"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": false,
+        "status": "final",
+        "tags": [
+          "marco_conceptual",
+          "tecnica_de_estudio",
+          "metodo_de_estudio",
+          "estudio_universitario",
+          "recomendacion_academica",
+          "clasificacion_conceptual",
+          "rag",
+          "grounding",
+          "chunking"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/frameworks/marco_conceptual_tecnica_vs_metodo_de_estudio.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [
+        "criterio técnica vs método",
+        "marco conceptual técnica vs método",
+        "decisión entre técnica aislada y método completo"
+      ],
+      "aliases_normalized": [
+        "criterio_tecnica_vs_metodo",
+        "marco_conceptual_tecnica_vs_metodo",
+        "decision_entre_tecnica_aislada_y_metodo_completo"
+      ],
+      "checksum": "c095e9f3ee33ff96d938f9379df96f26fc782d1c40596ae584a8ff04df71a59f",
+      "document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+      "document_type": "marco_decision",
+      "entity_id": "marco_decision_tecnica_vs_metodo",
+      "knowledge_type": "study_framework",
+      "name": "Marco de decisión: técnica vs método de estudio",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "criterio técnica vs método",
+          "marco conceptual técnica vs método",
+          "decisión entre técnica aislada y método completo"
+        ],
+        "component_techniques_normalized": [
+          [
+            "diagnostico_de_senales"
+          ],
+          [
+            "lectura_por_fases"
+          ],
+          [
+            "sintesis"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "aplicacion_activa"
+          ]
+        ],
+        "confidence_level": "medio",
+        "document_id": "study_framework.marco_decision_tecnica_vs_metodo",
+        "document_type": "marco_decision",
+        "entity_id": "marco_decision_tecnica_vs_metodo",
+        "estimated_duration_days_max": 14,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 90,
+        "estimated_session_minutes_min": 20,
+        "evidence_level": "conceptual_aplicada",
+        "excluded_techniques_normalized": [
+          [
+            "relectura_pasiva_como_estrategia_principal"
+          ],
+          [
+            "subrayado_sin_recuperacion"
+          ],
+          [
+            "memorizacion_masiva_sin_distribucion"
+          ]
+        ],
+        "framework_id": "marco_decision_tecnica_vs_metodo",
+        "id_key": "framework_id",
+        "is_operational_method": false,
+        "knowledge_type": "study_framework",
+        "name": "Marco de decisión: técnica vs método de estudio",
+        "objective_types": [
+          "study_recommendation_decision"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "resumen"
+          ],
+          [
+            "esquema"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "cuadro_comparativo"
+          ],
+          [
+            "fichas"
+          ]
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis de fuentes académicas e institucionales",
+            "source_type": "research_note",
+            "title": "investigacion_marco_conceptual_tecnica_vs_metodo_de_estudio",
+            "url_or_reference": "Archivo base del proyecto RAG",
+            "year": 2026
+          },
+          {
+            "author": "Centro Virtual Cervantes",
+            "source_type": "institutional_reference",
+            "title": "Definiciones didácticas de método y técnica",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          },
+          {
+            "author": "COIE-UNED",
+            "source_type": "institutional_guide",
+            "title": "Técnicas de estudio",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          },
+          {
+            "author": "UNAM",
+            "source_type": "academic_chapter",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          }
+        ],
+        "raw_entity_id": "marco_decision_tecnica_vs_metodo",
+        "requires_feedback": false,
+        "requires_materials": [
+          "material_base",
+          "fecha_de_examen_o_entrega",
+          "apuntes_o_fuente_principal",
+          "preguntas_o_ejercicios",
+          "calendario_basico"
+        ],
+        "requires_schedule_planning": true,
+        "source_path": "raw/frameworks/marco_decision_tecnica_vs_metodo_de_estudio.md",
+        "status": "draft",
+        "tags": [
+          "rag",
+          "estudio",
+          "tecnica_vs_metodo",
+          "decision_framework",
+          "ingenieria_de_sistemas",
+          "recomendacion"
+        ],
+        "target_activity_types": [
+          "quiz",
+          "parcial",
+          "lectura",
+          "repaso_semanal",
+          "proyecto",
+          "estudio_multi_asignatura"
+        ],
+        "target_signals": [
+          "olvida_rapido",
+          "relectura_pasiva",
+          "no_sabe_por_donde_empezar",
+          "desorden",
+          "falta_de_planificacion",
+          "varias_materias_simultaneas",
+          "problema_local",
+          "problema_sistemico"
+        ],
+        "target_student_profiles": [
+          "estudiante_con_flujo_inestable",
+          "estudiante_con_baja_retencion",
+          "estudiante_con_desorden_de_estudio",
+          "estudiante_con_varias_materias",
+          "estudiante_que_no_sabe_por_donde_empezar",
+          "tutor_o_agente_que_debe_recomendar_intervencion"
+        ],
+        "target_subject_types": [
+          "teórica",
+          "conceptual",
+          "mixta",
+          "práctica",
+          "numérica"
+        ],
+        "version": 1
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "criterio técnica vs método",
+          "marco conceptual técnica vs método",
+          "decisión entre técnica aislada y método completo"
+        ],
+        "component_techniques": [
+          "diagnostico_de_senales",
+          "lectura_por_fases",
+          "sintesis",
+          "autoevaluacion",
+          "practica_espaciada",
+          "aplicacion_activa"
+        ],
+        "confidence_level": "medio",
+        "document_type": "marco_decision",
+        "estimated_duration_days_max": 14,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 90,
+        "estimated_session_minutes_min": 20,
+        "evidence_level": "conceptual_aplicada",
+        "excluded_techniques": [
+          "relectura_pasiva_como_estrategia_principal",
+          "subrayado_sin_recuperacion",
+          "memorizacion_masiva_sin_distribucion"
+        ],
+        "framework_id": "marco_decision_tecnica_vs_metodo",
+        "is_operational_method": false,
+        "knowledge_type": "study_framework",
+        "name": "Marco de decisión: técnica vs método de estudio",
+        "objective_types": [
+          "study_recommendation_decision"
+        ],
+        "optional_techniques": [
+          "resumen",
+          "esquema",
+          "mapa_conceptual",
+          "cuadro_comparativo",
+          "fichas"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis de fuentes académicas e institucionales",
+            "source_type": "research_note",
+            "title": "investigacion_marco_conceptual_tecnica_vs_metodo_de_estudio",
+            "url_or_reference": "Archivo base del proyecto RAG",
+            "year": 2026
+          },
+          {
+            "author": "Centro Virtual Cervantes",
+            "source_type": "institutional_reference",
+            "title": "Definiciones didácticas de método y técnica",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          },
+          {
+            "author": "COIE-UNED",
+            "source_type": "institutional_guide",
+            "title": "Técnicas de estudio",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          },
+          {
+            "author": "UNAM",
+            "source_type": "academic_chapter",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Citado dentro de la investigación base",
+            "year": null
+          }
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "material_base",
+          "fecha_de_examen_o_entrega",
+          "apuntes_o_fuente_principal",
+          "preguntas_o_ejercicios",
+          "calendario_basico"
+        ],
+        "requires_schedule_planning": true,
+        "status": "draft",
+        "tags": [
+          "rag",
+          "estudio",
+          "tecnica_vs_metodo",
+          "decision_framework",
+          "ingenieria_de_sistemas",
+          "recomendacion"
+        ],
+        "target_activity_types": [
+          "quiz",
+          "parcial",
+          "lectura",
+          "repaso_semanal",
+          "proyecto",
+          "estudio_multi_asignatura"
+        ],
+        "target_signals": [
+          "olvida_rapido",
+          "relectura_pasiva",
+          "no_sabe_por_donde_empezar",
+          "desorden",
+          "falta_de_planificacion",
+          "varias_materias_simultaneas",
+          "problema_local",
+          "problema_sistemico"
+        ],
+        "target_student_profiles": [
+          "estudiante_con_flujo_inestable",
+          "estudiante_con_baja_retencion",
+          "estudiante_con_desorden_de_estudio",
+          "estudiante_con_varias_materias",
+          "estudiante_que_no_sabe_por_donde_empezar",
+          "tutor_o_agente_que_debe_recomendar_intervencion"
+        ],
+        "target_subject_types": [
+          "teórica",
+          "conceptual",
+          "mixta",
+          "práctica",
+          "numérica"
+        ],
+        "version": 1
+      },
+      "source_path": "raw/frameworks/marco_decision_tecnica_vs_metodo_de_estudio.md",
+      "status": "draft",
+      "version": "1"
+    },
+    {
+      "aliases": [],
+      "aliases_normalized": [],
+      "checksum": "aa90020838c219df0d284e9172f5173c9032beea0689614d0ea53c7b4370f352",
+      "document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "document_type": "matriz_de_combinacion",
+      "entity_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+      "knowledge_type": "technique_combination_matrix",
+      "name": "Matriz de combinación de técnicas para métodos de estudio",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "lectura",
+          "toma_de_apuntes",
+          "repaso_semanal",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "rapid_forgetting",
+          "distraction",
+          "difficulty_switching_topics",
+          "explanation_gap",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "con_baja_concentracion",
+          "orientado_a_memoria",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "combination_scope": "Matriz conceptual y operativa para comparar, combinar y priorizar técnicas de estudio frecuentes en estudiantes universitarios, especialmente en ingeniería de sistemas. No es un método completo ni una secuencia cerrada.",
+        "component_techniques_normalized": [
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "cornell"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "interleaving"
+          ],
+          [
+            "pomodoro"
+          ],
+          [
+            "mnemotecnia"
+          ]
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "active_recall_sin_retroalimentacion"
+          ],
+          [
+            "interleaving_sin_revision"
+          ],
+          [
+            "mnemotecnia_como_eje_de_comprension"
+          ],
+          [
+            "demasiadas_tecnicas_simultaneas"
+          ]
+        ],
+        "develops": [
+          "comprension_profunda",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "gestion_del_tiempo",
+          "repaso",
+          "transferencia",
+          "resolucion_de_problemas",
+          "preparacion_de_examen"
+        ],
+        "difficulty_level": "intermedio",
+        "document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+        "document_type": "matriz_de_combinacion",
+        "entity_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 25,
+        "evidence_level": "mixto",
+        "excluded_techniques_normalized": [],
+        "id_key": "matrix_id",
+        "included_techniques_normalized": [
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "cornell"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "interleaving"
+          ],
+          [
+            "pomodoro"
+          ],
+          [
+            "mnemotecnia"
+          ]
+        ],
+        "is_operational_method": false,
+        "knowledge_type": "technique_combination_matrix",
+        "matrix_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+        "name": "Matriz de combinación de técnicas para métodos de estudio",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals_normalized": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "comprension_profunda",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "gestion_del_tiempo",
+          "repaso",
+          "transferencia",
+          "resolucion_de_problemas",
+          "preparacion_de_examen"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "pomodoro"
+          ],
+          [
+            "mnemotecnia"
+          ]
+        ],
+        "primary_functions_covered": [
+          "comprension",
+          "sintesis",
+          "recuperacion",
+          "consolidacion",
+          "gestion_de_sesion",
+          "discriminacion",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "COIE-UNED",
+            "source_type": "guia_institucional",
+            "title": "Guía de repaso y preparación de exámenes",
+            "url_or_reference": "Tipos de repaso, advertencias sobre empollar y valor de los repasos intermedios.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía de metacognición sobre práctica espaciada y utilidad de técnicas",
+            "url_or_reference": "Definición de práctica espaciada, diferencias frente a estudio masivo y síntesis comparativa de utilidad de técnicas.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción Aptus",
+            "source_type": "guia_educativa",
+            "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
+            "url_or_reference": "Definición de práctica de recuperación, rol de la retroalimentación y metacognición.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción Aptus",
+            "source_type": "guia_educativa",
+            "title": "Cómo usar la práctica de recuperación espaciada para potenciar el aprendizaje",
+            "url_or_reference": "Relación explícita entre repetición espaciada y práctica de recuperación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "material_academico",
+            "title": "Fascículo sobre técnica Feynman",
+            "url_or_reference": "Explicación de la técnica Feynman y aclaración de que se usa para comprender, no para memorizar.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "material_academico",
+            "title": "Fascículo sobre estudio intercalado",
+            "url_or_reference": "Definición de interleaving, prerrequisitos y necesidad de revisión.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UAEH",
+            "source_type": "guia_institucional",
+            "title": "Técnica Pomodoro",
+            "url_or_reference": "Definición, pasos, ventajas y límites de Pomodoro.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Francesco Cirillo",
+            "source_type": "libro",
+            "title": "La técnica Pomodoro",
+            "url_or_reference": "Objetivos de foco, atención y reducción de interrupciones.",
+            "year": 2020
+          },
+          {
+            "author": "IHMC",
+            "source_type": "documento_academico",
+            "title": "Concept maps",
+            "url_or_reference": "Características de mapas conceptuales: conceptos, enlaces, jerarquía y pregunta de enfoque.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED Costa Rica",
+            "source_type": "guia_institucional",
+            "title": "Estrategia: mapa conceptual",
+            "url_or_reference": "Pasos y rasgos de mapas conceptuales.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Chile",
+            "source_type": "guia_institucional",
+            "title": "Método Cornell",
+            "url_or_reference": "Definición de Cornell y sus tres secciones.",
+            "year": "no especificado"
+          },
+          {
+            "author": "RAE y ANUIES",
+            "source_type": "definicion_y_guia",
+            "title": "Mnemotecnia",
+            "url_or_reference": "Definición normativa y ejemplo de uso como estrategia de memoria.",
+            "year": "no especificado"
+          }
+        ],
+        "raw_entity_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall",
+            "repeticion_espaciada"
+          ],
+          [
+            "interleaving",
+            "active_recall"
+          ],
+          [
+            "cornell",
+            "active_recall"
+          ],
+          [
+            "feynman",
+            "mapas_conceptuales"
+          ],
+          [
+            "mnemotecnia",
+            "active_recall",
+            "repeticion_espaciada"
+          ],
+          [
+            "pomodoro",
+            "tecnica_objetivo"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "preguntas",
+          "retroalimentacion",
+          "temporizador"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "source_path": "raw/matrices/matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio.md",
+        "status": "final",
+        "tags": [
+          "matriz_de_combinacion",
+          "tecnicas_de_estudio",
+          "combinaciones",
+          "ingenieria_de_sistemas",
+          "rag",
+          "grounding",
+          "chunking",
+          "active_recall",
+          "repeticion_espaciada",
+          "interleaving",
+          "pomodoro",
+          "mnemotecnia"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "lectura",
+          "toma_de_apuntes",
+          "repaso_semanal",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_se_autoevalua",
+          "olvida_rapido",
+          "se_distrae_facil",
+          "confunde_tipos_de_ejercicio",
+          "no_puede_explicar",
+          "procrastina",
+          "no_sostiene_sesiones_largas",
+          "necesita_estructura",
+          "siente_familiaridad_pero_no_recuerda"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "con_baja_concentracion",
+          "orientado_a_memoria",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "combination_scope": "Matriz conceptual y operativa para comparar, combinar y priorizar técnicas de estudio frecuentes en estudiantes universitarios, especialmente en ingeniería de sistemas. No es un método completo ni una secuencia cerrada.",
+        "component_techniques": [
+          "mapas_conceptuales",
+          "cornell",
+          "feynman",
+          "active_recall",
+          "repeticion_espaciada",
+          "interleaving",
+          "pomodoro",
+          "mnemotecnia"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "active_recall sin retroalimentacion",
+          "interleaving sin revision",
+          "mnemotecnia como eje de comprension",
+          "demasiadas tecnicas simultaneas"
+        ],
+        "develops": [
+          "comprension_profunda",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "gestion_del_tiempo",
+          "repaso",
+          "transferencia",
+          "resolucion_de_problemas",
+          "preparacion_de_examen"
+        ],
+        "difficulty_level": "intermedio",
+        "document_type": "matriz_de_combinacion",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 25,
+        "evidence_level": "mixto",
+        "excluded_techniques": [],
+        "included_techniques": [
+          "mapas_conceptuales",
+          "cornell",
+          "feynman",
+          "active_recall",
+          "repeticion_espaciada",
+          "interleaving",
+          "pomodoro",
+          "mnemotecnia"
+        ],
+        "is_operational_method": false,
+        "knowledge_type": "technique_combination_matrix",
+        "matrix_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
+        "name": "Matriz de combinación de técnicas para métodos de estudio",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "comprension_profunda",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "gestion_del_tiempo",
+          "repaso",
+          "transferencia",
+          "resolucion_de_problemas",
+          "preparacion_de_examen"
+        ],
+        "optional_techniques": [
+          "pomodoro",
+          "mnemotecnia"
+        ],
+        "primary_functions_covered": [
+          "comprension",
+          "sintesis",
+          "recuperacion",
+          "consolidacion",
+          "gestion_de_sesion",
+          "discriminacion",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "COIE-UNED",
+            "source_type": "guia_institucional",
+            "title": "Guía de repaso y preparación de exámenes",
+            "url_or_reference": "Tipos de repaso, advertencias sobre empollar y valor de los repasos intermedios.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía de metacognición sobre práctica espaciada y utilidad de técnicas",
+            "url_or_reference": "Definición de práctica espaciada, diferencias frente a estudio masivo y síntesis comparativa de utilidad de técnicas.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción Aptus",
+            "source_type": "guia_educativa",
+            "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
+            "url_or_reference": "Definición de práctica de recuperación, rol de la retroalimentación y metacognición.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción Aptus",
+            "source_type": "guia_educativa",
+            "title": "Cómo usar la práctica de recuperación espaciada para potenciar el aprendizaje",
+            "url_or_reference": "Relación explícita entre repetición espaciada y práctica de recuperación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "material_academico",
+            "title": "Fascículo sobre técnica Feynman",
+            "url_or_reference": "Explicación de la técnica Feynman y aclaración de que se usa para comprender, no para memorizar.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "material_academico",
+            "title": "Fascículo sobre estudio intercalado",
+            "url_or_reference": "Definición de interleaving, prerrequisitos y necesidad de revisión.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UAEH",
+            "source_type": "guia_institucional",
+            "title": "Técnica Pomodoro",
+            "url_or_reference": "Definición, pasos, ventajas y límites de Pomodoro.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Francesco Cirillo",
+            "source_type": "libro",
+            "title": "La técnica Pomodoro",
+            "url_or_reference": "Objetivos de foco, atención y reducción de interrupciones.",
+            "year": 2020
+          },
+          {
+            "author": "IHMC",
+            "source_type": "documento_academico",
+            "title": "Concept maps",
+            "url_or_reference": "Características de mapas conceptuales: conceptos, enlaces, jerarquía y pregunta de enfoque.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED Costa Rica",
+            "source_type": "guia_institucional",
+            "title": "Estrategia: mapa conceptual",
+            "url_or_reference": "Pasos y rasgos de mapas conceptuales.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Chile",
+            "source_type": "guia_institucional",
+            "title": "Método Cornell",
+            "url_or_reference": "Definición de Cornell y sus tres secciones.",
+            "year": "no especificado"
+          },
+          {
+            "author": "RAE y ANUIES",
+            "source_type": "definicion_y_guia",
+            "title": "Mnemotecnia",
+            "url_or_reference": "Definición normativa y ejemplo de uso como estrategia de memoria.",
+            "year": "no especificado"
+          }
+        ],
+        "recommended_combinations": [
+          "active_recall + repeticion_espaciada",
+          "interleaving + active_recall",
+          "cornell + active_recall",
+          "feynman + mapas_conceptuales",
+          "mnemotecnia + active_recall + repeticion_espaciada",
+          "pomodoro + tecnica_objetivo"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "preguntas",
+          "retroalimentacion",
+          "temporizador"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "status": "final",
+        "tags": [
+          "matriz_de_combinacion",
+          "tecnicas_de_estudio",
+          "combinaciones",
+          "ingenieria_de_sistemas",
+          "rag",
+          "grounding",
+          "chunking",
+          "active_recall",
+          "repeticion_espaciada",
+          "interleaving",
+          "pomodoro",
+          "mnemotecnia"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/matrices/matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [
+        "evaluacion_numerica_breve",
+        "metodo_para_quiz_numerico"
+      ],
+      "aliases_normalized": [
+        "evaluacion_numerica_breve",
+        "metodo_para_quiz_numerico"
+      ],
+      "checksum": "eed20956cdb48f3764eb6fa7230b0deb323338cda8f8cb6b33b6985821ae73fd",
+      "document_id": "study_method.metodo_evaluacion_numerica_breve",
+      "document_type": "study_method",
+      "entity_id": "metodo_evaluacion_numerica_breve",
+      "knowledge_type": "study_method",
+      "name": "Método de estudio para evaluación numérica breve",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "evaluacion_numerica_breve",
+          "metodo_para_quiz_numerico"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "rapid_forgetting",
+          "difficulty_switching_topics",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "no especificado"
+        ],
+        "best_for_subject_types": [
+          "numerica",
+          "practica",
+          "mixta"
+        ],
+        "component_techniques_normalized": [
+          [
+            "ejemplos_resueltos"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "interleaving"
+          ],
+          [
+            "simulacion_cronometrada"
+          ],
+          [
+            "revision_de_examenes_anteriores"
+          ]
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "practica_de_recuperacion_sin_feedback"
+          ],
+          [
+            "practica_mirando_apuntes"
+          ],
+          [
+            "interleaving_demasiado_pronto"
+          ],
+          [
+            "solo_relectura"
+          ],
+          [
+            "ejemplos_resueltos_lejanos_al_tipo_de_problema"
+          ]
+        ],
+        "develops": [
+          "resolucion_de_problemas",
+          "autoevaluacion",
+          "repaso",
+          "preparacion_de_examen",
+          "gestion_del_tiempo"
+        ],
+        "difficulty_level": "intermedio",
+        "document_id": "study_method.metodo_evaluacion_numerica_breve",
+        "document_type": "study_method",
+        "entity_id": "metodo_evaluacion_numerica_breve",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 60,
+        "estimated_session_minutes_min": 30,
+        "evidence_level": "moderado",
+        "excluded_techniques_normalized": [
+          []
+        ],
+        "id_key": "method_id",
+        "knowledge_type": "study_method",
+        "method_id": "metodo_evaluacion_numerica_breve",
+        "name": "Método de estudio para evaluación numérica breve",
+        "not_ideal_for_activity_types": [
+          "lectura",
+          "toma_de_apuntes",
+          "exposicion"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "no_especificado"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "teorica",
+          "conceptual"
+        ],
+        "objective_types": [
+          "resolucion_de_problemas",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "repaso",
+          "gestion_del_tiempo"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "pomodoro"
+          ],
+          [
+            "mnemotecnia"
+          ],
+          [
+            "feynman"
+          ]
+        ],
+        "primary_sources": [
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Pruebas de práctica, retroalimentación, frecuencia, ansiedad y aprendizaje por recuperación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Guía de preparación de exámenes",
+            "url_or_reference": "Repaso inicial, intermedio y final; control del tiempo; familiarización con exámenes anteriores.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía de metacognición",
+            "url_or_reference": "Práctica distribuida y evaluación de la práctica como técnicas de alta utilidad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción al español",
+            "source_type": "guia_basada_en_investigacion",
+            "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
+            "url_or_reference": "Recuperación como estrategia de aprendizaje y necesidad de retroalimentación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "articulo_academico",
+            "title": "Artículo en español sobre efecto del ejemplo resuelto y teoría de carga cognitiva",
+            "url_or_reference": "Ejemplos resueltos para reducir carga cognitiva en tareas procedimentales.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "guia_didactica",
+            "title": "Guía didáctica sobre estudio intercalado",
+            "url_or_reference": "Intercalado, discriminación entre tipos de ejercicios y revisión obligatoria.",
+            "year": "no especificado"
+          }
+        ],
+        "raw_entity_id": "metodo_evaluacion_numerica_breve",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall",
+            "repeticion_espaciada"
+          ],
+          [
+            "ejemplos_resueltos",
+            "active_recall"
+          ],
+          [
+            "interleaving",
+            "active_recall"
+          ],
+          [
+            "simulacion_cronometrada",
+            "revision_de_examenes_anteriores"
+          ],
+          [
+            "pomodoro",
+            "active_recall"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "banco_de_ejercicios",
+          "temporizador",
+          "soluciones_verificables"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "source_path": "raw/methods/metodo_evaluacion_numerica_breve.md",
+        "status": "final",
+        "tags": [
+          "metodo_de_estudio",
+          "evaluacion_numerica_breve",
+          "quiz",
+          "parcial",
+          "resolucion_de_problemas",
+          "practica_de_recuperacion",
+          "repeticion_espaciada",
+          "interleaving",
+          "simulacion_cronometrada",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "evaluacion_numerica_breve",
+          "metodo_para_quiz_numerico"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_se_autoevalua",
+          "olvida_rapido",
+          "confunde_tipos_de_ejercicio",
+          "siente_familiaridad_pero_no_recuerda",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "no especificado"
+        ],
+        "best_for_subject_types": [
+          "numerica",
+          "practica",
+          "mixta"
+        ],
+        "component_techniques": [
+          "ejemplos_resueltos",
+          "practica_de_recuperacion",
+          "repeticion_espaciada",
+          "interleaving",
+          "simulacion_cronometrada",
+          "revision_de_examenes_anteriores"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "practica_de_recuperacion_sin_feedback",
+          "practica_mirando_apuntes",
+          "interleaving_demasiado_pronto",
+          "solo_relectura",
+          "ejemplos_resueltos_lejanos_al_tipo_de_problema"
+        ],
+        "develops": [
+          "resolucion_de_problemas",
+          "autoevaluacion",
+          "repaso",
+          "preparacion_de_examen",
+          "gestion_del_tiempo"
+        ],
+        "difficulty_level": "intermedio",
+        "estimated_duration_days_max": 7,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 60,
+        "estimated_session_minutes_min": 30,
+        "evidence_level": "moderado",
+        "excluded_techniques": [
+          "no especificado"
+        ],
+        "knowledge_type": "study_method",
+        "method_id": "metodo_evaluacion_numerica_breve",
+        "name": "Método de estudio para evaluación numérica breve",
+        "not_ideal_for_activity_types": [
+          "lectura",
+          "toma_de_apuntes",
+          "exposicion"
+        ],
+        "not_ideal_for_signals": [
+          "no especificado"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "teorica",
+          "conceptual"
+        ],
+        "objective_types": [
+          "resolucion_de_problemas",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "repaso",
+          "gestion_del_tiempo"
+        ],
+        "optional_techniques": [
+          "pomodoro",
+          "mnemotecnia",
+          "feynman"
+        ],
+        "primary_sources": [
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Pruebas de práctica, retroalimentación, frecuencia, ansiedad y aprendizaje por recuperación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Guía de preparación de exámenes",
+            "url_or_reference": "Repaso inicial, intermedio y final; control del tiempo; familiarización con exámenes anteriores.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Guía de metacognición",
+            "url_or_reference": "Práctica distribuida y evaluación de la práctica como técnicas de alta utilidad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "retrievalpractice.org / traducción al español",
+            "source_type": "guia_basada_en_investigacion",
+            "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
+            "url_or_reference": "Recuperación como estrategia de aprendizaje y necesidad de retroalimentación.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "articulo_academico",
+            "title": "Artículo en español sobre efecto del ejemplo resuelto y teoría de carga cognitiva",
+            "url_or_reference": "Ejemplos resueltos para reducir carga cognitiva en tareas procedimentales.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "guia_didactica",
+            "title": "Guía didáctica sobre estudio intercalado",
+            "url_or_reference": "Intercalado, discriminación entre tipos de ejercicios y revisión obligatoria.",
+            "year": "no especificado"
+          }
+        ],
+        "recommended_combinations": [
+          "practica_de_recuperacion + repeticion_espaciada",
+          "ejemplos_resueltos + practica_de_recuperacion",
+          "interleaving + practica_de_recuperacion",
+          "simulacion_cronometrada + revision_de_examenes_anteriores",
+          "pomodoro + practica_de_recuperacion"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "banco_de_ejercicios",
+          "temporizador",
+          "soluciones_verificables"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "status": "final",
+        "tags": [
+          "metodo_de_estudio",
+          "evaluacion_numerica_breve",
+          "quiz",
+          "parcial",
+          "resolucion_de_problemas",
+          "practica_de_recuperacion",
+          "repeticion_espaciada",
+          "interleaving",
+          "simulacion_cronometrada",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/methods/metodo_evaluacion_numerica_breve.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [
+        "lectura_y_sintesis",
+        "metodo_de_lectura_activa_y_sintesis"
+      ],
+      "aliases_normalized": [
+        "lectura_y_sintesis",
+        "metodo_de_lectura_activa_y_sintesis"
+      ],
+      "checksum": "e4115013c68f860885192cd6bd6bfa5e90220490ac8b22dc8c23a94a0f20a07f",
+      "document_id": "study_method.metodo_lectura_y_sintesis",
+      "document_type": "study_method",
+      "entity_id": "metodo_lectura_y_sintesis",
+      "knowledge_type": "study_method",
+      "name": "Método de lectura y síntesis",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "lectura_y_sintesis",
+          "metodo_de_lectura_activa_y_sintesis"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "toma_de_apuntes",
+          "parcial",
+          "proyecto",
+          "repaso_semanal"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "explanation_gap",
+          "rapid_forgetting",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "analitico",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques_normalized": [
+          [
+            "sq3r"
+          ],
+          [
+            "prelectura"
+          ],
+          [
+            "preguntas_guia"
+          ],
+          [
+            "lectura_activa"
+          ],
+          [
+            "recite"
+          ],
+          [
+            "sintesis_estructurada"
+          ]
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "relectura_como_estrategia_principal"
+          ],
+          [
+            "subrayado_como_estrategia_principal"
+          ]
+        ],
+        "develops": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "difficulty_level": "medio",
+        "document_id": "study_method.metodo_lectura_y_sintesis",
+        "document_type": "study_method",
+        "entity_id": "metodo_lectura_y_sintesis",
+        "estimated_duration_days_max": 2,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "moderado",
+        "excluded_techniques_normalized": [
+          [
+            "relectura_como_estrategia_principal"
+          ],
+          [
+            "subrayado_como_estrategia_principal"
+          ]
+        ],
+        "id_key": "method_id",
+        "knowledge_type": "study_method",
+        "method_id": "metodo_lectura_y_sintesis",
+        "name": "Método de lectura y síntesis",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "difficulty_switching_topics"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "numerica",
+          "practica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "cornell"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "active_recall"
+          ]
+        ],
+        "primary_sources": [
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Técnicas de estudio: SQ3R, lectura, repaso y síntesis",
+            "url_or_reference": "Material universitario sobre SQ3R, lectura comprensiva, repaso y técnicas de síntesis.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Método de estudio por etapas",
+            "url_or_reference": "Secuencia prelectura, lectura-comprensión y sintetización.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y técnicas eficaces de estudio",
+            "url_or_reference": "Síntesis en español sobre práctica distribuida, evaluación de la práctica y utilidad relativa de relectura y subrayado.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Relación entre pruebas de práctica, recuperación y retención.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Chile",
+            "source_type": "recurso_universitario",
+            "title": "Método Cornell",
+            "url_or_reference": "Descripción operativa de Cornell con columna de ideas/preguntas y resumen.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "fasciculo_didactico",
+            "title": "Técnica Feynman",
+            "url_or_reference": "Explicación simple y breve para comprender mejor mediante autoexplicación.",
+            "year": "no especificado"
+          }
+        ],
+        "raw_entity_id": "metodo_lectura_y_sintesis",
+        "recommended_combinations_normalized": [
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "cornell"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "feynman"
+          ]
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "texto_base",
+          "apuntes",
+          "hoja_de_trabajo",
+          "hoja_cornell",
+          "software_de_mapas"
+        ],
+        "requires_prior_knowledge": false,
+        "requires_schedule_planning": true,
+        "source_path": "raw/methods/metodo_lectura_y_sintesis.md",
+        "status": "final",
+        "tags": [
+          "metodo_lectura_y_sintesis",
+          "lectura",
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "version": 1,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "lectura_y_sintesis",
+          "metodo_de_lectura_activa_y_sintesis"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "toma_de_apuntes",
+          "parcial",
+          "proyecto",
+          "repaso_semanal"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_puede_explicar",
+          "olvida_rapido",
+          "siente_familiaridad_pero_no_recuerda",
+          "necesita_estructura",
+          "no_se_autoevalua"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "analitico",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques": [
+          "sq3r",
+          "prelectura",
+          "preguntas_guia",
+          "lectura_activa",
+          "recite",
+          "sintesis_estructurada"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "relectura_como_estrategia_principal",
+          "subrayado_como_estrategia_principal"
+        ],
+        "develops": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "difficulty_level": "medio",
+        "estimated_duration_days_max": 2,
+        "estimated_duration_days_min": 1,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "moderado",
+        "excluded_techniques": [
+          "relectura_como_estrategia_principal",
+          "subrayado_como_estrategia_principal"
+        ],
+        "knowledge_type": "study_method",
+        "method_id": "metodo_lectura_y_sintesis",
+        "name": "Método de lectura y síntesis",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "confunde_tipos_de_ejercicio"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "numerica",
+          "practica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "optional_techniques": [
+          "cornell",
+          "mapa_conceptual",
+          "feynman",
+          "practica_distribuida",
+          "evaluacion_de_la_practica"
+        ],
+        "primary_sources": [
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Técnicas de estudio: SQ3R, lectura, repaso y síntesis",
+            "url_or_reference": "Material universitario sobre SQ3R, lectura comprensiva, repaso y técnicas de síntesis.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Método de estudio por etapas",
+            "url_or_reference": "Secuencia prelectura, lectura-comprensión y sintetización.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y técnicas eficaces de estudio",
+            "url_or_reference": "Síntesis en español sobre práctica distribuida, evaluación de la práctica y utilidad relativa de relectura y subrayado.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Relación entre pruebas de práctica, recuperación y retención.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Universidad de Chile",
+            "source_type": "recurso_universitario",
+            "title": "Método Cornell",
+            "url_or_reference": "Descripción operativa de Cornell con columna de ideas/preguntas y resumen.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "fasciculo_didactico",
+            "title": "Técnica Feynman",
+            "url_or_reference": "Explicación simple y breve para comprender mejor mediante autoexplicación.",
+            "year": "no especificado"
+          }
+        ],
+        "recommended_combinations": [
+          "practica_distribuida",
+          "evaluacion_de_la_practica",
+          "cornell",
+          "mapa_conceptual",
+          "feynman"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "texto_base",
+          "apuntes",
+          "hoja_de_trabajo",
+          "hoja_cornell",
+          "software_de_mapas"
+        ],
+        "requires_prior_knowledge": false,
+        "requires_schedule_planning": true,
+        "status": "final",
+        "tags": [
+          "metodo_lectura_y_sintesis",
+          "lectura",
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "version": 1,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/methods/metodo_lectura_y_sintesis.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [
+        "parcial_teorico",
+        "metodo_de_estudio_para_parcial_teorico"
+      ],
+      "aliases_normalized": [
+        "parcial_teorico",
+        "metodo_de_estudio_para_parcial_teorico"
+      ],
+      "checksum": "20290e6bae50e8e28bc6b629f93b17c8a5b10636a4dd2151b2e38529ed24b7ea",
+      "document_id": "study_method.metodo_parcial_teorico",
+      "document_type": "study_method",
+      "entity_id": "metodo_parcial_teorico",
+      "knowledge_type": "study_method",
+      "name": "Método para parcial teórico",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "parcial_teorico",
+          "metodo_de_estudio_para_parcial_teorico"
+        ],
+        "best_for_activity_types": [
+          "parcial",
+          "quiz",
+          "lectura",
+          "repaso_semanal"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "rapid_forgetting",
+          "difficulty_switching_topics",
+          "explanation_gap",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "orientado_a_memoria",
+          "orientado_a_comprension",
+          "analitico"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques_normalized": [
+          [
+            "analisis_de_examenes_anteriores"
+          ],
+          [
+            "sintesis_estructurada"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "retroalimentacion"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "simulacion"
+          ]
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "relectura_como_estrategia_principal"
+          ],
+          [
+            "empolle_ultimo_dia"
+          ],
+          [
+            "practica_de_recuperacion_sin_feedback"
+          ],
+          [
+            "practica_de_recuperacion_con_material"
+          ],
+          [
+            "repaso_sin_intermedios"
+          ]
+        ],
+        "develops": [
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "organizacion"
+        ],
+        "difficulty_level": "intermedio",
+        "document_id": "study_method.metodo_parcial_teorico",
+        "document_type": "study_method",
+        "entity_id": "metodo_parcial_teorico",
+        "estimated_duration_days_max": 30,
+        "estimated_duration_days_min": 5,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "moderado",
+        "excluded_techniques_normalized": [
+          [
+            "relectura_como_estrategia_principal"
+          ],
+          [
+            "empolle_ultimo_dia"
+          ],
+          [
+            "practica_de_recuperacion_con_material"
+          ],
+          [
+            "practica_sin_feedback"
+          ]
+        ],
+        "id_key": "method_id",
+        "knowledge_type": "study_method",
+        "method_id": "metodo_parcial_teorico",
+        "name": "Método para parcial teórico",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "no_especificado"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "numerica",
+          "practica"
+        ],
+        "objective_types": [
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "interleaving"
+          ],
+          [
+            "pomodoro"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "mnemotecnia"
+          ],
+          [
+            "cornell"
+          ]
+        ],
+        "primary_sources": [
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Preparación de exámenes en la UNED",
+            "url_or_reference": "Guía universitaria sobre análisis de exámenes anteriores, calendario de repaso y diferencias entre repaso sistemático y empolle.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Capítulo universitario sobre recuperación activa, retroalimentación, práctica distribuida, cuestionarios y reducción de ansiedad con pruebas de bajo riesgo.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y aprendizaje",
+            "url_or_reference": "Síntesis en español donde evaluación de la práctica y práctica distribuida se clasifican como estrategias de alta utilidad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Centro Virtual Cervantes y RAE",
+            "source_type": "referencia_conceptual",
+            "title": "Definiciones de método y técnica",
+            "url_or_reference": "Definiciones didácticas y lingüísticas usadas para distinguir método de técnica.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "fasciculos_didacticos",
+            "title": "Técnica Feynman e intercalado",
+            "url_or_reference": "Materiales sobre explicación simple para comprender e intercalado para discriminación entre temas similares.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Ayala, Moro y Germain",
+            "source_type": "estudio_piloto",
+            "title": "Estudio piloto sobre repetición espaciada con Anki",
+            "url_or_reference": "Estudio piloto universitario con mejora global en calificaciones al usar repaso espaciado con software.",
+            "year": 2024
+          }
+        ],
+        "raw_entity_id": "metodo_parcial_teorico",
+        "recommended_combinations_normalized": [
+          [
+            "sintesis_estructurada",
+            "active_recall"
+          ],
+          [
+            "active_recall",
+            "retroalimentacion"
+          ],
+          [
+            "active_recall",
+            "repeticion_espaciada"
+          ],
+          [
+            "repeticion_espaciada",
+            "simulacion"
+          ],
+          [
+            "interleaving",
+            "active_recall"
+          ],
+          [
+            "feynman",
+            "active_recall"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "examenes_anteriores",
+          "resúmenes",
+          "esquemas",
+          "banco_de_preguntas",
+          "temporizador"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "source_path": "raw/methods/metodo_parcial_teorico.md",
+        "status": "final",
+        "tags": [
+          "metodo_parcial_teorico",
+          "parcial",
+          "quiz",
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "teorica",
+          "conceptual",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [
+          "parcial_teorico",
+          "metodo_de_estudio_para_parcial_teorico"
+        ],
+        "best_for_activity_types": [
+          "parcial",
+          "quiz",
+          "lectura",
+          "repaso_semanal"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_se_autoevalua",
+          "olvida_rapido",
+          "confunde_tipos_de_ejercicio",
+          "no_puede_explicar",
+          "procrastina",
+          "necesita_estructura",
+          "siente_familiaridad_pero_no_recuerda"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "orientado_a_memoria",
+          "orientado_a_comprension",
+          "analitico"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques": [
+          "analisis_de_examenes_anteriores",
+          "sintesis_estructurada",
+          "practica_de_recuperacion",
+          "retroalimentacion",
+          "repeticion_espaciada",
+          "simulacion"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "relectura_como_estrategia_principal",
+          "empolle_ultimo_dia",
+          "practica_de_recuperacion_sin_feedback",
+          "practica_de_recuperacion_con_material",
+          "repaso_sin_intermedios"
+        ],
+        "develops": [
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "organizacion"
+        ],
+        "difficulty_level": "intermedio",
+        "estimated_duration_days_max": 30,
+        "estimated_duration_days_min": 5,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "moderado",
+        "excluded_techniques": [
+          "relectura_como_estrategia_principal",
+          "empolle_ultimo_dia",
+          "practica_de_recuperacion_con_material",
+          "practica_sin_feedback"
+        ],
+        "knowledge_type": "study_method",
+        "method_id": "metodo_parcial_teorico",
+        "name": "Método para parcial teórico",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "no especificado"
+        ],
+        "not_ideal_for_student_profiles": [
+          "no especificado"
+        ],
+        "not_ideal_for_subject_types": [
+          "numerica",
+          "practica"
+        ],
+        "objective_types": [
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia"
+        ],
+        "optional_techniques": [
+          "interleaving",
+          "pomodoro",
+          "feynman",
+          "mnemotecnia",
+          "cornell"
+        ],
+        "primary_sources": [
+          {
+            "author": "UNED",
+            "source_type": "guia_universitaria",
+            "title": "Preparación de exámenes en la UNED",
+            "url_or_reference": "Guía universitaria sobre análisis de exámenes anteriores, calendario de repaso y diferencias entre repaso sistemático y empolle.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Capítulo universitario sobre recuperación activa, retroalimentación, práctica distribuida, cuestionarios y reducción de ansiedad con pruebas de bajo riesgo.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y aprendizaje",
+            "url_or_reference": "Síntesis en español donde evaluación de la práctica y práctica distribuida se clasifican como estrategias de alta utilidad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Centro Virtual Cervantes y RAE",
+            "source_type": "referencia_conceptual",
+            "title": "Definiciones de método y técnica",
+            "url_or_reference": "Definiciones didácticas y lingüísticas usadas para distinguir método de técnica.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UnADM",
+            "source_type": "fasciculos_didacticos",
+            "title": "Técnica Feynman e intercalado",
+            "url_or_reference": "Materiales sobre explicación simple para comprender e intercalado para discriminación entre temas similares.",
+            "year": "no especificado"
+          },
+          {
+            "author": "Ayala, Moro y Germain",
+            "source_type": "estudio_piloto",
+            "title": "Estudio piloto sobre repetición espaciada con Anki",
+            "url_or_reference": "Estudio piloto universitario con mejora global en calificaciones al usar repaso espaciado con software.",
+            "year": 2024
+          }
+        ],
+        "recommended_combinations": [
+          "sintesis_estructurada + practica_de_recuperacion",
+          "practica_de_recuperacion + retroalimentacion",
+          "practica_de_recuperacion + repeticion_espaciada",
+          "repeticion_espaciada + simulacion",
+          "interleaving + practica_de_recuperacion",
+          "feynman + practica_de_recuperacion"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "examenes_anteriores",
+          "resúmenes",
+          "esquemas",
+          "banco_de_preguntas",
+          "temporizador"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "status": "final",
+        "tags": [
+          "metodo_parcial_teorico",
+          "parcial",
+          "quiz",
+          "preparacion_de_examen",
+          "memorizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "transferencia",
+          "teorica",
+          "conceptual",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/methods/metodo_parcial_teorico.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [],
+      "aliases_normalized": [],
+      "checksum": "c13342ce12821c88170ba868aaeb9d5138e29e6cbb98661e851a996530d6fa4b",
+      "document_id": "study_method.metodo_repaso_semanal",
+      "document_type": "study_method",
+      "entity_id": "metodo_repaso_semanal",
+      "knowledge_type": "study_method",
+      "name": "Método de repaso semanal",
+      "normalized_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "repaso_semanal",
+          "parcial",
+          "quiz",
+          "proyecto"
+        ],
+        "best_for_signals_normalized": [
+          "rapid_forgetting",
+          "passive_review_dependence",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "orientado_a_memoria",
+          "constante",
+          "desorganizado",
+          "procrastinador",
+          "visual"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques_normalized": [
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "active_recall"
+          ],
+          [
+            "interleaving"
+          ],
+          [
+            "pomodoro"
+          ]
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "relectura_masiva_sin_autoevaluacion"
+          ],
+          [
+            "repaso_solo_al_final"
+          ],
+          [
+            "autoevaluacion_sin_correccion"
+          ]
+        ],
+        "develops": [
+          "repaso",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "comprension_profunda"
+        ],
+        "difficulty_level": "intermedio",
+        "document_id": "study_method.metodo_repaso_semanal",
+        "document_type": "study_method",
+        "entity_id": "metodo_repaso_semanal",
+        "estimated_duration_days_max": 30,
+        "estimated_duration_days_min": 5,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "mixto",
+        "excluded_techniques_normalized": [
+          [
+            "relectura_pasiva_como_estrategia_principal"
+          ],
+          [
+            "subrayado_sin_autoevaluacion"
+          ],
+          [
+            "repaso_masivo_al_final"
+          ]
+        ],
+        "id_key": "method_id",
+        "knowledge_type": "study_method",
+        "method_id": "metodo_repaso_semanal",
+        "name": "Método de repaso semanal",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals_normalized": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "repaso",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion"
+        ],
+        "optional_techniques_normalized": [
+          [
+            "feynman"
+          ],
+          [
+            "cornell"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "mnemotecnia"
+          ]
+        ],
+        "primary_sources": [
+          {
+            "author": "Universidad de Extremadura y COIE-UNED",
+            "source_type": "guia_universitaria",
+            "title": "Guías de técnicas de estudio sobre repaso planificado",
+            "url_or_reference": "Repaso espaciado, curva del olvido, calendario de repaso y función del repaso planificado.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y aprendizaje",
+            "url_or_reference": "Práctica distribuida y evaluación de la práctica como estrategias de alta efectividad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Recuperación activa, quizzes y retroalimentación para favorecer retención.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "estudio_piloto",
+            "title": "Estudio piloto sobre repetición espaciada con Anki",
+            "url_or_reference": "Mejora de calificaciones en usuarios de sistemas de repetición espaciada.",
+            "year": "no especificado"
+          },
+          {
+            "author": "RAE",
+            "source_type": "diccionario",
+            "title": "Definiciones de método y técnica",
+            "url_or_reference": "Diferenciación entre método como modo ordenado de actuar y técnica como procedimiento puntual.",
+            "year": "no especificado"
+          }
+        ],
+        "raw_entity_id": "metodo_repaso_semanal",
+        "recommended_combinations_normalized": [
+          [
+            "repeticion_espaciada_y_evaluacion_de_la_practica"
+          ],
+          [
+            "repeticion_espaciada_y_notas_cornell"
+          ],
+          [
+            "repeticion_espaciada_y_mapas_conceptuales"
+          ],
+          [
+            "repeticion_espaciada_y_autoexplicacion"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "resumenes",
+          "ejercicios",
+          "agenda_o_calendario"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "source_path": "raw/methods/metodo_repaso_semanal.md",
+        "status": "final",
+        "tags": [
+          "metodo_de_estudio",
+          "repaso_semanal",
+          "repeticion_espaciada",
+          "evaluacion_de_la_practica",
+          "autoevaluacion",
+          "memoria",
+          "retencion",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "adaptation_variables": [
+          "time_available",
+          "difficulty_level",
+          "activity_type",
+          "subject_type",
+          "student_profile",
+          "exam_proximity"
+        ],
+        "aliases": [],
+        "best_for_activity_types": [
+          "repaso_semanal",
+          "parcial",
+          "quiz",
+          "proyecto"
+        ],
+        "best_for_signals": [
+          "olvida_rapido",
+          "no_se_autoevalua",
+          "relee_mucho",
+          "procrastina",
+          "necesita_estructura",
+          "siente_familiaridad_pero_no_recuerda"
+        ],
+        "best_for_student_profiles": [
+          "orientado_a_memoria",
+          "constante",
+          "desorganizado",
+          "procrastinador",
+          "visual"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "component_techniques": [
+          "repeticion_espaciada",
+          "evaluacion_de_la_practica",
+          "intercalado",
+          "pomodoro"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "relectura_masiva_sin_autoevaluacion",
+          "repaso_solo_al_final",
+          "autoevaluacion_sin_correccion"
+        ],
+        "develops": [
+          "repaso",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion",
+          "comprension_profunda"
+        ],
+        "difficulty_level": "intermedio",
+        "estimated_duration_days_max": 30,
+        "estimated_duration_days_min": 5,
+        "estimated_session_minutes_max": 120,
+        "estimated_session_minutes_min": 60,
+        "evidence_level": "mixto",
+        "excluded_techniques": [
+          "relectura_pasiva_como_estrategia_principal",
+          "subrayado_sin_autoevaluacion",
+          "repaso_masivo_al_final"
+        ],
+        "knowledge_type": "study_method",
+        "method_id": "metodo_repaso_semanal",
+        "name": "Método de repaso semanal",
+        "not_ideal_for_activity_types": [],
+        "not_ideal_for_signals": [],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "repaso",
+          "memorizacion",
+          "autoevaluacion",
+          "organizacion"
+        ],
+        "optional_techniques": [
+          "autoexplicacion",
+          "notas_cornell",
+          "mapas_conceptuales",
+          "mnemotecnia"
+        ],
+        "primary_sources": [
+          {
+            "author": "Universidad de Extremadura y COIE-UNED",
+            "source_type": "guia_universitaria",
+            "title": "Guías de técnicas de estudio sobre repaso planificado",
+            "url_or_reference": "Repaso espaciado, curva del olvido, calendario de repaso y función del repaso planificado.",
+            "year": "no especificado"
+          },
+          {
+            "author": "EduCaixa",
+            "source_type": "guia_educativa",
+            "title": "Metacognición y aprendizaje",
+            "url_or_reference": "Práctica distribuida y evaluación de la práctica como estrategias de alta efectividad.",
+            "year": "no especificado"
+          },
+          {
+            "author": "UNAM",
+            "source_type": "capitulo_universitario",
+            "title": "Aprendizaje potenciado por la evaluación",
+            "url_or_reference": "Recuperación activa, quizzes y retroalimentación para favorecer retención.",
+            "year": "no especificado"
+          },
+          {
+            "author": "no especificado",
+            "source_type": "estudio_piloto",
+            "title": "Estudio piloto sobre repetición espaciada con Anki",
+            "url_or_reference": "Mejora de calificaciones en usuarios de sistemas de repetición espaciada.",
+            "year": "no especificado"
+          },
+          {
+            "author": "RAE",
+            "source_type": "diccionario",
+            "title": "Definiciones de método y técnica",
+            "url_or_reference": "Diferenciación entre método como modo ordenado de actuar y técnica como procedimiento puntual.",
+            "year": "no especificado"
+          }
+        ],
+        "recommended_combinations": [
+          "repeticion_espaciada_y_evaluacion_de_la_practica",
+          "repeticion_espaciada_y_notas_cornell",
+          "repeticion_espaciada_y_mapas_conceptuales",
+          "repeticion_espaciada_y_autoexplicacion"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "apuntes",
+          "resumenes",
+          "ejercicios",
+          "agenda_o_calendario"
+        ],
+        "requires_prior_knowledge": true,
+        "requires_schedule_planning": true,
+        "status": "final",
+        "tags": [
+          "metodo_de_estudio",
+          "repaso_semanal",
+          "repeticion_espaciada",
+          "evaluacion_de_la_practica",
+          "autoevaluacion",
+          "memoria",
+          "retencion",
+          "ingenieria_de_sistemas",
+          "rag"
+        ],
+        "version": 1,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/methods/metodo_repaso_semanal.md",
+      "status": "final",
+      "version": "1"
+    },
+    {
+      "aliases": [
+        "Cornell",
+        "Toma de apuntes Cornell",
+        "Notas Cornell"
+      ],
+      "aliases_normalized": [
+        "cornell",
+        "toma_de_apuntes_cornell",
+        "notas_cornell"
+      ],
+      "checksum": "a86066dcddbf8582c61c2b20c70b09d9f89a08295dbd7545ac0c94b5b1a2b613",
+      "document_id": "technique.cornell",
+      "document_type": "study_technique",
+      "entity_id": "cornell",
+      "knowledge_type": "technique",
+      "name": "Método Cornell",
+      "normalized_metadata": {
+        "aliases": [
+          "Cornell",
+          "Toma de apuntes Cornell",
+          "Notas Cornell"
+        ],
+        "best_for_activity_types": [
+          "toma_de_apuntes",
+          "lectura",
+          "repaso_semanal",
+          "parcial",
+          "exposicion"
+        ],
+        "best_for_signals_normalized": [
+          "procrastination",
+          "note_organization",
+          "passive_review_dependence",
+          "explanation_gap",
+          "distraction"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "visual",
+          "desorganizado",
+          "orientado_a_comprension",
+          "con_baja_concentracion"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "copia_literal_sin_revision"
+          ],
+          [
+            "uso_sin_resumen_ni_preguntas"
+          ],
+          [
+            "uso_como_sustituto_de_practica_aplicada"
+          ],
+          [
+            "saturar_una_hoja_con_temas_demasiado_amplios"
+          ]
+        ],
+        "develops": [
+          "Organización",
+          "Síntesis",
+          "Comprensión",
+          "Autoevaluación",
+          "Concentración"
+        ],
+        "difficulty_level": "baja",
+        "document_id": "technique.cornell",
+        "document_type": "study_technique",
+        "entity_id": "cornell",
+        "evidence_level": "mixto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Método Cornell",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas",
+          "proyecto"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "rapid_forgetting"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "organizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "preparacion_de_examen"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Método Cornell para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: cornell.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "cornell",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "mapas_conceptuales"
+          ]
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "plantilla_cornell",
+          "apuntes_o_fuente_base",
+          "lapiz_o_editor",
+          "tiempo_de_revision_posterior"
+        ],
+        "requires_prior_knowledge": false,
+        "source_path": "raw/techniques/tecnica_cornell_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "toma_de_apuntes",
+          "organizacion",
+          "sintesis",
+          "autoevaluacion",
+          "repaso",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "cornell",
+        "time_to_apply_minutes_max": 30,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Cornell",
+          "Toma de apuntes Cornell",
+          "Notas Cornell"
+        ],
+        "best_for_activity_types": [
+          "toma_de_apuntes",
+          "lectura",
+          "repaso_semanal",
+          "parcial",
+          "exposicion"
+        ],
+        "best_for_signals": [
+          "necesita_estructura",
+          "relee_mucho",
+          "no_se_autoevalua",
+          "no_puede_explicar",
+          "se_distrae_facil"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "visual",
+          "desorganizado",
+          "orientado_a_comprension",
+          "con_baja_concentracion"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "copia_literal_sin_revision",
+          "uso_sin_resumen_ni_preguntas",
+          "uso_como_sustituto_de_practica_aplicada",
+          "saturar_una_hoja_con_temas_demasiado_amplios"
+        ],
+        "develops": [
+          "Organización",
+          "Síntesis",
+          "Comprensión",
+          "Autoevaluación",
+          "Concentración"
+        ],
+        "difficulty_level": "baja",
+        "evidence_level": "mixto",
+        "knowledge_type": "technique",
+        "name": "Método Cornell",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas",
+          "proyecto"
+        ],
+        "not_ideal_for_signals": [
+          "olvida_rapido"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "organizacion",
+          "comprension_profunda",
+          "autoevaluacion",
+          "repaso",
+          "preparacion_de_examen"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Método Cornell para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: cornell.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "repeticion_espaciada",
+          "feynman",
+          "mapas_conceptuales"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "plantilla_cornell",
+          "apuntes_o_fuente_base",
+          "lapiz_o_editor",
+          "tiempo_de_revision_posterior"
+        ],
+        "requires_prior_knowledge": false,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "toma_de_apuntes",
+          "organizacion",
+          "sintesis",
+          "autoevaluacion",
+          "repaso",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "cornell",
+        "time_to_apply_minutes_max": 30,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_cornell_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Método Feynman",
+        "Técnica de explicación simple",
+        "Feynman technique"
+      ],
+      "aliases_normalized": [
+        "metodo_feynman",
+        "tecnica_de_explicacion_simple",
+        "feynman_technique"
+      ],
+      "checksum": "038ad50a0dfb1966de244443e9bea22d0ac9a44c9f2426ae088b83ac3888a255",
+      "document_id": "technique.feynman",
+      "document_type": "study_technique",
+      "entity_id": "feynman",
+      "knowledge_type": "technique",
+      "name": "Técnica Feynman",
+      "normalized_metadata": {
+        "aliases": [
+          "Método Feynman",
+          "Técnica de explicación simple",
+          "Feynman technique"
+        ],
+        "best_for_activity_types": [
+          "parcial",
+          "quiz",
+          "exposicion",
+          "repaso_semanal",
+          "lectura"
+        ],
+        "best_for_signals_normalized": [
+          "explanation_gap",
+          "passive_review_dependence"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "analitico",
+          "constante",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "memorizacion_literal_sin_comprension"
+          ],
+          [
+            "uso_como_unico_metodo_para_tareas_formales_sin_verificacion"
+          ]
+        ],
+        "develops": [
+          "Comprensión",
+          "Autoevaluación",
+          "Síntesis",
+          "Transferencia",
+          "Organización"
+        ],
+        "difficulty_level": "media",
+        "document_id": "technique.feynman",
+        "document_type": "study_technique",
+        "entity_id": "feynman",
+        "evidence_level": "mixto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Técnica Feynman",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "distraction"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria",
+          "procrastinador"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Técnica de estudio Feynman para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: feynman.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "feynman",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "preguntas_de_respuesta_corta"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "hoja_o_documento_para_explicar",
+          "preguntas_de_verificacion"
+        ],
+        "requires_prior_knowledge": true,
+        "source_path": "raw/techniques/tecnica_feynman_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "comprension_profunda",
+          "autoexplicacion",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "transferencia",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "feynman",
+        "time_to_apply_minutes_max": 45,
+        "time_to_apply_minutes_min": 20,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Método Feynman",
+          "Técnica de explicación simple",
+          "Feynman technique"
+        ],
+        "best_for_activity_types": [
+          "parcial",
+          "quiz",
+          "exposicion",
+          "repaso_semanal",
+          "lectura"
+        ],
+        "best_for_signals": [
+          "no_puede_explicar",
+          "siente_familiaridad_pero_no_recuerda",
+          "relee_mucho",
+          "no_se_autoevalua"
+        ],
+        "best_for_student_profiles": [
+          "reflexivo",
+          "analitico",
+          "constante",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "memorizacion_literal_sin_comprension",
+          "uso_como_unico_metodo_para_tareas_formales_sin_verificacion"
+        ],
+        "develops": [
+          "Comprensión",
+          "Autoevaluación",
+          "Síntesis",
+          "Transferencia",
+          "Organización"
+        ],
+        "difficulty_level": "media",
+        "evidence_level": "mixto",
+        "knowledge_type": "technique",
+        "name": "Técnica Feynman",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "no_sostiene_sesiones_largas",
+          "se_distrae_facil"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria",
+          "procrastinador"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Técnica de estudio Feynman para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: feynman.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "practica_espaciada",
+          "mapas_conceptuales",
+          "preguntas_de_respuesta_corta"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "hoja_o_documento_para_explicar",
+          "preguntas_de_verificacion"
+        ],
+        "requires_prior_knowledge": true,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "comprension_profunda",
+          "autoexplicacion",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "transferencia",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "feynman",
+        "time_to_apply_minutes_max": 45,
+        "time_to_apply_minutes_min": 20,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_feynman_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Práctica intercalada",
+        "Aprendizaje intercalado",
+        "Estudio intercalado"
+      ],
+      "aliases_normalized": [
+        "practica_intercalada",
+        "aprendizaje_intercalado",
+        "estudio_intercalado"
+      ],
+      "checksum": "81339a2718ae62dbcc0c51a95a557520877986bd61ae87171005087cf683e9b1",
+      "document_id": "technique.interleaving",
+      "document_type": "study_technique",
+      "entity_id": "interleaving",
+      "knowledge_type": "technique",
+      "name": "Interleaving",
+      "normalized_metadata": {
+        "aliases": [
+          "Práctica intercalada",
+          "Aprendizaje intercalado",
+          "Estudio intercalado"
+        ],
+        "best_for_activity_types": [
+          "taller",
+          "parcial",
+          "quiz",
+          "resolucion_de_problemas",
+          "repaso_semanal",
+          "laboratorio"
+        ],
+        "best_for_signals_normalized": [
+          "difficulty_switching_topics",
+          "passive_review_dependence",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "analitico",
+          "reflexivo",
+          "constante",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "practica",
+          "numerica",
+          "mixta",
+          "conceptual"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "mezcla_aleatoria_sin_criterio"
+          ],
+          [
+            "uso_sobre_temas_totalmente_nuevos"
+          ],
+          [
+            "falta_de_verificacion_de_respuestas"
+          ],
+          [
+            "intercalar_materias_sin_relacion"
+          ]
+        ],
+        "develops": [
+          "Discriminación de estrategias",
+          "Transferencia",
+          "Autoevaluación",
+          "Organización",
+          "Comprensión"
+        ],
+        "difficulty_level": "media",
+        "document_id": "technique.interleaving",
+        "document_type": "study_technique",
+        "entity_id": "interleaving",
+        "evidence_level": "mixto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Interleaving",
+        "not_ideal_for_activity_types": [
+          "lectura",
+          "exposicion",
+          "toma_de_apuntes"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "rapid_forgetting"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "teorica"
+        ],
+        "objective_types": [
+          "resolucion_de_problemas",
+          "transferencia",
+          "preparacion_de_examen",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Interleaving para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: interleaving.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "interleaving",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "pomodoro"
+          ],
+          [
+            "feynman"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "banco_de_ejercicios",
+          "soluciones_o_feedback",
+          "clasificacion_de_tipos_de_problema",
+          "hoja_de_registro_de_errores"
+        ],
+        "requires_prior_knowledge": true,
+        "source_path": "raw/techniques/tecnica_interleaving_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "resolucion_de_problemas",
+          "transferencia",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "discriminacion_de_estrategias",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "interleaving",
+        "time_to_apply_minutes_max": 60,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Práctica intercalada",
+          "Aprendizaje intercalado",
+          "Estudio intercalado"
+        ],
+        "best_for_activity_types": [
+          "taller",
+          "parcial",
+          "quiz",
+          "resolucion_de_problemas",
+          "repaso_semanal",
+          "laboratorio"
+        ],
+        "best_for_signals": [
+          "confunde_tipos_de_ejercicio",
+          "siente_familiaridad_pero_no_recuerda",
+          "no_se_autoevalua",
+          "relee_mucho",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "analitico",
+          "reflexivo",
+          "constante",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "practica",
+          "numerica",
+          "mixta",
+          "conceptual"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "mezcla_aleatoria_sin_criterio",
+          "uso_sobre_temas_totalmente_nuevos",
+          "falta_de_verificacion_de_respuestas",
+          "intercalar_materias_sin_relacion"
+        ],
+        "develops": [
+          "Discriminación de estrategias",
+          "Transferencia",
+          "Autoevaluación",
+          "Organización",
+          "Comprensión"
+        ],
+        "difficulty_level": "media",
+        "evidence_level": "mixto",
+        "knowledge_type": "technique",
+        "name": "Interleaving",
+        "not_ideal_for_activity_types": [
+          "lectura",
+          "exposicion",
+          "toma_de_apuntes"
+        ],
+        "not_ideal_for_signals": [
+          "olvida_rapido"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "teorica"
+        ],
+        "objective_types": [
+          "resolucion_de_problemas",
+          "transferencia",
+          "preparacion_de_examen",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Interleaving para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: interleaving.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "repeticion_espaciada",
+          "pomodoro",
+          "feynman"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "banco_de_ejercicios",
+          "soluciones_o_feedback",
+          "clasificacion_de_tipos_de_problema",
+          "hoja_de_registro_de_errores"
+        ],
+        "requires_prior_knowledge": true,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "resolucion_de_problemas",
+          "transferencia",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "discriminacion_de_estrategias",
+          "aprendizaje_activo"
+        ],
+        "technique_id": "interleaving",
+        "time_to_apply_minutes_max": 60,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_interleaving_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Mapa conceptual",
+        "Concept mapping"
+      ],
+      "aliases_normalized": [
+        "mapa_conceptual",
+        "concept_mapping"
+      ],
+      "checksum": "91594e885b19130843b41456af2489acd71b7aae1dbb6352eef2dc02316823fc",
+      "document_id": "technique.mapas_conceptuales",
+      "document_type": "study_technique",
+      "entity_id": "mapas_conceptuales",
+      "knowledge_type": "technique",
+      "name": "Mapas conceptuales",
+      "normalized_metadata": {
+        "aliases": [
+          "Mapa conceptual",
+          "Concept mapping"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "parcial",
+          "exposicion",
+          "repaso_semanal",
+          "toma_de_apuntes"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "explanation_gap",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "visual",
+          "reflexivo",
+          "analitico",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations_normalized": [
+          [
+            "memorizacion_mecanica_sin_relaciones"
+          ],
+          [
+            "uso_como_unico_metodo_para_tareas_puramente_procedimentales"
+          ]
+        ],
+        "develops": [
+          "Comprensión",
+          "Síntesis",
+          "Organización",
+          "Autoevaluación",
+          "Transferencia"
+        ],
+        "difficulty_level": "media",
+        "document_id": "technique.mapas_conceptuales",
+        "document_type": "study_technique",
+        "entity_id": "mapas_conceptuales",
+        "evidence_level": "moderado",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Mapas conceptuales",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "procrastination",
+          "distraction"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Mapas conceptuales para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: mapas-conceptuales.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "mapas_conceptuales",
+        "recommended_combinations_normalized": [
+          [
+            "mapa_mental"
+          ],
+          [
+            "linea_del_tiempo"
+          ],
+          [
+            "flujograma"
+          ],
+          [
+            "rubrica_de_revision"
+          ]
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "material_base",
+          "papel_y_lapiz_o_herramienta_digital",
+          "pregunta_de_enfoque"
+        ],
+        "requires_prior_knowledge": true,
+        "source_path": "raw/techniques/tecnica_mapas_conceptuales_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "representacion_del_conocimiento",
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "aprendizaje_significativo"
+        ],
+        "technique_id": "mapas_conceptuales",
+        "time_to_apply_minutes_max": 60,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Mapa conceptual",
+          "Concept mapping"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "parcial",
+          "exposicion",
+          "repaso_semanal",
+          "toma_de_apuntes"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_puede_explicar",
+          "necesita_estructura",
+          "siente_familiaridad_pero_no_recuerda"
+        ],
+        "best_for_student_profiles": [
+          "visual",
+          "reflexivo",
+          "analitico",
+          "orientado_a_comprension"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations": [
+          "memorizacion_mecanica_sin_relaciones",
+          "uso_como_unico_metodo_para_tareas_puramente_procedimentales"
+        ],
+        "develops": [
+          "Comprensión",
+          "Síntesis",
+          "Organización",
+          "Autoevaluación",
+          "Transferencia"
+        ],
+        "difficulty_level": "media",
+        "evidence_level": "moderado",
+        "knowledge_type": "technique",
+        "name": "Mapas conceptuales",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "procrastina",
+          "no_sostiene_sesiones_largas"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_memoria"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica",
+          "numerica"
+        ],
+        "objective_types": [
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Mapas conceptuales para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: mapas-conceptuales.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "mapa_mental",
+          "linea_del_tiempo",
+          "flujograma",
+          "rubrica_de_revision"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "material_base",
+          "papel_y_lapiz_o_herramienta_digital",
+          "pregunta_de_enfoque"
+        ],
+        "requires_prior_knowledge": true,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "representacion_del_conocimiento",
+          "comprension_profunda",
+          "organizacion",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "aprendizaje_significativo"
+        ],
+        "technique_id": "mapas_conceptuales",
+        "time_to_apply_minutes_max": 60,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_mapas_conceptuales_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Mnemoctenia",
+        "Nemotecnia",
+        "Técnicas mnemotécnicas",
+        "Mnemonics"
+      ],
+      "aliases_normalized": [
+        "mnemoctenia",
+        "nemotecnia",
+        "tecnicas_mnemotecnicas",
+        "mnemonics"
+      ],
+      "checksum": "7ab738bd5a5171b30b7323ca281110dbb931a73e216b903580c0495dedab6a75",
+      "document_id": "technique.mnemotecnia",
+      "document_type": "study_technique",
+      "entity_id": "mnemotecnia",
+      "knowledge_type": "technique",
+      "name": "Mnemotecnia",
+      "normalized_metadata": {
+        "aliases": [
+          "Mnemoctenia",
+          "Nemotecnia",
+          "Técnicas mnemotécnicas",
+          "Mnemonics"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "exposicion",
+          "repaso_semanal",
+          "lectura"
+        ],
+        "best_for_signals_normalized": [
+          "rapid_forgetting",
+          "passive_review_dependence",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "visual",
+          "analitico",
+          "constante",
+          "orientado_a_memoria"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "numerica",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "uso_como_unico_metodo_para_temas_complejos"
+          ],
+          [
+            "relectura_pasiva_sin_recuperacion"
+          ],
+          [
+            "asociaciones_poco_distintivas"
+          ],
+          [
+            "memorizacion_sin_aplicacion"
+          ]
+        ],
+        "develops": [
+          "Memoria",
+          "Organización",
+          "Autoevaluación",
+          "Concentración"
+        ],
+        "difficulty_level": "baja",
+        "document_id": "technique.mnemotecnia",
+        "document_type": "study_technique",
+        "entity_id": "mnemotecnia",
+        "evidence_level": "mixto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Mnemotecnia",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "explanation_gap",
+          "difficulty_switching_topics"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_comprension"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "MNEMOCTENIA en estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: mnemoctenia.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "mnemotecnia",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "pomodoro"
+          ]
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "lista_de_items_a_recordar",
+          "papel_o_tarjetas",
+          "claves_o_asociaciones_creadas",
+          "preguntas_de_recuperacion"
+        ],
+        "requires_prior_knowledge": true,
+        "source_path": "raw/techniques/tecnica_mnemotecnia_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "mnemotecnia",
+          "retencion"
+        ],
+        "technique_id": "mnemotecnia",
+        "time_to_apply_minutes_max": 30,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Mnemoctenia",
+          "Nemotecnia",
+          "Técnicas mnemotécnicas",
+          "Mnemonics"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "exposicion",
+          "repaso_semanal",
+          "lectura"
+        ],
+        "best_for_signals": [
+          "olvida_rapido",
+          "siente_familiaridad_pero_no_recuerda",
+          "relee_mucho",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "visual",
+          "analitico",
+          "constante",
+          "orientado_a_memoria"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "numerica",
+          "mixta"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "uso_como_unico_metodo_para_temas_complejos",
+          "relectura_pasiva_sin_recuperacion",
+          "asociaciones_poco_distintivas",
+          "memorizacion_sin_aplicacion"
+        ],
+        "develops": [
+          "Memoria",
+          "Organización",
+          "Autoevaluación",
+          "Concentración"
+        ],
+        "difficulty_level": "baja",
+        "evidence_level": "mixto",
+        "knowledge_type": "technique",
+        "name": "Mnemotecnia",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "no_puede_explicar",
+          "confunde_tipos_de_ejercicio"
+        ],
+        "not_ideal_for_student_profiles": [
+          "orientado_a_comprension"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "MNEMOCTENIA en estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: mnemoctenia.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "repeticion_espaciada",
+          "feynman",
+          "pomodoro"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "lista_de_items_a_recordar",
+          "papel_o_tarjetas",
+          "claves_o_asociaciones_creadas",
+          "preguntas_de_recuperacion"
+        ],
+        "requires_prior_knowledge": true,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "mnemotecnia",
+          "retencion"
+        ],
+        "technique_id": "mnemotecnia",
+        "time_to_apply_minutes_max": 30,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_mnemotecnia_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Método Pomodoro",
+        "Pomodoro",
+        "Pomodoro Technique"
+      ],
+      "aliases_normalized": [
+        "metodo_pomodoro",
+        "pomodoro",
+        "pomodoro_technique"
+      ],
+      "checksum": "b83c0c49e22bc7baed120a0530ff173ced2ac7552e6c76cf2f209180fbae7d72",
+      "document_id": "technique.pomodoro",
+      "document_type": "study_technique",
+      "entity_id": "pomodoro",
+      "knowledge_type": "technique",
+      "name": "Técnica Pomodoro",
+      "normalized_metadata": {
+        "aliases": [
+          "Método Pomodoro",
+          "Pomodoro",
+          "Pomodoro Technique"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "taller",
+          "laboratorio",
+          "proyecto",
+          "repaso_semanal",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals_normalized": [
+          "distraction",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "con_baja_concentracion",
+          "constante"
+        ],
+        "best_for_subject_types": [
+          "practica",
+          "mixta",
+          "teorica"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations_normalized": [
+          [
+            "multitarea_durante_el_pomodoro"
+          ],
+          [
+            "descansos_con_scroll_infinito"
+          ],
+          [
+            "uso_rigido_en_tareas_de_alta_continuidad"
+          ]
+        ],
+        "develops": [
+          "Concentración",
+          "Organización",
+          "Autoevaluación",
+          "Gestión del tiempo",
+          "Sostenimiento del esfuerzo"
+        ],
+        "difficulty_level": "baja",
+        "document_id": "technique.pomodoro",
+        "document_type": "study_technique",
+        "entity_id": "pomodoro",
+        "evidence_level": "mixto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Técnica Pomodoro",
+        "not_ideal_for_activity_types": [
+          "exposicion"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "explanation_gap",
+          "rapid_forgetting"
+        ],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "gestion_del_tiempo",
+          "organizacion",
+          "preparacion_de_examen",
+          "resolucion_de_problemas"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Técnica Pomodoro para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: pomodoro.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "pomodoro",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "mapas_conceptuales"
+          ]
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "temporizador",
+          "lista_de_tareas",
+          "material_de_estudio_o_trabajo",
+          "registro_simple_de_pomodoros"
+        ],
+        "requires_prior_knowledge": false,
+        "source_path": "raw/techniques/tecnica_pomodoro_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "gestion_del_tiempo",
+          "organizacion",
+          "concentracion",
+          "preparacion_de_examen",
+          "resolucion_de_problemas",
+          "ingenieria_de_sistemas",
+          "aprendizaje_autorregulado"
+        ],
+        "technique_id": "pomodoro",
+        "time_to_apply_minutes_max": 120,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Método Pomodoro",
+          "Pomodoro",
+          "Pomodoro Technique"
+        ],
+        "best_for_activity_types": [
+          "lectura",
+          "taller",
+          "laboratorio",
+          "proyecto",
+          "repaso_semanal",
+          "resolucion_de_problemas"
+        ],
+        "best_for_signals": [
+          "se_distrae_facil",
+          "procrastina",
+          "no_sostiene_sesiones_largas",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "procrastinador",
+          "desorganizado",
+          "con_baja_concentracion",
+          "constante"
+        ],
+        "best_for_subject_types": [
+          "practica",
+          "mixta",
+          "teorica"
+        ],
+        "confidence_level": "medio",
+        "contraindicated_combinations": [
+          "multitarea_durante_el_pomodoro",
+          "descansos_con_scroll_infinito",
+          "uso_rigido_en_tareas_de_alta_continuidad"
+        ],
+        "develops": [
+          "Concentración",
+          "Organización",
+          "Autoevaluación",
+          "Gestión del tiempo",
+          "Sostenimiento del esfuerzo"
+        ],
+        "difficulty_level": "baja",
+        "evidence_level": "mixto",
+        "knowledge_type": "technique",
+        "name": "Técnica Pomodoro",
+        "not_ideal_for_activity_types": [
+          "exposicion"
+        ],
+        "not_ideal_for_signals": [
+          "no_puede_explicar",
+          "olvida_rapido"
+        ],
+        "not_ideal_for_student_profiles": [],
+        "not_ideal_for_subject_types": [],
+        "objective_types": [
+          "gestion_del_tiempo",
+          "organizacion",
+          "preparacion_de_examen",
+          "resolucion_de_problemas"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Técnica Pomodoro para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: pomodoro.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "repeticion_espaciada",
+          "feynman",
+          "mapas_conceptuales"
+        ],
+        "requires_feedback": false,
+        "requires_materials": [
+          "temporizador",
+          "lista_de_tareas",
+          "material_de_estudio_o_trabajo",
+          "registro_simple_de_pomodoros"
+        ],
+        "requires_prior_knowledge": false,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "gestion_del_tiempo",
+          "organizacion",
+          "concentracion",
+          "preparacion_de_examen",
+          "resolucion_de_problemas",
+          "ingenieria_de_sistemas",
+          "aprendizaje_autorregulado"
+        ],
+        "technique_id": "pomodoro",
+        "time_to_apply_minutes_max": 120,
+        "time_to_apply_minutes_min": 25,
+        "version": 2,
+        "works_best_alone": false,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_pomodoro_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Active Recall",
+        "Práctica de recuperación",
+        "Aprendizaje potenciado por pruebas",
+        "recuperacion_activa",
+        "recuperacion activa",
+        "practica de recuperacion"
+      ],
+      "aliases_normalized": [
+        "active_recall",
+        "practica_de_recuperacion",
+        "aprendizaje_potenciado_por_pruebas",
+        "recuperacion_activa"
+      ],
+      "checksum": "ed11348c7291ed876ad61770b78d29c7b248a7f78f47e743f910a77f2e367294",
+      "document_id": "technique.active_recall",
+      "document_type": "study_technique",
+      "entity_id": "active_recall",
+      "knowledge_type": "technique",
+      "name": "Recuperación activa",
+      "normalized_metadata": {
+        "aliases": [
+          "Active Recall",
+          "Práctica de recuperación",
+          "Aprendizaje potenciado por pruebas"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "repaso_semanal",
+          "taller",
+          "lectura",
+          "laboratorio"
+        ],
+        "best_for_signals_normalized": [
+          "passive_review_dependence",
+          "rapid_forgetting",
+          "explanation_gap"
+        ],
+        "best_for_student_profiles": [
+          "analitico",
+          "reflexivo",
+          "constante",
+          "orientado_a_comprension",
+          "orientado_a_memoria"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations_normalized": [
+          [
+            "uso_como_evaluacion_punitiva"
+          ],
+          [
+            "ausencia_de_feedback"
+          ],
+          [
+            "relectura_pasiva_como_sustituto"
+          ],
+          [
+            "practica_masiva_sin_distribucion"
+          ]
+        ],
+        "develops": [
+          "Memoria",
+          "Autoevaluación",
+          "Comprensión",
+          "Transferencia",
+          "Concentración"
+        ],
+        "difficulty_level": "media",
+        "document_id": "technique.active_recall",
+        "document_type": "study_technique",
+        "entity_id": "active_recall",
+        "evidence_level": "alto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Recuperación activa",
+        "not_ideal_for_activity_types": [
+          "proyecto",
+          "toma_de_apuntes"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "distraction"
+        ],
+        "not_ideal_for_student_profiles": [
+          "desorganizado"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "repaso",
+          "comprension_profunda",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Recuperación activa para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: active-recall.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "recuperacion_activa",
+        "recommended_combinations_normalized": [
+          [
+            "repeticion_espaciada"
+          ],
+          [
+            "cornell"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "pomodoro"
+          ],
+          [
+            "interleaving"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "banco_de_preguntas",
+          "respuestas_o_fuente_de_verificacion",
+          "hoja_de_registro_de_errores"
+        ],
+        "requires_prior_knowledge": false,
+        "source_path": "raw/techniques/tecnica_recuperacion_activa_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "repaso",
+          "comprension_profunda",
+          "transferencia",
+          "ingenieria_de_sistemas",
+          "retrieval_practice",
+          "active_recall"
+        ],
+        "technique_id": "recuperacion_activa",
+        "time_to_apply_minutes_max": 45,
+        "time_to_apply_minutes_min": 15,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Active Recall",
+          "Práctica de recuperación",
+          "Aprendizaje potenciado por pruebas"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "repaso_semanal",
+          "taller",
+          "lectura",
+          "laboratorio"
+        ],
+        "best_for_signals": [
+          "relee_mucho",
+          "no_se_autoevalua",
+          "olvida_rapido",
+          "no_puede_explicar",
+          "siente_familiaridad_pero_no_recuerda"
+        ],
+        "best_for_student_profiles": [
+          "analitico",
+          "reflexivo",
+          "constante",
+          "orientado_a_comprension",
+          "orientado_a_memoria"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations": [
+          "uso_como_evaluacion_punitiva",
+          "ausencia_de_feedback",
+          "relectura_pasiva_como_sustituto",
+          "practica_masiva_sin_distribucion"
+        ],
+        "develops": [
+          "Memoria",
+          "Autoevaluación",
+          "Comprensión",
+          "Transferencia",
+          "Concentración"
+        ],
+        "difficulty_level": "media",
+        "evidence_level": "alto",
+        "knowledge_type": "technique",
+        "name": "Recuperación activa",
+        "not_ideal_for_activity_types": [
+          "proyecto",
+          "toma_de_apuntes"
+        ],
+        "not_ideal_for_signals": [
+          "se_distrae_facil"
+        ],
+        "not_ideal_for_student_profiles": [
+          "desorganizado"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "repaso",
+          "comprension_profunda",
+          "transferencia"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Recuperación activa para estudiantes de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: active-recall.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "repeticion_espaciada",
+          "cornell",
+          "feynman",
+          "pomodoro",
+          "interleaving"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "banco_de_preguntas",
+          "respuestas_o_fuente_de_verificacion",
+          "hoja_de_registro_de_errores"
+        ],
+        "requires_prior_knowledge": false,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "autoevaluacion",
+          "preparacion_de_examen",
+          "repaso",
+          "comprension_profunda",
+          "transferencia",
+          "ingenieria_de_sistemas",
+          "retrieval_practice",
+          "active_recall"
+        ],
+        "technique_id": "recuperacion_activa",
+        "time_to_apply_minutes_max": 45,
+        "time_to_apply_minutes_min": 15,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_recuperacion_activa_rag.md",
+      "status": "ready",
+      "version": "2"
+    },
+    {
+      "aliases": [
+        "Spaced repetition",
+        "Práctica espaciada",
+        "Repaso distribuido"
+      ],
+      "aliases_normalized": [
+        "spaced_repetition",
+        "practica_espaciada",
+        "repaso_distribuido"
+      ],
+      "checksum": "db73e73b0f788f7bdcbb0a984a3abcf47707f97fd59bfd2c3d1dd1d782f438c1",
+      "document_id": "technique.repeticion_espaciada",
+      "document_type": "study_technique",
+      "entity_id": "repeticion_espaciada",
+      "knowledge_type": "technique",
+      "name": "Repetición espaciada",
+      "normalized_metadata": {
+        "aliases": [
+          "Spaced repetition",
+          "Práctica espaciada",
+          "Repaso distribuido"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "repaso_semanal",
+          "lectura",
+          "toma_de_apuntes"
+        ],
+        "best_for_signals_normalized": [
+          "rapid_forgetting",
+          "passive_review_dependence",
+          "distraction",
+          "procrastination",
+          "note_organization"
+        ],
+        "best_for_student_profiles": [
+          "constante",
+          "analitico",
+          "orientado_a_memoria",
+          "con_baja_concentracion"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "numerica",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations_normalized": [
+          [
+            "relectura_pasiva_sin_recuperacion"
+          ],
+          [
+            "repaso_masivo_de_ultima_hora"
+          ],
+          [
+            "uso_como_unico_metodo_para_tareas_de_aplicacion_compleja"
+          ]
+        ],
+        "develops": [
+          "Memoria",
+          "Autoevaluación",
+          "Organización",
+          "Concentración"
+        ],
+        "difficulty_level": "media",
+        "document_id": "technique.repeticion_espaciada",
+        "document_type": "study_technique",
+        "entity_id": "repeticion_espaciada",
+        "evidence_level": "alto",
+        "id_key": "technique_id",
+        "knowledge_type": "technique",
+        "name": "Repetición espaciada",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "exposicion",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals_normalized": [
+          "explanation_gap",
+          "difficulty_switching_topics"
+        ],
+        "not_ideal_for_student_profiles": [
+          "procrastinador"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Repetición espaciada para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: spaced-repetition.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "raw_entity_id": "repeticion_espaciada",
+        "recommended_combinations_normalized": [
+          [
+            "active_recall"
+          ],
+          [
+            "feynman"
+          ],
+          [
+            "mapas_conceptuales"
+          ],
+          [
+            "pomodoro"
+          ]
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "flashcards_o_software_srs",
+          "calendario_de_repaso",
+          "preguntas_de_autoevaluacion"
+        ],
+        "requires_prior_knowledge": true,
+        "source_path": "raw/techniques/tecnica_repeticion_espaciada_rag.md",
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo",
+          "retencion_a_largo_plazo"
+        ],
+        "technique_id": "repeticion_espaciada",
+        "time_to_apply_minutes_max": 25,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "raw_metadata": {
+        "aliases": [
+          "Spaced repetition",
+          "Práctica espaciada",
+          "Repaso distribuido"
+        ],
+        "best_for_activity_types": [
+          "quiz",
+          "parcial",
+          "repaso_semanal",
+          "lectura",
+          "toma_de_apuntes"
+        ],
+        "best_for_signals": [
+          "olvida_rapido",
+          "siente_familiaridad_pero_no_recuerda",
+          "relee_mucho",
+          "no_sostiene_sesiones_largas",
+          "necesita_estructura"
+        ],
+        "best_for_student_profiles": [
+          "constante",
+          "analitico",
+          "orientado_a_memoria",
+          "con_baja_concentracion"
+        ],
+        "best_for_subject_types": [
+          "teorica",
+          "conceptual",
+          "numerica",
+          "mixta"
+        ],
+        "confidence_level": "alto",
+        "contraindicated_combinations": [
+          "relectura_pasiva_sin_recuperacion",
+          "repaso_masivo_de_ultima_hora",
+          "uso_como_unico_metodo_para_tareas_de_aplicacion_compleja"
+        ],
+        "develops": [
+          "Memoria",
+          "Autoevaluación",
+          "Organización",
+          "Concentración"
+        ],
+        "difficulty_level": "media",
+        "evidence_level": "alto",
+        "knowledge_type": "technique",
+        "name": "Repetición espaciada",
+        "not_ideal_for_activity_types": [
+          "laboratorio",
+          "proyecto",
+          "exposicion",
+          "resolucion_de_problemas"
+        ],
+        "not_ideal_for_signals": [
+          "no_puede_explicar",
+          "confunde_tipos_de_ejercicio"
+        ],
+        "not_ideal_for_student_profiles": [
+          "procrastinador"
+        ],
+        "not_ideal_for_subject_types": [
+          "practica"
+        ],
+        "objective_types": [
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion"
+        ],
+        "primary_sources": [
+          {
+            "author": "Síntesis interna basada en revisión documental",
+            "source_type": "internal_review",
+            "title": "Repetición espaciada para estudiantes universitarios de ingeniería de sistemas",
+            "url_or_reference": "archivo interno: spaced-repetition.md",
+            "year": 2026
+          },
+          {
+            "author": "Documento interno",
+            "source_type": "internal_reference",
+            "title": "Catálogo de valores para plantillas y metadata RAG",
+            "url_or_reference": "archivo interno: Catálogo_.pdf",
+            "year": 2026
+          }
+        ],
+        "recommended_combinations": [
+          "autoevaluacion",
+          "feynman",
+          "mapas_conceptuales",
+          "pomodoro"
+        ],
+        "requires_feedback": true,
+        "requires_materials": [
+          "material_base",
+          "flashcards_o_software_srs",
+          "calendario_de_repaso",
+          "preguntas_de_autoevaluacion"
+        ],
+        "requires_prior_knowledge": true,
+        "status": "ready",
+        "tags": [
+          "tecnica_de_estudio",
+          "memorizacion",
+          "repaso",
+          "preparacion_de_examen",
+          "autoevaluacion",
+          "ingenieria_de_sistemas",
+          "aprendizaje_activo",
+          "retencion_a_largo_plazo"
+        ],
+        "technique_id": "repeticion_espaciada",
+        "time_to_apply_minutes_max": 25,
+        "time_to_apply_minutes_min": 10,
+        "version": 2,
+        "works_best_alone": true,
+        "works_best_combined": true
+      },
+      "source_path": "raw/techniques/tecnica_repeticion_espaciada_rag.md",
+      "status": "ready",
+      "version": "2"
+    }
+  ],
+  "documents_count": 15,
+  "source_root": "knowledge_base/study_recommendations"
+}
