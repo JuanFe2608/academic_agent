@@ -68,8 +68,14 @@ def welcome_consent(state: AgentState) -> dict:
 
     updates["user_message_count"] = current_count
     updates["awaiting_user_input"] = False
-
     updates["last_user_text"] = last_text
+
+    if not state.get("welcome_sent", False):
+        updates["messages"] = _welcome_sequence()
+        updates["welcome_sent"] = True
+        updates["awaiting_user_input"] = True
+        return updates
+
     consent_answer = parse_yes_no(last_text)
     normalized = normalize_text(last_text)
     if consent_answer is True:

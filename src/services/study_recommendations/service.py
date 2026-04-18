@@ -16,7 +16,12 @@ from integrations.embeddings import (
     build_openai_embedding_client_from_env,
 )
 from rag.ingestion.normalization import normalize_signals, normalize_technique_id, slugify_identifier
-from rag.prompting import build_grounded_study_recommendation_result, render_fallback_answer
+from rag.prompting import (
+    GroundedAnswerGenerator,
+    build_grounded_study_recommendation_result,
+    build_llm_grounded_answer_generator_from_env,
+    render_fallback_answer,
+)
 from rag.retrieval.hybrid import HybridRagRetriever
 from repositories.rag import RagRepositoryError, build_rag_repository
 from schemas.rag import StudyRecommendationQuery, StudyRecommendationResult
@@ -57,10 +62,12 @@ class StudyRecommendationService:
         *,
         settings: RagSettings,
         retriever: StudyRecommendationRetriever | None = None,
+        answer_generator: GroundedAnswerGenerator | None = None,
         unavailable_reason: str | None = None,
     ) -> None:
         self.settings = settings
         self._retriever = retriever
+        self._answer_generator = answer_generator
         self._unavailable_reason = unavailable_reason
 
     @property
@@ -85,7 +92,10 @@ class StudyRecommendationService:
             )
         try:
             package = self._retriever.retrieve(query)
-            return build_grounded_study_recommendation_result(package)
+            return build_grounded_study_recommendation_result(
+                package,
+                answer_generator=self._answer_generator,
+            )
         except Exception as exc:  # noqa: BLE001 - RAG must not break operational flows
             return _fallback_result(
                 query,
@@ -284,6 +294,7 @@ def build_study_recommendation_service() -> StudyRecommendationService:
             embedding_client=embedding_client,
             settings=settings,
         ),
+        answer_generator=build_llm_grounded_answer_generator_from_env(settings),
     )
 
 

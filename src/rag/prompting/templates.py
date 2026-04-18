@@ -11,12 +11,12 @@ def render_fallback_answer(query: StudyRecommendationQuery, *, intent: str) -> s
     target = query.query_text.strip() or query.subject_name or "esta solicitud"
     if intent == "session_guidance":
         return (
-            f"No tengo suficientes fuentes internas para armar una guia de sesion sobre {target}. "
-            "Agrega tecnica, materia, actividad y tiempo disponible para recuperar una fuente util."
+            f"No tengo informacion suficiente para armar una guia de sesion confiable sobre {target}. "
+            "Agrega tecnica, materia, actividad y tiempo disponible para darte una recomendacion mas precisa."
         )
     return (
-        f"No tengo suficientes fuentes internas para responder de forma confiable sobre {target}. "
-        "La recomendacion debe quedar pendiente hasta recuperar una tecnica, metodo o contexto mas especifico."
+        f"No tengo informacion suficiente para responder de forma confiable sobre {target}. "
+        "Prueba con una tecnica, metodo o contexto de estudio mas especifico."
     )
 
 
@@ -40,7 +40,7 @@ def render_grounded_answer(
         pieces.append(primary_text)
     else:
         pieces.append(
-            "Las fuentes internas recuperadas son relevantes, pero no contienen una respuesta directa reusable."
+            "Tengo informacion relacionada, pero no es suficiente para darte una respuesta directa y confiable."
         )
 
     support = _first_non_redundant(supporting_facts, pieces[0])
@@ -61,7 +61,8 @@ def render_grounded_answer(
     if next_action:
         pieces.append(next_action)
 
-    return _shorten(" ".join(piece.strip() for piece in pieces if piece.strip()), max_chars=1200)
+    max_chars = 2000 if intent == "session_guidance" else 1200
+    return _shorten(" ".join(piece.strip() for piece in pieces if piece.strip()), max_chars=max_chars)
 
 
 def _next_action(

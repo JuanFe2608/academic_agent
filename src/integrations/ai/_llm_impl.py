@@ -17,7 +17,7 @@ from langchain_openai import AzureChatOpenAI, ChatOpenAI
 _LAST_LLM_ERROR: str | None = None
 
 
-def get_azure_llm() -> AzureChatOpenAI:
+def get_azure_llm(temperature: float = 0.0) -> AzureChatOpenAI:
     """Crea el cliente de Azure OpenAI usando variables de entorno."""
     endpoint = _get_env("AZURE_OPENAI_ENDPOINT")
     api_key = _get_env("AZURE_OPENAI_API_KEY")
@@ -32,11 +32,11 @@ def get_azure_llm() -> AzureChatOpenAI:
         api_key=api_key,
         azure_deployment=deployment,
         api_version=api_version,
-        temperature=0,
+        temperature=temperature,
     )
 
 
-def get_openai_llm() -> ChatOpenAI:
+def get_openai_llm(temperature: float = 0.0) -> ChatOpenAI:
     """Crea el cliente OpenAI estandar usando variables de entorno."""
     api_key = _get_env("OPENAI_API_KEY")
     model = _get_env("OPENAI_MODEL") or "gpt-4o-mini"
@@ -48,21 +48,21 @@ def get_openai_llm() -> ChatOpenAI:
     kwargs: dict[str, Any] = {
         "model": model,
         "api_key": api_key,
-        "temperature": 0,
+        "temperature": temperature,
     }
     if base_url:
         kwargs["base_url"] = base_url
     return ChatOpenAI(**kwargs)
 
 
-def maybe_get_llm() -> AzureChatOpenAI | ChatOpenAI | None:
+def maybe_get_llm(temperature: float = 0.0) -> AzureChatOpenAI | ChatOpenAI | None:
     """Retorna cliente Azure/OpenAI o None si falta configuracion."""
     try:
-        return get_azure_llm()
+        return get_azure_llm(temperature=temperature)
     except ValueError:
         pass
     try:
-        return get_openai_llm()
+        return get_openai_llm(temperature=temperature)
     except ValueError:
         return None
 

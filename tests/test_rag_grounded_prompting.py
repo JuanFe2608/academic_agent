@@ -135,6 +135,40 @@ def test_grounded_answer_does_not_expand_pair_relations_for_single_recommendatio
     assert result.relations_used == []
 
 
+def test_grounded_answer_prefers_requested_entity_over_answer_ready_from_other_technique() -> None:
+    package = _package(
+        query=StudyRecommendationQuery(
+            query_text="Como aplicar Feynman en una sesion?",
+            intent="session_guidance",
+            top_techniques=["feynman", "active_recall"],
+        ),
+        understanding=QueryUnderstanding(
+            intent="session_guidance",
+            query_text="Como aplicar Feynman en una sesion?",
+            detected_entities=["feynman", "active_recall"],
+            detected_techniques=["feynman", "active_recall"],
+        ),
+        chunks=[
+            _chunk(
+                chunk_id="technique.active_recall::answer",
+                entity_id="active_recall",
+                chunk_kind="answer_ready",
+                content="## Respuesta corta reusable para RAG\nActive Recall recupera informacion desde memoria.",
+            ),
+            _chunk(
+                chunk_id="technique.feynman::steps",
+                entity_id="feynman",
+                chunk_kind="steps",
+                content="## Pasos\nFeynman empieza explicando el tema con tus propias palabras.",
+            ),
+        ],
+    )
+
+    result = build_grounded_study_recommendation_result(package)
+
+    assert "Feynman empieza" in result.answer
+
+
 def test_grounded_answer_keeps_signal_relations_inside_selected_entities() -> None:
     package = _package(
         query=StudyRecommendationQuery(
@@ -196,7 +230,7 @@ def test_grounded_answer_returns_honest_fallback_without_sources() -> None:
 
     result = build_grounded_study_recommendation_result(package)
 
-    assert "No tengo suficientes fuentes internas" in result.answer
+    assert "No tengo informacion suficiente" in result.answer
     assert result.source_chunks == []
     assert result.relations_used == []
     assert result.confidence == "baja"

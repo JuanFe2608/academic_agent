@@ -63,4 +63,42 @@ def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
     image_url = messages[1].content[0]["image_url"]["url"]
     assert not image_url.startswith("data:image")
     assert Path(image_url).exists()
-    assert messages[2].content.startswith("AUTORIZACIÓN")
+    assert "Autorización para el tratamiento de datos personales" in messages[2].content
+    assert "Lara AI / Universidad Católica de Colombia" in messages[2].content
+
+
+def test_welcome_consent_sends_welcome_first_for_any_initial_user_message() -> None:
+    state = AgentState(
+        messages=[HumanMessage(content="quiero crear mi horario")],
+        user_message_count=0,
+        awaiting_user_input=False,
+        welcome_sent=False,
+    )
+
+    update = welcome_consent(state)
+    messages = update["messages"]
+
+    assert update["phase"] == "consent"
+    assert update["awaiting_user_input"] is True
+    assert update["welcome_sent"] is True
+    assert update["user_message_count"] == 1
+    assert update["last_user_text"] == "quiero crear mi horario"
+    assert "Soy Lara" in messages[0].content
+    assert messages[1].content[0]["type"] == "image_url"
+    assert "Autorización para el tratamiento de datos personales" in messages[2].content
+
+
+def test_welcome_consent_does_not_accept_initial_yes_before_welcome() -> None:
+    state = AgentState(
+        messages=[HumanMessage(content="sí")],
+        user_message_count=0,
+        awaiting_user_input=False,
+        welcome_sent=False,
+    )
+
+    update = welcome_consent(state)
+
+    assert update["phase"] == "consent"
+    assert update["awaiting_user_input"] is True
+    assert "consent" not in update
+    assert "Soy Lara" in update["messages"][0].content

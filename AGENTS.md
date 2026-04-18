@@ -15,4 +15,4 @@ Implementar un MVP de agente académico (LangGraph + Python) enfocado SOLO en:
 - Python 3.11+
 - LangGraph
 - PostgreSQL + pgvector (más adelante)
-- Integración calendario: Outlook (Microsoft Graph) / Google Calendar (OAuth)
+- Integración calendario: Outlook (Microsoft Graph) (OAuth)

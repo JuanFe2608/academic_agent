@@ -64,7 +64,7 @@ def build_grounded_prompt_context(
 ) -> GroundedPromptContext:
     """Convert retrieval output into grounded facts and inferred payload."""
 
-    primary_chunk = _select_primary_chunk(package.selected_chunks)
+    primary_chunk = _select_primary_chunk(package)
     primary_text = _chunk_summary(primary_chunk, max_chars=780) if primary_chunk else ""
     supporting_facts = _supporting_facts(package.selected_chunks, primary_chunk)
     blocked_pairs = _blocked_pairs(package.relations)
@@ -149,19 +149,40 @@ def clean_chunk_text(text: str, *, max_chars: int = 900) -> str:
     return _shorten(cleaned, max_chars=max_chars)
 
 
-def _select_primary_chunk(chunks: list[RagRetrievedChunk]) -> RagRetrievedChunk | None:
+def _select_primary_chunk(package: GroundedContextPackage) -> RagRetrievedChunk | None:
+    chunks = package.selected_chunks
     if not chunks:
         return None
+    preferred_entities = _preferred_primary_entities(package)
+    preferred_order = {
+        entity_id: index
+        for index, entity_id in enumerate(preferred_entities)
+    }
+    fallback_entity_rank = len(preferred_order) + 1
     indexed = list(enumerate(chunks))
     _, chunk = min(
         indexed,
         key=lambda item: (
+            preferred_order.get(item[1].entity_id, fallback_entity_rank),
             _CHUNK_PRIORITY.get(item[1].chunk_kind, 99),
             -item[1].final_score,
             item[0],
         ),
     )
     return chunk
+
+
+def _preferred_primary_entities(package: GroundedContextPackage) -> list[str]:
+    """Prefer the explicit requested entity for single-technique answers."""
+
+    if package.understanding.intent in {
+        "compare_options",
+        "technique_vs_method",
+        "combine_techniques",
+        "contraindication_check",
+    }:
+        return []
+    return list(package.understanding.detected_entities)
 
 
 def _supporting_facts(

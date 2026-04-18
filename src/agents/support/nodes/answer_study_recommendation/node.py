@@ -34,8 +34,8 @@ def answer_study_recommendation(state: AgentState) -> dict:
         answer = result.answer.strip()
     except Exception:
         answer = (
-            "No pude consultar las fuentes internas de tecnicas de estudio en este momento. "
-            "Puedes intentar de nuevo con una tecnica o metodo mas especifico."
+            "No pude preparar una respuesta confiable sobre esa tecnica en este momento. "
+            "Puedes intentar de nuevo con una tecnica o metodo de estudio mas especifico."
         )
 
     return {

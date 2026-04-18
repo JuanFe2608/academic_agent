@@ -18,6 +18,23 @@ def test_understand_query_detects_technique_alias_and_explain_intent() -> None:
     assert "feynman" in understanding.filters["entity_ids"]
 
 
+def test_understand_query_prioritizes_explicit_technique_over_profile_context() -> None:
+    query = StudyRecommendationQuery(
+        query_text="Que es Pomodoro?",
+        top_techniques=["feynman", "active_recall"],
+    )
+
+    understanding = understand_query(query)
+
+    assert understanding.intent == "explain_technique"
+    assert understanding.detected_techniques[:3] == [
+        "pomodoro",
+        "feynman",
+        "active_recall",
+    ]
+    assert understanding.detected_entities[0] == "pomodoro"
+
+
 def test_understand_query_normalizes_active_recall_alias_and_combination_intent() -> None:
     query = StudyRecommendationQuery(
         query_text="Puedo combinar Pomodoro con recuperacion activa?",

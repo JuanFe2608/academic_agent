@@ -315,9 +315,8 @@ def detect_new_input(
     last_text = get_last_user_text(messages)
     current_images = get_last_user_images(messages)
     has_new_input = current_count > last_count
-    if not has_new_input and last_text and awaiting_user_input:
-        if last_text != (last_user_text or ""):
-            has_new_input = True
+    if not has_new_input and last_text and last_text != (last_user_text or ""):
+        has_new_input = True
     if (
         not has_new_input
         and current_images

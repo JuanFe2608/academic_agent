@@ -3,6 +3,7 @@
 **Proyecto:** Implementación de un agente de IA académico para el apoyo a estudiantes en la gestión del tiempo, la planificación de actividades y la recomendación de métodos de estudio personalizados.
 
 **Contexto del MVP:**
+
 - Población objetivo: estudiantes de Ingeniería de Sistemas y Computación.
 - Canales e integraciones objetivo: WhatsApp, ecosistema Microsoft/Outlook, lista de tareas tipo To-Do.
 - Stack base reportado: Python, LangGraph, PostgreSQL, pgvector, Azure OpenAI API.
@@ -29,6 +30,7 @@ El resultado buscado no es un agente “que entienda cualquier cosa”, sino un 
 ## 2. Objetivo de esta evolución
 
 ### 2.1 Objetivo funcional
+
 Lograr que, después del bloque de preguntas de personalización y recomendación de técnicas, Lara pueda pasar a un modo operativo conversacional en el que el estudiante escriba solicitudes naturales como:
 
 - “Quiero agregar esta actividad extracurricular al calendario”.
@@ -41,6 +43,7 @@ Lograr que, después del bloque de preguntas de personalización y recomendació
 Y que el agente responda adecuadamente sin depender de menús rígidos, pero manteniendo control y confirmación antes de ejecutar cambios.
 
 ### 2.2 Objetivo técnico
+
 Rediseñar la experiencia conversacional y la arquitectura funcional para soportar:
 
 1. Entendimiento de intención en lenguaje natural.
@@ -57,6 +60,7 @@ Rediseñar la experiencia conversacional y la arquitectura funcional para soport
 A partir del contexto entregado durante el proyecto, se identifican los siguientes patrones en la lógica actual:
 
 ### 3.1 Fortalezas observadas
+
 - Ya existe una noción de flujo por etapas: onboarding, caracterización, recomendación y posterior organización.
 - Ya existe una estructura de captura de datos del estudiante y horarios.
 - Ya existe una intención de usar un scoring determinístico para técnicas de estudio.
@@ -64,6 +68,7 @@ A partir del contexto entregado durante el proyecto, se identifican los siguient
 - Ya existe preocupación por validación, persistencia y calidad del flujo.
 
 ### 3.2 Debilidades observadas
+
 - Exceso de interacción basada en listas numeradas y respuestas cerradas.
 - Fricción conversacional al pedir datos con redacciones poco naturales.
 - Tendencia a mezclar descubrimiento de intención con ejecución directa.
@@ -72,6 +77,7 @@ A partir del contexto entregado durante el proyecto, se identifican los siguient
 - Posible falta de separación clara entre: intención, extracción, validación, confirmación y acción.
 
 ### 3.3 Problema central a corregir
+
 El agente corre el riesgo de sentirse como un formulario conversacional, cuando el objetivo del MVP debería ser que se perciba como un asistente académico operativo. El cambio no consiste en abandonar la lógica determinística, sino en **encapsularla detrás de una capa conversacional flexible**.
 
 ---
@@ -113,10 +119,13 @@ Lara debe ser un agente académico híbrido con cinco capacidades principales:
 ## 5. Principio de diseño: agente híbrido y no puramente libre
 
 ### 5.1 Qué significa “híbrido” en este proyecto
+
 En este contexto, híbrido no significa solo usar más de una tecnología. Significa que el sistema se divide en capas complementarias:
 
 #### Capa A. Comprensión de intención
+
 El LLM identifica qué quiere hacer el estudiante:
+
 - crear evento
 - consultar calendario
 - modificar evento
@@ -131,7 +140,9 @@ El LLM identifica qué quiere hacer el estudiante:
 - salir o volver al menú principal
 
 #### Capa B. Extracción de entidades
+
 A partir del texto libre, el sistema detecta:
+
 - nombre de actividad o tarea
 - materia asociada
 - fecha o día
@@ -144,12 +155,15 @@ A partir del texto libre, el sistema detecta:
 - contexto académico
 
 Esta extracción debe apoyarse en:
+
 - regex para horas, rangos, fechas, am/pm, días de la semana, listas.
 - normalizadores de texto.
 - LLM para completar interpretación semántica cuando el texto sea flexible.
 
 #### Capa C. Validación y completitud
+
 La lógica de negocio decide:
+
 - si la información es suficiente,
 - qué datos faltan,
 - qué formatos son válidos,
@@ -157,12 +171,15 @@ La lógica de negocio decide:
 - si existen cruces.
 
 #### Capa D. Confirmación
-Antes de crear, actualizar o eliminar, el agente resume lo entendido y solicita confirmación.
+
+Antes de crear, actualizar o eliminar, el agente resume lo entendido y solicita confirmación. Si algo esta mal el estudiante lo puede cambiar diciendo que esta mal especificamente y colocandolo tal cual
 
 #### Capa E. Ejecución
+
 Solo después de confirmar, se llama la herramienta externa o se persiste el cambio.
 
 ### 5.2 Por qué este enfoque es el adecuado
+
 - Mantiene naturalidad conversacional.
 - Reduce errores operativos.
 - Permite crecer por dominios.
@@ -174,6 +191,7 @@ Solo después de confirmar, se llama la herramienta externa o se persiste el cam
 ## 6. Experiencia conversacional objetivo
 
 ### 6.1 Mensaje de transición después del bloque de preguntas
+
 Este mensaje marca el paso entre caracterización y operación del agente.
 
 ```text
@@ -202,7 +220,9 @@ Cuando quieras volver al menú principal, escribe: salir.
 ```
 
 ### 6.2 Criterio de estilo conversacional
+
 Los mensajes del agente deben ser:
+
 - amables,
 - breves,
 - claros,
@@ -214,26 +234,34 @@ Los mensajes del agente deben ser:
 
 ## 7. Flujos conversacionales óptimos por dominio
 
+- EL AGENTE DEBE SER CAPAZ DE PODER IDENTIFICAR MUY BIEN LA PETICION DEL ESTUDIANTE, USAR TECNICAS DE PROMPTING PARA LIMITAR AL AGENTE A SU PROPOSITO EL CUAL ES GESTIONAR EL TIEMPO DE LOS ESTUDIANTES, PLANIFICAR METODOS DE ESTUDIO Y RECOMENDAR METODOS DE ESTUDIO PERSONALIZADOS. EL AGENTE DEBE SABER CUANDO ACTIVAR CADA BLOQUE
+
+- EL AGENTE DEBE SER NETAMENTE PARA TEMAS ACADEMICOS, ESTE AGENDE PUEDE RESPONDER PREGUNTAS SOLO ACADEMICAS Y EL ESTUDIANTE LE PIDE QUE HAGA UNA ACTIVIDAD, UN QUIZ O UN PARCIAL EL AGENTE NO LE DEBE RESPONDER LA PREGUNTA DIRECTAMENTE, DEBE LLEVARLO A UN PENSAMIENTO SOCRATICO Y SIEMPRE SE DEBE ES APOYAR AL ESTUDIANTE EN LA GESTION DEL TIEMPO, PLANIFICACION DE METODOS DE ESTUDIO Y RECOMENDACION DE METODOS DE ESTUDIO PERSONALIZADOS, ESE DEBE SER SU ENFOQUE.
+
 ## 7.1 Flujo: crear actividad en calendario
 
 ### Activaciones posibles
+
 - “Quiero agregar esta actividad extracurricular al calendario”.
 - “Agrega grupo de estudio de cálculo el miércoles de 4 a 6”.
 - “Registra asesoría de física mañana”.
 
 ### Datos mínimos necesarios
+
 - nombre
 - fecha o día
 - hora inicio
 - hora fin
 
 ### Datos opcionales
+
 - recurrencia
 - descripción
 - materia
 - ubicación
 
 ### Mensaje inicial del agente
+
 ```text
 ¡Claro! 📅 Vamos a registrarla.
 
@@ -247,13 +275,17 @@ Si se repite cada semana, también dímelo.
 Ejemplo: “Natación, martes y jueves, 5:00 pm a 6:30 pm, semanal”.
 ```
 
+En caso de que se repita semanalmente el estudiante debe poner una fecha tentativa para que no se agente para siempre esta actividad.
+
 ### Cuando faltan campos
+
 ```text
 Ya entendí el nombre y el día 👍
 Solo me falta la hora de inicio y la hora de finalización para poder registrarla.
 ```
 
 ### Confirmación previa
+
 ```text
 Esto fue lo que entendí 👇
 
@@ -267,6 +299,7 @@ Responde: sí o no.
 ```
 
 ### Regla operativa
+
 No crear el evento hasta que exista confirmación explícita.
 
 ---
@@ -274,11 +307,13 @@ No crear el evento hasta que exista confirmación explícita.
 ## 7.2 Flujo: consultar calendario
 
 ### Activaciones posibles
+
 - “Muéstrame qué tengo esta semana”.
 - “¿Qué actividades tengo mañana?”.
 - “Quiero visualizar mi calendario”.
 
 ### Respuesta de salida recomendada
+
 Mostrar por días, no como bloque denso.
 
 ```text
@@ -299,6 +334,7 @@ Sin actividades registradas
 ```
 
 ### Posibles extensiones
+
 - detectar huecos libres,
 - detectar cruces,
 - sugerir reorganización,
@@ -309,11 +345,13 @@ Sin actividades registradas
 ## 7.3 Flujo: modificar actividad en calendario
 
 ### Activaciones posibles
+
 - “Quiero modificar una actividad”.
 - “Cámbiale la hora al estudio de física”.
 - “La asesoría del jueves pasó para el viernes”.
 
 ### Paso 1. Identificación de la actividad
+
 ```text
 Claro, te ayudo a modificarla ✏️
 
@@ -323,6 +361,7 @@ Ejemplo: “grupo de estudio de cálculo del miércoles”.
 ```
 
 ### Paso 2. Desambiguación si hay varias coincidencias
+
 ```text
 Encontré varias actividades parecidas. ¿Cuál de estas quieres modificar? 👇
 
@@ -333,6 +372,7 @@ Responde con el número.
 ```
 
 ### Paso 3. Campo a modificar
+
 ```text
 Perfecto. ¿Qué quieres cambiar de esa actividad?
 
@@ -345,6 +385,7 @@ Puedes decirme:
 ```
 
 ### Paso 4. Confirmación
+
 ```text
 Esto fue lo que entendí 👇
 
@@ -366,6 +407,7 @@ Responde: sí o no.
 ## 7.4 Flujo: eliminar actividad en calendario
 
 ### Mensaje inicial
+
 ```text
 Claro 🗑️ Dime qué actividad quieres eliminar.
 
@@ -374,6 +416,7 @@ Ejemplo: “la tutoría de física del jueves”.
 ```
 
 ### Confirmación
+
 ```text
 Entendí que quieres eliminar esta actividad:
 
@@ -390,11 +433,13 @@ Responde: sí o no.
 ## 7.5 Flujo: crear tarea en To-Do
 
 ### Activaciones posibles
+
 - “Agrega una tarea pendiente”.
 - “Anota que debo entregar taller de programación el jueves”.
 - “Registra leer el capítulo 3 para el viernes”.
 
 ### Mensaje inicial
+
 ```text
 Perfecto 📝 Vamos a registrarla como tarea pendiente.
 
@@ -408,6 +453,7 @@ Ejemplo: “Entrega de informe, Programación, viernes, alta”.
 ```
 
 ### Confirmación
+
 ```text
 Esto fue lo que entendí 👇
 
@@ -459,11 +505,13 @@ Marqué como completada:
 ## 7.8 Flujo: plan semanal
 
 ### Activaciones posibles
+
 - “Ayúdame a organizar mi semana”.
 - “Tengo muchas entregas y un parcial”.
 - “Quiero planear la semana”.
 
 ### Mensaje inicial
+
 ```text
 🗓️ Ya revisé tu semana y puedo ayudarte a organizarla mejor.
 
@@ -478,6 +526,7 @@ Con eso te propondré un plan semanal realista, sin cruzarte actividades y dejan
 ```
 
 ### Formato sugerido de salida
+
 ```text
 📚 Plan semanal sugerido
 
@@ -506,11 +555,13 @@ Con eso te propondré un plan semanal realista, sin cruzarte actividades y dejan
 ## 7.9 Flujo: método de estudio personalizado
 
 ### Activaciones posibles
-- “¿Cómo aplico mi técnica de estudio para cálculo?”.
-- “Tengo parcial, ¿cómo estudio según mi perfil?”.
-- “¿Cómo usar mi método para una exposición?”.
+
+- .
+- “Tengo parcial, ¿cómo puedo estudiar?”.
+- “¿Cómo puedo prepararme para esta exposición?”.
 
 ### Mensaje base
+
 ```text
 🧠 Según tu perfil, una de las estrategias que mejor encaja contigo es: {tecnica_o_metodo}.
 
@@ -524,6 +575,7 @@ Solo dime qué actividad quieres preparar y te propongo cómo usar tu método pa
 ```
 
 ### Respuesta aplicada
+
 ```text
 Para tu parcial de {materia}, te propongo aplicar {tecnica} así:
 
@@ -543,6 +595,7 @@ Si quieres, también puedo convertir esto en bloques concretos dentro de tu sema
 La idea del checklist semanal es correcta, pero debe evitar sentirse como una encuesta repetitiva. Debe ser breve, útil y orientado a acción.
 
 ### Propuesta recomendada
+
 1. Revisar entregas y evaluaciones próximas.
 2. Registrar tareas pendientes que aún no estén en To-Do.
 3. Definir qué materias requieren más atención esta semana.
@@ -550,6 +603,7 @@ La idea del checklist semanal es correcta, pero debe evitar sentirse como una en
 5. Revisar cambios o nuevas cargas académicas.
 
 ### Mensaje base
+
 ```text
 📌 Revisión semanal de organización
 
@@ -565,6 +619,7 @@ A medida que avancemos, te iré marcando cada punto como completado ✅
 ```
 
 ### Mensaje dinámico
+
 ```text
 📌 Estado de tu organización semanal
 
@@ -582,12 +637,15 @@ Vamos paso a paso. Empecemos por las materias que están más sensibles esta sem
 ## 9. Priorización semanal sin rigidez excesiva
 
 ### 9.1 Problema del enfoque anterior
+
 Un sistema que obliga cada semana a marcar materias de forma muy rígida se vuelve repetitivo, poco natural y puede llevar a que el estudiante ignore materias no priorizadas.
 
 ### 9.2 Solución propuesta
+
 La prioridad semanal debe ser **sugerida por el sistema** y ajustada por el estudiante en lenguaje natural.
 
 ### 9.3 Señales para calcular prioridad sugerida
+
 - entregas cercanas,
 - parciales o quices próximos,
 - tareas acumuladas,
@@ -598,6 +656,7 @@ La prioridad semanal debe ser **sugerida por el sistema** y ajustada por el estu
 - riesgo de rezago.
 
 ### 9.4 Mensaje recomendado
+
 ```text
 Con base en tus actividades de esta semana, estas materias parecen necesitar más atención 🎯
 
@@ -612,6 +671,7 @@ Si quieres, puedes ajustarlas escribiéndome algo como:
 ```
 
 ### 9.5 Beneficio
+
 La decisión final no es totalmente automática ni totalmente manual. Es híbrida, explicable y flexible.
 
 ---
@@ -619,6 +679,7 @@ La decisión final no es totalmente automática ni totalmente manual. Es híbrid
 ## 10. Lógica funcional del agente
 
 ## 10.1 Patrón general de operación
+
 Para cualquier acción sensible, el agente debe seguir este ciclo:
 
 1. Detectar intención.
@@ -630,9 +691,11 @@ Para cualquier acción sensible, el agente debe seguir este ciclo:
 7. Reportar resultado.
 
 ## 10.2 Ejemplo abstracto
+
 **Entrada del estudiante:** “Agrega entrenamiento de fútbol los martes a las 5”.
 
 **Interpretación:**
+
 - intención: crear evento
 - título: entrenamiento de fútbol
 - día: martes
@@ -644,7 +707,9 @@ Para cualquier acción sensible, el agente debe seguir este ciclo:
 “Ya entendí el nombre, el día y la hora de inicio. Solo me falta la hora de finalización para poder registrarlo.”
 
 ## 10.3 Regla de seguridad
+
 Ninguna operación de escritura debe ejecutarse si:
+
 - hay ambigüedad en la entidad objetivo,
 - faltan campos mínimos,
 - no existe confirmación explícita,
@@ -655,6 +720,7 @@ Ninguna operación de escritura debe ejecutarse si:
 ## 11. Datos necesarios para implementar esta evolución
 
 ## 11.1 Datos del estudiante
+
 - student_id
 - full_name
 - university_email
@@ -667,6 +733,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - preferred_task_provider
 
 ## 11.2 Datos del perfil de estudio
+
 - questionnaire_session_id
 - question_id
 - selected_option_id
@@ -678,6 +745,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - last_profile_update_at
 
 ## 11.3 Datos académicos estructurados
+
 - subjects
 - subject_priority_base
 - subject_difficulty
@@ -686,6 +754,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - active_term
 
 ## 11.4 Datos operativos del calendario
+
 - activity_id
 - student_id
 - provider (google / microsoft / local)
@@ -705,6 +774,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - confirmation_status
 
 ## 11.5 Datos operativos de tareas
+
 - task_id
 - student_id
 - provider
@@ -722,6 +792,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - confirmation_status
 
 ## 11.6 Datos de planificación semanal
+
 - weekly_plan_id
 - student_id
 - week_start_date
@@ -736,6 +807,7 @@ Ninguna operación de escritura debe ejecutarse si:
 - version
 
 ## 11.7 Datos conversacionales y de estado del agente
+
 - conversation_id
 - student_id
 - current_domain
@@ -758,9 +830,11 @@ A continuación se plantea una expansión natural del modelo relacional existent
 ## 12.1 Entidades principales recomendadas
 
 ### students
+
 Información base del estudiante.
 
 Campos sugeridos:
+
 - id
 - student_code
 - full_name
@@ -774,9 +848,11 @@ Campos sugeridos:
 - updated_at
 
 ### study_profiles
+
 Resultado consolidado del bloque de personalización.
 
 Campos:
+
 - id
 - student_id
 - profile_version
@@ -790,9 +866,11 @@ Campos:
 - created_at
 
 ### study_profile_answers
+
 Persistencia de respuestas individuales.
 
 Campos:
+
 - id
 - study_profile_id
 - question_id
@@ -802,9 +880,11 @@ Campos:
 - created_at
 
 ### subjects
+
 Materias del estudiante.
 
 Campos:
+
 - id
 - student_id
 - name
@@ -816,9 +896,11 @@ Campos:
 - updated_at
 
 ### calendar_activities
+
 Eventos académicos y operativos.
 
 Campos:
+
 - id
 - student_id
 - external_provider
@@ -840,9 +922,11 @@ Campos:
 - updated_at
 
 ### tasks
+
 Tareas pendientes.
 
 Campos:
+
 - id
 - student_id
 - external_provider
@@ -860,9 +944,11 @@ Campos:
 - updated_at
 
 ### weekly_priority_snapshots
+
 Foto semanal de prioridades sugeridas.
 
 Campos:
+
 - id
 - student_id
 - week_start_date
@@ -872,9 +958,11 @@ Campos:
 - created_at
 
 ### weekly_plans
+
 Plan semanal generado.
 
 Campos:
+
 - id
 - student_id
 - week_start_date
@@ -889,9 +977,11 @@ Campos:
 - updated_at
 
 ### agent_conversation_state
+
 Estado operativo del flujo conversacional.
 
 Campos:
+
 - id
 - student_id
 - conversation_channel
@@ -905,9 +995,11 @@ Campos:
 - updated_at
 
 ### rag_documents
+
 Catálogo de documentos indexados.
 
 Campos:
+
 - id
 - source_type
 - title
@@ -919,9 +1011,11 @@ Campos:
 - created_at
 
 ### rag_chunks
+
 Fragmentos embebidos.
 
 Campos:
+
 - id
 - document_id
 - chunk_index
@@ -933,6 +1027,7 @@ Campos:
 ---
 
 ## 12.2 Principios del modelo relacional
+
 - Separar perfil de estudio de operación diaria.
 - Guardar texto original del usuario cuando sea útil para auditoría y trazabilidad.
 - Guardar payload parseado cuando se use extracción híbrida.
@@ -944,6 +1039,7 @@ Campos:
 ## 13. Implementación de RAG
 
 ## 13.1 Rol del RAG en el proyecto
+
 El RAG no debe encargarse de crear o editar eventos. Tampoco debe tomar decisiones operativas del calendario. Su función es enriquecer las respuestas relacionadas con:
 
 - explicación de técnicas de estudio,
@@ -951,10 +1047,12 @@ El RAG no debe encargarse de crear o editar eventos. Tampoco debe tomar decision
 - aplicación práctica de técnicas según actividad académica,
 - sugerencias de organización compatibles con el perfil del estudiante,
 - justificación breve de recomendaciones.
+- Si no tiene informacion academica sobre algo que el estudiente quiere saber que se apoye en el LLM
 
 ## 13.2 Qué información debe vivir en el RAG
 
 ### Fuentes ideales
+
 - documentos estructurados sobre técnicas de estudio,
 - métodos de estudio,
 - aplicación de técnicas por tipo de evaluación,
@@ -962,6 +1060,7 @@ El RAG no debe encargarse de crear o editar eventos. Tampoco debe tomar decision
 - guías expertas curadas por el proyecto.
 
 ### Ejemplos de temas útiles
+
 - active recall,
 - spaced repetition,
 - pomodoro,
@@ -974,13 +1073,16 @@ El RAG no debe encargarse de crear o editar eventos. Tampoco debe tomar decision
 - gestión de carga académica.
 
 ## 13.3 Qué no debe meter el RAG
+
 - lógica de agenda,
 - validaciones de fecha y hora,
 - decisiones de negocio del CRUD,
 - estado conversacional efímero.
 
 ## 13.4 Estructura recomendada del documento base
+
 Cada técnica o método debería tener una plantilla uniforme:
+
 - nombre,
 - definición,
 - para qué sirve,
@@ -995,6 +1097,7 @@ Cada técnica o método debería tener una plantilla uniforme:
 - variantes según tiempo disponible.
 
 ## 13.5 Proceso RAG recomendado
+
 1. Curar contenido.
 2. Normalizar formato.
 3. Dividir en chunks semánticos.
@@ -1003,9 +1106,11 @@ Cada técnica o método debería tener una plantilla uniforme:
 6. Construir prompt de respuesta contextual.
 
 ## 13.6 Ejemplo de uso del RAG
+
 **Pregunta del estudiante:** “¿Cómo aplico mi técnica para un parcial de cálculo?”
 
 **Entradas del generador:**
+
 - perfil del estudiante,
 - top técnicas detectadas,
 - materia objetivo,
@@ -1016,6 +1121,7 @@ Cada técnica o método debería tener una plantilla uniforme:
 Una guía corta, accionable y alineada al perfil.
 
 ## 13.7 Integración ideal entre perfil y RAG
+
 El sistema no debe preguntar al RAG “qué técnica tiene el estudiante”. Eso ya debe venir de la capa determinística de caracterización. El RAG debe responder: **cómo aplicar esa técnica o método al caso actual**.
 
 ---
@@ -1023,9 +1129,11 @@ El sistema no debe preguntar al RAG “qué técnica tiene el estudiante”. Eso
 ## 14. Revisión de la arquitectura actual del agente
 
 ### 14.1 Evaluación general
+
 Con base en el recorrido previo del proyecto, la arquitectura parece estar evolucionando desde un flujo centrado en formularios conversacionales hacia una arquitectura por dominios del agente. Ese movimiento es correcto y debe consolidarse.
 
 ### 14.2 Riesgos típicos detectables en este punto
+
 Aunque en este turno no se inspeccionó el repositorio directamente, por el comportamiento descrito del sistema los riesgos más probables son:
 
 1. **Acoplamiento entre mensajes y lógica**
@@ -1044,9 +1152,11 @@ Aunque en este turno no se inspeccionó el repositorio directamente, por el comp
    Si el agente no guarda claramente la acción pendiente y los campos faltantes, los diálogos se vuelven frágiles.
 
 ### 14.3 Arquitectura objetivo recomendada
+
 Se recomienda una arquitectura modular por capacidades, manteniendo el proyecto como **monolito modular**. No es necesario migrar a microservicios para este MVP.
 
 #### Módulos sugeridos
+
 - `conversation_router`
 - `intent_classifier`
 - `entity_extractor`
@@ -1063,6 +1173,7 @@ Se recomienda una arquitectura modular por capacidades, manteniendo el proyecto 
 - `integration_microsoft`
 
 ### 14.4 Flujo de arquitectura recomendado
+
 1. Entrada del mensaje.
 2. Router conversacional.
 3. Clasificación de intención.
@@ -1074,7 +1185,9 @@ Se recomienda una arquitectura modular por capacidades, manteniendo el proyecto 
 9. Respuesta final.
 
 ### 14.5 Recomendación estructural principal
+
 El proyecto debe mantenerse como un sistema centralizado, pero con fronteras claras entre:
+
 - orquestación conversacional,
 - lógica de dominio,
 - acceso a datos,
@@ -1086,6 +1199,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 ## 15. Diseño lógico sugerido del agente
 
 ## 15.1 Intents mínimos del MVP
+
 - `create_calendar_activity`
 - `view_calendar`
 - `update_calendar_activity`
@@ -1105,6 +1219,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 ## 15.2 Slots por intención
 
 ### create_calendar_activity
+
 - title
 - date_or_days
 - start_time
@@ -1113,27 +1228,32 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 - subject optional
 
 ### update_calendar_activity
+
 - target_activity_identifier
 - field_to_update
 - new_value
 
 ### create_task
+
 - title
 - subject optional
 - due_date optional
 - priority optional
 
 ### generate_weekly_plan
+
 - week_reference optional
 - focus_subjects optional
 - urgency_signals optional
 
 ### apply_study_technique
+
 - target_subject
 - target_activity_type
 - target_date optional
 
 ## 15.3 Estado conversacional mínimo
+
 - domain
 - intent
 - candidate_entities
@@ -1148,6 +1268,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 ## 16. Reglas de implementación del entendimiento híbrido
 
 ## 16.1 Qué debe resolver el LLM
+
 - intención,
 - reformulación natural,
 - pregunta de aclaración,
@@ -1156,6 +1277,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 - aplicación explicada del método de estudio.
 
 ## 16.2 Qué debe resolver regex/parsers
+
 - días de la semana,
 - fechas absolutas,
 - fechas relativas,
@@ -1165,6 +1287,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 - listas de materias cuando vengan enumeradas.
 
 ## 16.3 Qué debe resolver la lógica determinística
+
 - campos mínimos requeridos,
 - normalización de datos,
 - detección de conflictos,
@@ -1179,6 +1302,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 ## 17. Planificación semanal: lógica recomendada
 
 ## 17.1 Entradas necesarias
+
 - horario fijo académico,
 - horario laboral si existe,
 - actividades extracurriculares,
@@ -1192,6 +1316,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 - urgencia declarada por el estudiante.
 
 ## 17.2 Proceso sugerido
+
 1. Consolidar agenda fija.
 2. Insertar eventos ya registrados.
 3. Analizar tareas y evaluaciones próximas.
@@ -1203,6 +1328,7 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 9. Preguntar si desea convertir el plan en eventos reales.
 
 ## 17.3 Reglas de equilibrio académico
+
 - No dedicar toda la semana a una sola materia salvo urgencia extrema.
 - Mantener al menos un bloque de mantenimiento para materias activas relevantes.
 - Priorizar fecha cercana, pero sin destruir sostenibilidad semanal.
@@ -1215,24 +1341,28 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 Para la fase final del proyecto conviene medir no solo si “funciona”, sino cómo funciona.
 
 ### 18.1 Métricas de entendimiento
+
 - accuracy de clasificación de intención,
 - tasa de extracción correcta de fecha/hora,
 - tasa de identificación correcta de entidad objetivo,
 - número promedio de repreguntas por tarea.
 
 ### 18.2 Métricas operativas
+
 - porcentaje de acciones ejecutadas correctamente,
 - porcentaje de errores evitados por confirmación,
 - tasa de conflictos detectados,
 - tiempo conversacional hasta completar una acción.
 
 ### 18.3 Métricas de usabilidad
+
 - satisfacción subjetiva del estudiante,
 - percepción de claridad del agente,
 - percepción de utilidad del plan semanal,
 - percepción de personalización del método de estudio.
 
 ### 18.4 Métricas del componente RAG
+
 - relevancia percibida de recomendaciones,
 - grounding con técnica detectada,
 - utilidad práctica de la explicación,
@@ -1243,10 +1373,13 @@ Para la fase final del proyecto conviene medir no solo si “funciona”, sino c
 ## 19. Plan de implementación por fases
 
 ## Fase 0. Auditoría y preparación
+
 ### Objetivo
+
 Preparar el sistema actual para evolucionar sin romper lo existente.
 
 ### Tareas
+
 - documentar arquitectura actual,
 - mapear nodos, servicios y repositorios,
 - identificar ownership de estado,
@@ -1255,6 +1388,7 @@ Preparar el sistema actual para evolucionar sin romper lo existente.
 - listar intents ya existentes.
 
 ### Entregables
+
 - mapa del flujo actual,
 - inventario de módulos,
 - lista de refactors mínimos previos.
@@ -1262,10 +1396,13 @@ Preparar el sistema actual para evolucionar sin romper lo existente.
 ---
 
 ## Fase 1. Capa de entendimiento híbrido
+
 ### Objetivo
+
 Permitir que el estudiante escriba solicitudes libres dentro del dominio.
 
 ### Tareas
+
 - crear catálogo de intents,
 - implementar classifier de intención,
 - definir contratos de salida estructurada,
@@ -1274,6 +1411,7 @@ Permitir que el estudiante escriba solicitudes libres dentro del dominio.
 - definir estado conversacional mínimo.
 
 ### Entregables
+
 - servicio de intención,
 - servicio de extracción,
 - esquema de payload normalizado,
@@ -1282,10 +1420,13 @@ Permitir que el estudiante escriba solicitudes libres dentro del dominio.
 ---
 
 ## Fase 2. Calendario conversacional
+
 ### Objetivo
+
 Implementar CRUD conversacional de calendario con confirmación.
 
 ### Tareas
+
 - crear flujo create/view/update/delete,
 - manejar desambiguación,
 - guardar confirmaciones,
@@ -1293,6 +1434,7 @@ Implementar CRUD conversacional de calendario con confirmación.
 - persistir eventos y metadatos operativos.
 
 ### Entregables
+
 - flujos completos de calendario,
 - mensajes optimizados,
 - pruebas funcionales sobre casos ambiguos.
@@ -1300,16 +1442,20 @@ Implementar CRUD conversacional de calendario con confirmación.
 ---
 
 ## Fase 3. To-Do conversacional
+
 ### Objetivo
+
 Replicar el patrón híbrido para pendientes.
 
 ### Tareas
+
 - crear flujos create/view/update/complete/delete,
 - modelar prioridades y estados,
 - conectar proveedor de tareas o tabla local,
 - integrar con agenda y priorización.
 
 ### Entregables
+
 - dominio To-Do operativo,
 - vista de tareas por prioridad y estado,
 - pruebas funcionales.
@@ -1317,10 +1463,13 @@ Replicar el patrón híbrido para pendientes.
 ---
 
 ## Fase 4. Priorización semanal híbrida
+
 ### Objetivo
+
 Transformar la priorización rígida en una priorización sugerida y ajustable.
 
 ### Tareas
+
 - definir señales de prioridad,
 - crear motor base de scoring semanal,
 - generar snapshot semanal,
@@ -1328,6 +1477,7 @@ Transformar la priorización rígida en una priorización sugerida y ajustable.
 - permitir ajuste libre por el estudiante.
 
 ### Entregables
+
 - servicio de prioridad semanal,
 - mensaje conversacional,
 - persistencia de ajustes del usuario.
@@ -1335,10 +1485,13 @@ Transformar la priorización rígida en una priorización sugerida y ajustable.
 ---
 
 ## Fase 5. Generador de plan semanal
+
 ### Objetivo
+
 Producir un plan realista y accionable.
 
 ### Tareas
+
 - consolidar agenda fija y eventos,
 - cruzar con tareas y fechas límite,
 - detectar espacios disponibles,
@@ -1347,6 +1500,7 @@ Producir un plan realista y accionable.
 - ofrecer convertir bloques a calendario.
 
 ### Entregables
+
 - motor de planificación semanal,
 - formato de salida estándar,
 - aceptación o rechazo del plan por el usuario.
@@ -1354,29 +1508,19 @@ Producir un plan realista y accionable.
 ---
 
 ## Fase 6. Integración RAG para método de estudio
-### Objetivo
-Aterrizar técnicas y métodos de estudio detectados al contexto real del estudiante.
 
-### Tareas
-- curar corpus,
-- crear plantilla maestra de contenido,
-- chunking semántico,
-- embeddings en pgvector,
-- retrieval contextual,
-- prompts de respuesta aplicada.
-
-### Entregables
-- base vectorial operativa,
-- respuestas contextualizadas,
-- pruebas de calidad y grounding.
+- EL RAG YA ESTA IMPLEMENTADO.
 
 ---
 
 ## Fase 7. Observabilidad, pruebas y cierre
+
 ### Objetivo
+
 Validar el MVP con criterios claros.
 
 ### Tareas
+
 - crear suite de casos conversacionales,
 - medir clasificación de intención,
 - medir calidad de extracción,
@@ -1385,6 +1529,7 @@ Validar el MVP con criterios claros.
 - documentar resultados para sustentación.
 
 ### Entregables
+
 - matriz de pruebas,
 - métricas finales,
 - informe de validación.
@@ -1410,21 +1555,27 @@ Este orden maximiza valor visible del producto y reduce riesgo.
 ## 21. Riesgos de implementación y mitigación
 
 ### Riesgo 1. El LLM interpreta mal una acción sensible
+
 **Mitigación:** confirmación obligatoria antes de ejecutar.
 
 ### Riesgo 2. Exceso de preguntas al usuario
+
 **Mitigación:** preguntar solo por campos faltantes mínimos.
 
 ### Riesgo 3. Ambigüedad al modificar o eliminar
+
 **Mitigación:** desambiguación por lista cuando haya múltiples coincidencias.
 
 ### Riesgo 4. Plan semanal poco realista
+
 **Mitigación:** usar agenda real, carga disponible y reglas de equilibrio.
 
 ### Riesgo 5. RAG demasiado teórico
+
 **Mitigación:** estructurar corpus con ejemplos aplicados a parciales, entregas y exposiciones.
 
 ### Riesgo 6. Mezcla de responsabilidades en el código
+
 **Mitigación:** separar router, extractor, validación, dominio y persistencia.
 
 ---

@@ -5,9 +5,6 @@ from __future__ import annotations
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
-from agents.support.flows.planning.persistence_support import (
-    persist_planning_snapshot_for_update,
-)
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.scheduling.state_helpers import ensure_schedule_flow_state
 from agents.support.state import AgentState
@@ -59,11 +56,6 @@ def handle_academic_update(state: AgentState) -> dict:
             "awaiting_user_input": False,
         }
 
-    next_phase = "study_plan" if result.event_type == "academic_deadline" and result.replan_required else "end"
-    response = result.message
-    if next_phase == "study_plan":
-        response = f"{response} Voy a ajustar solo el plan afectado."
-
     update = {
         "subjects": subject_items_to_update(result.subjects or current_subjects),
         "priorities": update_priorities_state(
@@ -78,14 +70,12 @@ def handle_academic_update(state: AgentState) -> dict:
             draft={"event_update": result.payload},
         ),
         "replan": _build_replan_state(state, result),
-        "phase": next_phase,
+        "phase": "end",
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": bool(result.requires_clarification),
-        "messages": append_message(messages, "assistant", response),
+        "messages": append_message(messages, "assistant", result.message),
     }
-    if result.event_type == "academic_deadline":
-        return persist_planning_snapshot_for_update(state, update)
     return update
 
 

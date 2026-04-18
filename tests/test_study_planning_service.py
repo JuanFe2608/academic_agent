@@ -109,17 +109,30 @@ def _completed_profile_payload() -> dict[str, object]:
 
 
 class _StudyRecommendationServiceStub:
-    def __init__(self, *, ready: bool = True) -> None:
+    def __init__(
+        self,
+        *,
+        ready: bool = True,
+        student_answer: str | None = None,
+        session_answer: str | None = None,
+        session_source_chunks: list[str] | None = None,
+    ) -> None:
         self.status = SimpleNamespace(ready=ready)
         self.calls: list[dict[str, object]] = []
+        self.student_answer = student_answer or (
+            "Pomodoro puede ayudarte a empezar en bloques cortos y sostener la atencion "
+            "cuando hay procrastinacion o distraccion."
+        )
+        self.session_answer = session_answer or (
+            "Empieza la sesion con una meta concreta, trabaja en un bloque breve y cierra "
+            "verificando que puedes recordar o aplicar lo estudiado."
+        )
+        self.session_source_chunks = session_source_chunks or ["technique.pomodoro::session"]
 
     def recommend_for_student(self, **kwargs):
         self.calls.append(dict(kwargs))
         return StudyRecommendationResult(
-            answer=(
-                "Pomodoro puede ayudarte a empezar en bloques cortos y sostener la atencion "
-                "cuando hay procrastinacion o distraccion."
-            ),
+            answer=self.student_answer,
             recommended_techniques=["pomodoro"],
             source_chunks=["technique.pomodoro::answer"],
             confidence="media",
@@ -129,12 +142,9 @@ class _StudyRecommendationServiceStub:
     def recommend_for_session(self, **kwargs):
         self.calls.append({"method": "recommend_for_session", **dict(kwargs)})
         return StudyRecommendationResult(
-            answer=(
-                "Empieza la sesion con una meta concreta, trabaja en un bloque breve y cierra "
-                "verificando que puedes recordar o aplicar lo estudiado."
-            ),
+            answer=self.session_answer,
             recommended_techniques=[str(kwargs.get("technique_id") or "pomodoro")],
-            source_chunks=["technique.pomodoro::session"],
+            source_chunks=list(self.session_source_chunks),
             confidence="media",
             groundedness_notes=["sources:cited"],
         )
@@ -217,7 +227,7 @@ def test_build_initial_study_plan_spreads_sessions_for_spaced_repetition() -> No
     assert plan.rules["spacing_days"] == 2
 
 
-def test_persist_study_profile_generates_study_plan_without_breaking_flow(
+def test_persist_study_profile_closes_without_generating_study_plan(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
@@ -243,12 +253,10 @@ def test_persist_study_profile_generates_study_plan_without_breaking_flow(
         update = persist_study_profile(state)
 
         assert update["phase"] == "end"
-        assert "subjects" in update
-        assert "study_plan" in update
-        assert update["subjects"][0].nombre == "Calculo"
-        assert update["study_plan"]["rules"]["primary_technique_id"] == "pomodoro"
-        assert len(update["study_plan"]["plan_events"]) >= 1
-        assert "Radar de estudio completado" in update["messages"][0].content
+        assert "subjects" not in update
+        assert "priorities" not in update
+        assert "study_plan" not in update
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in update["messages"][0].content
     finally:
         set_personalization_service(None)
 
@@ -261,7 +269,14 @@ def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),
     )
-    recommendation_service = _StudyRecommendationServiceStub(ready=True)
+    recommendation_service = _StudyRecommendationServiceStub(
+        ready=True,
+        student_answer=(
+            'La técnica Feynman es ideal para trabajar el "explanation_gap". '
+            'El Método Cornell ayuda con "note_organization" y la mnemotecnia '
+            "sirve para recordar listas."
+        ),
+    )
     set_personalization_service(personalization_service)
     set_study_recommendation_service(recommendation_service)
     try:
@@ -281,11 +296,61 @@ def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
         update = persist_study_profile(state)
 
         final_message = update["messages"][0].content
-        assert "Radar de estudio completado" in final_message
-        assert "Complemento pedagógico con fuentes internas:" in final_message
-        assert "Pomodoro puede ayudarte" in final_message
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in final_message
+        assert "Para llevarlo a la práctica:" in final_message
+        assert "fuentes internas" not in final_message
+        assert "fragmento" not in final_message
+        assert "Empieza cada sesión con un objetivo pequeño" in final_message
+        assert "Feynman" not in final_message
+        assert "Cornell" not in final_message
+        assert "mnemotecnia" not in final_message
+        assert "explanation_gap" not in final_message
+        assert "note_organization" not in final_message
         assert recommendation_service.calls[0]["top_techniques"] == study_profile["top_techniques"]
         assert "procrastination" in recommendation_service.calls[0]["student_signals"]
+    finally:
+        set_personalization_service(None)
+        set_study_recommendation_service(None)
+
+
+def test_persist_study_profile_keeps_rag_guidance_complete_without_ellipsis(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    long_guidance = (
+        "Pomodoro puede ayudarte a iniciar con una meta concreta. "
+        + "Despues revisa una pregunta concreta para comprobar avance. " * 12
+        + "Esta frase queda fuera del limite conversacional."
+    )
+    recommendation_service = _StudyRecommendationServiceStub(
+        ready=True,
+        student_answer=long_guidance,
+    )
+    set_personalization_service(personalization_service)
+    set_study_recommendation_service(recommendation_service)
+    try:
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=_completed_profile_payload(),
+        )
+
+        update = persist_study_profile(state)
+
+        final_message = update["messages"][0].content
+        assert "Para llevarlo a la práctica:" in final_message
+        assert "..." not in final_message
+        assert final_message.endswith(".")
     finally:
         set_personalization_service(None)
         set_study_recommendation_service(None)
@@ -318,8 +383,8 @@ def test_persist_study_profile_keeps_base_summary_when_rag_service_is_not_ready(
         update = persist_study_profile(state)
 
         final_message = update["messages"][0].content
-        assert "Radar de estudio completado" in final_message
-        assert "Complemento pedagógico con fuentes internas:" not in final_message
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in final_message
+        assert "Para llevarlo a la práctica:" not in final_message
         assert recommendation_service.calls == []
     finally:
         set_personalization_service(None)
@@ -364,5 +429,94 @@ def test_build_study_plan_adds_rag_session_guidance_when_service_is_ready() -> N
             "procrastination",
             "distraction",
         ]
+    finally:
+        set_study_recommendation_service(None)
+
+
+def test_build_study_plan_skips_rag_session_guidance_when_sources_do_not_match_primary_technique() -> None:
+    recommendation_service = _StudyRecommendationServiceStub(
+        ready=True,
+        session_source_chunks=["technique.active_recall::session"],
+    )
+    set_study_recommendation_service(recommendation_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            study_profile={
+                "top_techniques": ["feynman", "active_recall"],
+                "weakness_tags": ["explanation_gap", "passive_review_dependence"],
+            },
+            schedule={
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Fisica")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Fisica",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    is_priority_confirmed=True,
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        assert update["study_plan"]["rules"]["primary_technique_id"] == "feynman"
+        assert "rag_session_guidance" not in update["study_plan"]["rules"]
+        assert "Guía sugerida para la primera sesión:" not in update["messages"][0].content
+        assert recommendation_service.calls[0]["method"] == "recommend_for_session"
+    finally:
+        set_study_recommendation_service(None)
+
+
+def test_build_study_plan_keeps_full_rag_session_guidance_without_extra_truncation() -> None:
+    long_guidance = " ".join(
+        [
+            "Paso 1: elige un concepto concreto.",
+            "Paso 2: explicalo con tus palabras.",
+            "Paso 3: marca dudas reales.",
+            "Paso 4: corrige solo los vacios.",
+            "Paso 5: vuelve a explicarlo de forma simple.",
+            "Paso 6: comprueba si puedes sostener la explicacion.",
+            "Paso 7: conecta el concepto con un ejemplo.",
+            "Paso 8: cierra con una pregunta de verificacion final completa.",
+        ]
+        * 4
+    )
+    recommendation_service = _StudyRecommendationServiceStub(
+        ready=True,
+        session_answer=long_guidance,
+        session_source_chunks=["technique.pomodoro::session"],
+    )
+    set_study_recommendation_service(recommendation_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            study_profile={
+                "top_techniques": ["pomodoro"],
+                "weakness_tags": ["procrastination"],
+            },
+            schedule={
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    is_priority_confirmed=True,
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        guidance = update["study_plan"]["rules"]["rag_session_guidance"]["answer"]
+        assert "verificacion final completa" in guidance
+        assert not guidance.endswith("...")
     finally:
         set_study_recommendation_service(None)

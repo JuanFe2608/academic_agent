@@ -35,8 +35,8 @@ def test_end_phase_routes_academic_deadline_to_event_update() -> None:
     update = handle_academic_update(state)
     next_state = AgentState(**{**state.model_dump(), **{k: v for k, v in update.items() if k != "messages"}})
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "end"
     assert update["subjects"][0].urgency_type == "parcial"
     assert update["subjects"][0].urgencia == "alta"
     assert update["replan"]["trigger"] == "academic_deadline"
-    assert _route_handle_academic_update(next_state) == "build_study_plan"
+    assert _route_handle_academic_update(next_state) == "end"

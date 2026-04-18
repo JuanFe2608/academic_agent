@@ -160,13 +160,13 @@ def _resolve_intent(
 
 def _detect_techniques(slug_text: str, top_techniques: list[str]) -> list[str]:
     detected: list[str] = []
+    for alias, canonical in TECHNIQUE_ALIASES.items():
+        if _slug_contains(slug_text, alias):
+            detected.append(canonical)
     for technique in top_techniques:
         normalized = normalize_technique_id(technique)
         if normalized:
             detected.append(normalized)
-    for alias, canonical in TECHNIQUE_ALIASES.items():
-        if _slug_contains(slug_text, alias):
-            detected.append(canonical)
     return _unique(detected)
 
 

@@ -38,6 +38,7 @@ class RagSettings:
     top_k_lexical: int = 8
     top_k_final: int = 5
     min_score: float = 0.0
+    answer_temperature: float = 0.2
 
 
 def load_bootstrap_settings() -> BootstrapSettings:
@@ -99,6 +100,7 @@ def load_rag_settings() -> RagSettings:
         top_k_lexical=_env_int("RAG_TOP_K_LEXICAL", 8, minimum=1),
         top_k_final=_env_int("RAG_TOP_K_FINAL", 5, minimum=1),
         min_score=_env_float("RAG_MIN_SCORE", 0.0, minimum=0.0),
+        answer_temperature=_env_float("RAG_ANSWER_TEMPERATURE", 0.2, minimum=0.0),
     )
 
 

@@ -204,11 +204,10 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
         assert state.phase == "end"
         assert state.study_profile.persisted_profile_id == 1
         final_message = state.messages[-1].content
-        assert "Radar de estudio completado" in final_message
-        assert "1. Pomodoro" in final_message
-        assert final_message.index("Lo que detecté en tu forma de estudiar:") < final_message.index(
-            "Tus 3 técnicas más prometedoras ahora mismo:"
-        )
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in final_message
+        assert "Iniciar tus sesiones con bloques claros" in final_message
+        assert "Tus técnicas más recomendadas en este momento son:" not in final_message
+        assert "Ahora voy a usar este resultado" not in final_message
         saved_profile = personalization_repository._profiles[15]
         assert saved_profile["questionnaire_version"] == "v3"
         assert saved_profile["scoring_version"] == "v3"
@@ -284,8 +283,9 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
         state = _apply_update(state, persist_study_profile(state))
 
         assert state.phase == "end"
-        assert "afiné mejor tu perfil de estudio" in state.messages[-1].content
-        assert "Pomodoro" in state.messages[-1].content
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in state.messages[-1].content
+        assert "Tus técnicas más recomendadas en este momento son:" not in state.messages[-1].content
+        assert "Con tus respuestas extra" not in state.messages[-1].content
         saved_profile = personalization_repository._profiles[15]
         assert len(saved_profile["answers"]) == 13
         assert saved_profile["result_payload"]["tiebreaker"]["status"] == "completed"

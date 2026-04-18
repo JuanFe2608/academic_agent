@@ -6,11 +6,14 @@ from rag.retrieval.models import GroundedContextPackage
 from schemas.rag import StudyRecommendationResult
 
 from .context_package import build_grounded_prompt_context
+from .llm_answer import GroundedAnswerGenerator
 from .templates import render_fallback_answer, render_grounded_answer
 
 
 def build_grounded_study_recommendation_result(
     package: GroundedContextPackage,
+    *,
+    answer_generator: GroundedAnswerGenerator | None = None,
 ) -> StudyRecommendationResult:
     """Convert grounded retrieval context into a structured recommendation result."""
 
@@ -31,14 +34,31 @@ def build_grounded_study_recommendation_result(
             ),
         )
 
-    answer = render_grounded_answer(
-        query=package.query,
-        intent=package.understanding.intent,
-        primary_text=prompt_context.primary_text,
-        supporting_facts=prompt_context.supporting_facts,
-        cautions=prompt_context.cautions,
-        has_blocking_contraindication=prompt_context.has_blocking_contraindication,
-    )
+    answer_notes: list[str] = []
+    answer = ""
+    if answer_generator is not None:
+        try:
+            answer = (
+                answer_generator.generate(
+                    package=package,
+                    prompt_context=prompt_context,
+                )
+                or ""
+            ).strip()
+        except Exception as exc:  # noqa: BLE001 - synthesis fallback must be controlled
+            answer_notes.append(f"answer_llm:error:{exc.__class__.__name__}")
+    if answer:
+        answer_notes.append("answer:llm_synthesis")
+    else:
+        answer = render_grounded_answer(
+            query=package.query,
+            intent=package.understanding.intent,
+            primary_text=prompt_context.primary_text,
+            supporting_facts=prompt_context.supporting_facts,
+            cautions=prompt_context.cautions,
+            has_blocking_contraindication=prompt_context.has_blocking_contraindication,
+        )
+        answer_notes.append("answer:deterministic_template")
     return StudyRecommendationResult(
         answer=answer,
         recommended_techniques=prompt_context.recommended_techniques,
@@ -51,7 +71,7 @@ def build_grounded_study_recommendation_result(
         groundedness_notes=_unique(
             [
                 *prompt_context.groundedness_notes,
-                "answer:deterministic_template",
+                *answer_notes,
                 "sources:cited",
             ]
         ),

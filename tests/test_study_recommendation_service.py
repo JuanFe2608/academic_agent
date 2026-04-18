@@ -156,7 +156,7 @@ def test_service_returns_fallback_when_rag_is_disabled() -> None:
 
     assert result.confidence == "baja"
     assert result.source_chunks == []
-    assert "No tengo suficientes fuentes internas" in result.answer
+    assert "No tengo informacion suficiente" in result.answer
     assert "service:rag_disabled" in result.groundedness_notes
 
 

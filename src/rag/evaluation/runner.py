@@ -223,7 +223,7 @@ def evaluate_disabled_fallback(cases: list[RagEvalCase]) -> dict[str, float | in
             not result.source_chunks
             and result.confidence == "baja"
             and "service:rag_disabled" in result.groundedness_notes
-            and "No tengo suficientes fuentes internas" in result.answer
+            and "No tengo informacion suficiente" in result.answer
         ):
             passed += 1
     total = len(cases)

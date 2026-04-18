@@ -267,7 +267,7 @@ def test_postgres_study_planning_repository_persists_profiles_subjects_and_event
 
 
 
-def test_persist_study_profile_persists_initial_priorities_and_plan(monkeypatch) -> None:
+def test_persist_study_profile_does_not_persist_initial_priorities_or_plan(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
@@ -292,12 +292,11 @@ def test_persist_study_profile_persists_initial_priorities_and_plan(monkeypatch)
 
         update = persist_study_profile(state)
 
-        assert update["phase"] == "priorities"
-        assert update["priorities"]["persisted_profile_id"] == 1
-        assert update["study_plan"]["persisted_profile_id"] == 1
-        assert update["study_plan"]["version_number"] == 1
-        assert planning_repository._priority_profiles[15]["status"] == "collecting"
-        assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 1
+        assert update["phase"] == "end"
+        assert "priorities" not in update
+        assert "study_plan" not in update
+        assert planning_repository._priority_profiles == {}
+        assert planning_repository._study_plan_profiles == {}
     finally:
         set_personalization_service(None)
         set_study_planning_persistence_service(None)

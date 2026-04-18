@@ -88,11 +88,15 @@ def _enrich_study_plan_with_rag_session_guidance(
     except Exception:
         return study_plan
 
-    if not result.source_chunks or not result.answer.strip():
+    if (
+        not result.source_chunks
+        or not result.answer.strip()
+        or not _result_supports_primary_technique(result.source_chunks, primary_technique)
+    ):
         return study_plan
 
     rules["rag_session_guidance"] = {
-        "answer": _compact_text(result.answer),
+        "answer": _clean_text(result.answer),
         "cautions": [_compact_text(caution, max_chars=240) for caution in result.cautions[:2]],
         "source_chunks": list(result.source_chunks),
         "relations_used": list(result.relations_used),
@@ -101,6 +105,20 @@ def _enrich_study_plan_with_rag_session_guidance(
         "subject_name": subject_name,
     }
     return study_plan.model_copy(update={"rules": rules})
+
+
+def _result_supports_primary_technique(
+    source_chunks: list[str],
+    primary_technique: str,
+) -> bool:
+    """Evita mostrar guia de una tecnica distinta a la tecnica base del plan."""
+
+    prefix = f"technique.{primary_technique}::"
+    return any(str(chunk_id).startswith(prefix) for chunk_id in source_chunks)
+
+
+def _clean_text(text: str) -> str:
+    return " ".join(str(text or "").split())
 
 
 def _compact_text(text: str, *, max_chars: int = 520) -> str:

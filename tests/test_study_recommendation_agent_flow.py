@@ -8,6 +8,7 @@ from langchain_core.messages import HumanMessage
 
 from agents.support.agent import _route_welcome
 from agents.support.dependencies import set_study_recommendation_service
+from agents.support.nodes.answer_scope_boundary import answer_scope_boundary
 from agents.support.nodes.answer_study_recommendation import answer_study_recommendation
 from agents.support.state import AgentState
 from schemas.rag import StudyRecommendationResult
@@ -36,6 +37,18 @@ def test_end_phase_routes_direct_study_question_to_rag_service_node() -> None:
         awaiting_user_input=False,
         user_message_count=0,
         messages=[HumanMessage(content="Que es Pomodoro y cuando conviene?")],
+    )
+
+    assert _route_welcome(state) == "answer_study_recommendation"
+
+
+def test_end_phase_routes_direct_study_question_when_counter_is_already_current() -> None:
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=1,
+        last_user_text="Ya quedo el plan",
+        messages=[HumanMessage(content="Que es Pomodoro?")],
     )
 
     assert _route_welcome(state) == "answer_study_recommendation"
@@ -79,3 +92,40 @@ def test_academic_update_keeps_precedence_over_study_recommendation_route() -> N
     )
 
     assert _route_welcome(state) == "handle_academic_update"
+
+
+def test_end_phase_routes_out_of_scope_question_to_scope_boundary() -> None:
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=1,
+        last_user_text="Que es Feynman?",
+        messages=[
+            HumanMessage(content="Que es Feynman?"),
+            HumanMessage(content="Quien es Messi?"),
+        ],
+    )
+
+    assert _route_welcome(state) == "answer_scope_boundary"
+
+
+def test_scope_boundary_answers_and_updates_last_user_text() -> None:
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=1,
+        last_user_text="Que es Feynman?",
+        messages=[
+            HumanMessage(content="Que es Feynman?"),
+            HumanMessage(content="Quien es Messi?"),
+        ],
+    )
+
+    update = answer_scope_boundary(state)
+
+    assert update["phase"] == "end"
+    assert update["awaiting_user_input"] is False
+    assert update["user_message_count"] == 2
+    assert update["last_user_text"] == "Quien es Messi?"
+    assert "temas académicos" in update["messages"][0].content
+    assert "No puedo responder sobre temas generales" in update["messages"][0].content

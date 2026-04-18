@@ -67,7 +67,7 @@ def _completed_profile_payload() -> dict[str, object]:
     return payload
 
 
-def test_priorities_feature_flag_routes_after_persist_study_profile(monkeypatch) -> None:
+def test_priorities_feature_flag_no_longer_routes_after_persist_study_profile(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
@@ -90,19 +90,11 @@ def test_priorities_feature_flag_routes_after_persist_study_profile(monkeypatch)
         update = persist_study_profile(state)
         next_state = _apply_update(state, update)
 
-        assert update["phase"] == "priorities"
-        assert _route_persist_study_profile(next_state) == "collect_priorities"
-
-        prompt_update = collect_priorities(next_state)
-        assert prompt_update["phase"] == "priorities"
-        assert prompt_update["awaiting_user_input"] is True
-        prompt = prompt_update["messages"][0].content
-        assert "Sí, actualizarlas" in prompt
-        assert "Después" in prompt
-        assert "usar horario" not in prompt
-        assert "omitir" not in prompt
-        assert "Calculo" in prompt
-        assert "120 min/semana" in prompt
+        assert update["phase"] == "end"
+        assert "subjects" not in update
+        assert "priorities" not in update
+        assert "study_plan" not in update
+        assert _route_persist_study_profile(next_state) == "end"
     finally:
         set_personalization_service(None)
 
@@ -138,7 +130,7 @@ def test_collect_priorities_accepts_manual_subjects_and_rebuilds_plan(monkeypatc
     assert update["subjects"][0].nombre == "Calculo"
     assert update["subjects"][0].urgencia == "alta"
     assert update["subjects"][0].carga_semanal_min == 240
-    assert _route_collect_priorities(next_state) == "build_study_plan"
+    assert _route_collect_priorities(next_state) == "end"
 
     plan_update = build_study_plan(next_state)
     assert plan_update["phase"] == "end"
@@ -200,7 +192,7 @@ def test_collect_priorities_supports_visible_later_option(monkeypatch) -> None:
     assert update["phase"] == "study_plan"
     assert len(update["subjects"]) == 2
     assert update["priorities"]["status"] == "completed"
-    assert _route_collect_priorities(next_state) == "build_study_plan"
+    assert _route_collect_priorities(next_state) == "end"
 
 
 def test_collect_priorities_guides_weekly_snapshot_until_confirmation(monkeypatch) -> None:
@@ -265,4 +257,4 @@ def test_collect_priorities_guides_weekly_snapshot_until_confirmation(monkeypatc
     assert update["phase"] == "study_plan"
     assert update["priorities"]["status"] == "completed"
     assert update["priorities"]["capture_stage"] is None
-    assert _route_collect_priorities(next_state) == "build_study_plan"
+    assert _route_collect_priorities(next_state) == "end"

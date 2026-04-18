@@ -151,7 +151,7 @@ def test_materialization_service_supersedes_future_instances_from_previous_plan(
     assert previous_plan_statuses == {"superseded"}
 
 
-def test_persist_study_profile_materializes_instances_without_breaking_flow(
+def test_persist_study_profile_does_not_materialize_instances_after_radar(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
@@ -184,11 +184,9 @@ def test_persist_study_profile_materializes_instances_without_breaking_flow(
 
         update = persist_study_profile(state)
 
-        assert update["study_plan"]["persisted_profile_id"] == 1
-        assert update["study_plan"]["materialization_error"] is None
-        assert (update["study_plan"]["materialized_instance_count"] or 0) >= 1
-        assert update["study_plan"]["materialized_horizon_days"] == 14
-        assert len(instances_repository._instances_by_key) >= 1
+        assert update["phase"] == "end"
+        assert "study_plan" not in update
+        assert instances_repository._instances_by_key == {}
     finally:
         set_personalization_service(None)
         set_study_planning_persistence_service(None)

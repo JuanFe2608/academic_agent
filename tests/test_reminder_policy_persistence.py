@@ -70,7 +70,7 @@ def _completed_profile_payload() -> dict[str, object]:
     return payload
 
 
-def test_persist_study_profile_syncs_reminders_without_breaking_flow(monkeypatch) -> None:
+def test_persist_study_profile_does_not_sync_reminders_after_radar(monkeypatch) -> None:
     monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
     monkeypatch.setattr(reminders_module, "datetime", _FrozenDateTime)
     personalization_service = PersonalizationService(
@@ -107,11 +107,9 @@ def test_persist_study_profile_syncs_reminders_without_breaking_flow(monkeypatch
 
         update = persist_study_profile(state)
 
-        assert update["study_plan"]["persisted_profile_id"] == 1
-        assert update["study_plan"]["materialization_error"] is None
-        assert update["reminders"]["last_dispatch_error"] is None
-        assert len(update["reminders"]["persisted_policy_ids"]) == 4
-        assert update["reminders"]["last_sync_at"] is not None
+        assert update["phase"] == "end"
+        assert "study_plan" not in update
+        assert "reminders" not in update
     finally:
         set_personalization_service(None)
         set_study_planning_persistence_service(None)

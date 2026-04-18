@@ -11,6 +11,7 @@ from agents.support.nodes.collect_study_profile_tiebreaker import (
     collect_study_profile_tiebreaker,
 )
 from agents.support.nodes.answer_study_recommendation import answer_study_recommendation
+from agents.support.nodes.answer_scope_boundary import answer_scope_boundary
 from agents.support.nodes.apply_schedule_correction import apply_schedule_correction
 from agents.support.nodes.ask_extracurricular import ask_extracurricular
 from agents.support.nodes.build_draft_schedule import build_draft_schedule
@@ -92,6 +93,7 @@ def _route_welcome(state: AgentState) -> str:
             return "handle_academic_update"
         if is_study_recommendation_message(_current_user_text(state)):
             return "answer_study_recommendation"
+        return "answer_scope_boundary"
     if conversation.phase == "end":
         return "end"
     if conversation.phase != "consent":
@@ -150,12 +152,8 @@ def _route_from_phase(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
         return "persist_study_profile"
-    if phase == "priorities":
-        return "collect_priorities"
-    if phase == "study_plan":
-        return "build_study_plan"
-    if phase == "running":
-        return "handle_academic_update"
+    if phase in {"priorities", "study_plan", "running"}:
+        return "end"
     return "welcome_consent"
 
 
@@ -434,43 +432,24 @@ def _route_persist_study_profile(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile":
         return "collect_study_profile"
-    if phase == "priorities":
-        return "collect_priorities"
-    if phase == "study_plan":
-        return "build_study_plan"
     return "end"
 
 
 def _route_collect_priorities(state: AgentState) -> str:
-    """Coordina la captura de prioridades y el recálculo del plan."""
+    """Flujo posterior al Radar desactivado hasta la siguiente refactorizacion."""
 
-    if _should_wait(state):
-        return "end"
-    phase = state.conversation_state.phase
-    if phase == "study_plan":
-        return "build_study_plan"
-    if phase == "end":
-        return "end"
-    return "collect_priorities"
+    return "end"
 
 
 def _route_build_study_plan(state: AgentState) -> str:
-    """Finaliza el subflujo de plan semanal o vuelve a prioridades si aplica."""
+    """Flujo posterior al Radar desactivado hasta la siguiente refactorizacion."""
 
-    if _should_wait(state):
-        return "end"
-    if state.conversation_state.phase == "priorities":
-        return "collect_priorities"
     return "end"
 
 
 def _route_handle_academic_update(state: AgentState) -> str:
-    """Encadena actualizaciones puntuales con replanning ligero si aplica."""
+    """Cierra actualizaciones puntuales sin activar planning posterior al Radar."""
 
-    if _should_wait(state):
-        return "end"
-    if state.conversation_state.phase == "study_plan":
-        return "build_study_plan"
     return "end"
 
 
@@ -543,6 +522,7 @@ def build_agent() -> StateGraph:
     graph.add_node("build_study_plan", build_study_plan)
     graph.add_node("handle_academic_update", handle_academic_update)
     graph.add_node("answer_study_recommendation", answer_study_recommendation)
+    graph.add_node("answer_scope_boundary", answer_scope_boundary)
 
     graph.set_entry_point("welcome_consent")
 
@@ -574,6 +554,7 @@ def build_agent() -> StateGraph:
             "build_study_plan": "build_study_plan",
             "handle_academic_update": "handle_academic_update",
             "answer_study_recommendation": "answer_study_recommendation",
+            "answer_scope_boundary": "answer_scope_boundary",
             "end": END,
         },
     )
@@ -780,6 +761,7 @@ def build_agent() -> StateGraph:
         },
     )
     graph.add_edge("answer_study_recommendation", END)
+    graph.add_edge("answer_scope_boundary", END)
 
     return graph.compile()
 
