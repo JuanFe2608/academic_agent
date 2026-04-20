@@ -115,8 +115,18 @@ _ACADEMIC_SCOPE_TERMS = {
     "todo",
     "to do",
     "pendientes",
+    "pendiente",
     "semana",
     "cronograma",
+    "hoy",
+    "manana",
+    "proximos dias",
+    "esta semana",
+    "ver mis",
+    "mis materias",
+    "mis tareas",
+    "que tengo",
+    "lo que tengo",
 }
 _PARTIAL_SCOPE_TERMS = {
     "memorizar",
@@ -331,6 +341,8 @@ def decide_scope(
         "prioritize_academic_work",
         "weekly_planning",
         "calendar_action",
+        "view_weekly_agenda",
+        "view_tasks",
     }:
         return _decision(
             input_classification,
@@ -436,16 +448,17 @@ def decide_scope(
             confidence=0.64,
         )
 
+    # No match definitivo: pasar al clasificador LLM para decision semantica final.
+    # Solo se rechazan mensajes con keywords explicitamente fuera de alcance.
     return _decision(
         input_classification,
-        category="hard_out_of_scope",
-        action="reject",
-        allowed=False,
-        domain="out_of_scope",
-        intent="general_out_of_scope_request",
-        reason="no_academic_scope_match",
-        response_text=_GENERAL_REJECTION_RESPONSE,
-        confidence=0.68,
+        category="in_scope",
+        action="normal",
+        allowed=True,
+        domain="guided_academic_support",
+        intent=input_classification.possible_intent or "followup_in_context",
+        reason="ambiguous_let_llm_decide",
+        confidence=0.45,
     )
 
 

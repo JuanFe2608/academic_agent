@@ -41,6 +41,27 @@ _FLOW_DOMAIN = "fixed_schedule_management"
 _CONFIRMATION_STAGE = "awaiting_fixed_schedule_confirmation"
 
 
+# ---------------------------------------------------------------------------
+# Helpers de renderizado visual
+# ---------------------------------------------------------------------------
+
+
+def _try_render_schedule_content(
+    blocks: list[WeeklyScheduleBlock],
+    text: str,
+    timezone: str = "America/Bogota",
+) -> str | list:
+    """Renderiza imagen del horario con texto como caption; cae a texto si falla."""
+    if not blocks:
+        return text
+    try:
+        from agents.support.scheduling.render import build_rendered_schedule_message_content
+        content, _ = build_rendered_schedule_message_content(text, blocks, timezone_name=timezone)
+        return content
+    except Exception:
+        return text
+
+
 def handle_fixed_schedule_management_turn(state: AgentState) -> dict:
     """Gestiona ver, editar y eliminar horario fijo ya registrado."""
 
@@ -330,13 +351,17 @@ def _view_schedule_update(
     text: str,
     current_count: int,
 ) -> dict:
+    summary = build_fixed_schedule_summary(blocks, target=operation.target)
+    timezone = str(state.get("timezone", "America/Bogota"))
+    visible_blocks = [b for b in blocks if not operation.target or b.block_type == operation.target]
+    prompt_content = _try_render_schedule_content(visible_blocks, summary, timezone)
     return _prompt_update(
         state,
         phase="end",
         current_count=current_count,
         last_text=text,
         awaiting_user_input=False,
-        prompt=build_fixed_schedule_summary(blocks, target=operation.target),
+        prompt=prompt_content,
         replan=_clear_change_request(dict(state.get("replan", {}))),
         interaction={
             "active_intent": "view_fixed_schedule",
@@ -743,7 +768,10 @@ def _persist_confirmed_schedule_change(
         detail = getattr(sync_result, "detail", None) or getattr(sync_result, "error_code", None) or "desconocido"
         sync_message = f" No pude reconciliar Outlook automaticamente: {detail}."
 
-    prompt = f"Listo, deje tu horario fijo {success_label}.{sync_message}"
+    success_text = f"Listo, deje tu horario fijo {success_label}.{sync_message}"
+    timezone = str(state.get("timezone", "America/Bogota"))
+    active_blocks = [b for b in updated_blocks if getattr(b, "is_active", True)]
+    prompt = _try_render_schedule_content(active_blocks, success_text, timezone)
     return _prompt_update(
         state,
         phase="end",
@@ -823,7 +851,7 @@ def _prompt_update(
     current_count: int,
     last_text: str | None,
     awaiting_user_input: bool,
-    prompt: str | None,
+    prompt: str | list | None,
     replan: dict | None = None,
     interaction: dict[str, object] | None = None,
     **state_changes: object,

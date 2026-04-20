@@ -12,6 +12,23 @@ from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
 
 
+_OPERATIONAL_WELCOME = (
+    "\n\n✨ Ya entiendo mejor cómo estudias y eso me ayudará a acompañarte "
+    "de una forma más útil y personalizada. 📚\n\n"
+    "Desde ahora puedo apoyarte en:\n\n"
+    "📅 Organizar tus actividades académicas en el calendario\n"
+    "📝 Registrar y dar seguimiento a tus tareas pendientes\n"
+    "🧠 Recomendarte cómo aplicar tu método de estudio\n"
+    "🗓️ Ayudarte a planear tu semana sin que se te acumulen entregas o parciales\n\n"
+    "Puedes escribirme de forma natural. Por ejemplo:\n"
+    "- \"Ayúdame a organizar mi semana\"\n"
+    "- \"¿Cómo aplico mi técnica para un parcial?\"\n"
+    "- \"Agrega grupo de estudio el miércoles de 4 a 6 pm\"\n\n"
+    "Cuando falte información, solo te preguntaré lo necesario. "
+    "Antes de hacer cambios, siempre te mostraré lo que entendí para que confirmes. ✅"
+)
+
+
 def persist_study_profile(state: AgentState) -> dict:
     """Guarda el Radar final y cierra el flujo de personalizacion."""
 
@@ -36,7 +53,7 @@ def persist_study_profile(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                _build_personalization_summary_with_rag(study_profile),
+                _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
             ),
         }
 

@@ -65,7 +65,7 @@ def build_study_plan(state: AgentState) -> dict:
     update = {
         "subjects": subject_items_to_update(result.subjects),
         "study_plan": study_plan_state_to_update(study_plan),
-        "phase": "end",
+        "phase": "running",
         "awaiting_user_input": False,
     }
     persisted_update = persist_planning_snapshot_for_update(state, update)

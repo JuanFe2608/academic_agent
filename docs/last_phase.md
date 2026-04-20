@@ -190,7 +190,7 @@ Solo después de confirmar, se llama la herramienta externa o se persiste el cam
 
 ## 6. Experiencia conversacional objetivo
 
-### 6.1 Mensaje de transición después del bloque de preguntas
+### 6.1 Mensaje de transición después del bloque de preguntas del radar y del mensaje del agente sobre lo que identifico.
 
 Este mensaje marca el paso entre caracterización y operación del agente.
 
@@ -504,6 +504,8 @@ Marqué como completada:
 
 ## 7.8 Flujo: plan semanal
 
+El plan semanal debe tambien ser guardado en el calendario de outlook.
+
 ### Activaciones posibles
 
 - “Ayúdame a organizar mi semana”.
@@ -556,7 +558,6 @@ Con eso te propondré un plan semanal realista, sin cruzarte actividades y dejan
 
 ### Activaciones posibles
 
-- .
 - “Tengo parcial, ¿cómo puedo estudiar?”.
 - “¿Cómo puedo prepararme para esta exposición?”.
 
@@ -1198,6 +1199,8 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 
 ## 15. Diseño lógico sugerido del agente
 
+Ya existen unos intents deberia revisarse si sirven los que ya estan implementados par aver si pueden servir o se tiene que agregar alguno.
+
 ## 15.1 Intents mínimos del MVP
 
 - `create_calendar_activity`
@@ -1217,6 +1220,8 @@ El proyecto debe mantenerse como un sistema centralizado, pero con fronteras cla
 - `exit`
 
 ## 15.2 Slots por intención
+
+Ya existen unos slots deberia revisarse si sirven los que ya estan implementados par aver si pueden servir o se tiene que agregar alguno.
 
 ### create_calendar_activity
 

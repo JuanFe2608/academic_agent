@@ -22,6 +22,8 @@ from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
 from agents.support.nodes.guided_academic_support import guided_academic_support
 from agents.support.nodes.handle_academic_update import handle_academic_update
+from agents.support.nodes.view_weekly_agenda import view_weekly_agenda
+from agents.support.nodes.view_tasks import view_tasks
 from agents.support.nodes.manage_fixed_schedule import manage_fixed_schedule
 from agents.support.nodes.persist_profile import persist_profile
 from agents.support.nodes.persist_study_profile import persist_study_profile
@@ -94,11 +96,11 @@ def _route_welcome(state: AgentState) -> str:
         return "welcome_consent" if has_new_input else "end"
     if _should_wait(state):
         return "end"
-    if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_renewal(state):
+    if conversation.phase in {"end", "running"} and _has_new_user_input(state) and requires_fixed_schedule_renewal(state):
         return "renew_fixed_schedule"
-    if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_repair(state):
+    if conversation.phase in {"end", "running"} and _has_new_user_input(state) and requires_fixed_schedule_repair(state):
         return "repair_fixed_schedule"
-    if conversation.phase == "end" and _has_new_user_input(state):
+    if conversation.phase in {"end", "running"} and _has_new_user_input(state):
         decision = route_conversation_input(
             _current_user_text(state),
             interaction=state.interaction_state,
@@ -109,7 +111,7 @@ def _route_welcome(state: AgentState) -> str:
         if route_name == "collect_priorities" and not is_post_radar_flow_enabled():
             return "answer_scope_boundary"
         return route_name
-    if conversation.phase == "end":
+    if conversation.phase in {"end", "running"}:
         return "end"
     if conversation.phase != "consent":
         return _route_from_phase(state)
@@ -640,7 +642,7 @@ def _recent_user_texts(state: AgentState) -> list[str]:
     return user_texts[-2:]
 
 
-def build_agent() -> StateGraph:
+def build_agent(*, checkpointer=None) -> StateGraph:
     """Construye el grafo de soporte hasta la validacion."""
     graph = StateGraph(AgentState)
 
@@ -676,6 +678,8 @@ def build_agent() -> StateGraph:
     graph.add_node("guided_academic_support", guided_academic_support)
     graph.add_node("answer_study_recommendation", answer_study_recommendation)
     graph.add_node("answer_scope_boundary", answer_scope_boundary)
+    graph.add_node("view_weekly_agenda", view_weekly_agenda)
+    graph.add_node("view_tasks", view_tasks)
 
     graph.set_entry_point("welcome_consent")
 
@@ -966,8 +970,10 @@ def build_agent() -> StateGraph:
     graph.add_edge("answer_study_recommendation", END)
     graph.add_edge("guided_academic_support", END)
     graph.add_edge("answer_scope_boundary", END)
+    graph.add_edge("view_weekly_agenda", END)
+    graph.add_edge("view_tasks", END)
 
-    return graph.compile()
+    return graph.compile(checkpointer=checkpointer)
 
 
 agent = build_agent()

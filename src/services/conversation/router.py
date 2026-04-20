@@ -417,7 +417,7 @@ def _is_blocking_policy(policy: ScopeDecision) -> bool:
 
 
 def _has_active_block(phase: str | None) -> bool:
-    return bool(phase and phase not in {"end"})
+    return bool(phase and phase not in {"end", "running"})
 
 
 

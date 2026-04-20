@@ -82,6 +82,32 @@ _STUDY_METHOD_TERMS = {
 _WEEKLY_PLAN_TERMS = {"semana", "cronograma", "plan", "bloques", "organizar"}
 _REPLAN_TERMS = {"replanifica", "replanificar", "replanificacion", "reagenda", "reprograma"}
 _CALENDAR_TERMS = {"calendario", "outlook", "evento", "recordatorio", "agenda"}
+_VIEW_TASKS_TERMS = {
+    "mis tareas",
+    "ver tareas",
+    "que tengo pendiente",
+    "actividades pendientes",
+    "mis pendientes",
+    "cuales son mis tareas",
+    "que me falta",
+    "tareas pendientes",
+    "pendientes de hoy",
+    "listar tareas",
+}
+_VIEW_AGENDA_TERMS = {
+    "ver mi agenda",
+    "mi agenda",
+    "agenda de hoy",
+    "que tengo hoy",
+    "que hay hoy",
+    "ver agenda",
+    "agenda semanal",
+    "ver mi semana",
+    "que tengo esta semana",
+    "que hay esta semana",
+    "lo que tengo hoy",
+    "lo que tengo esta semana",
+}
 _RISK_TERMS = {
     "crisis",
     "salud mental",
@@ -247,6 +273,12 @@ def _detect_possible_intent(normalized_text: str, signals: list[str]) -> str | N
     if is_study_todo_sync_message(normalized_text):
         signals.append("todo_sync")
         return "sync_study_todo"
+    if contains_any(normalized_text, _VIEW_TASKS_TERMS):
+        signals.append("activity_management")
+        return "view_tasks"
+    if contains_any(normalized_text, _VIEW_AGENDA_TERMS):
+        signals.append("schedule_management")
+        return "view_weekly_agenda"
     checks = [
         ("wellbeing_or_crisis_signal", _RISK_TERMS, "risk_or_wellbeing"),
         ("update_student_profile", _PROFILE_TERMS, "student_profile"),

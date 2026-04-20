@@ -9,6 +9,7 @@ _INTENTS: dict[str, tuple[str, str]] = {
     # intent: (domain, route_name)
     "smalltalk_greeting":                    ("smalltalk_contextual",       "answer_scope_boundary"),
     "manage_fixed_schedule":                 ("schedule_management",         "manage_fixed_schedule"),
+    "view_weekly_agenda":                    ("schedule_management",         "view_weekly_agenda"),
     "request_study_method_recommendation":   ("study_method_recommendation", "answer_study_recommendation"),
     "request_guided_academic_help":          ("guided_academic_support",     "guided_academic_support"),
     "enter_socratic_mode":                   ("guided_academic_support",     "guided_academic_support"),
@@ -17,6 +18,7 @@ _INTENTS: dict[str, tuple[str, str]] = {
     "sync_study_calendar":                   ("calendar_action",             "sync_study_calendar"),
     "sync_study_todo":                       ("todo_action",                 "sync_study_todo"),
     "register_academic_activity":            ("activity_management",         "handle_academic_update"),
+    "view_tasks":                            ("activity_management",         "view_tasks"),
     "request_weekly_prioritization":         ("prioritization",              "collect_priorities"),
     "followup_in_context":                   ("guided_academic_support",     "guided_academic_support"),
     "out_of_scope":                          ("out_of_scope",                "answer_scope_boundary"),
@@ -25,6 +27,7 @@ _INTENTS: dict[str, tuple[str, str]] = {
 _INTENT_DESCRIPTIONS = (
     '"smalltalk_greeting": saludo simple sin pregunta academica (hola, buenos dias, como estas)\n'
     '"manage_fixed_schedule": modificar, consultar o gestionar el horario fijo semanal\n'
+    '"view_weekly_agenda": ver o consultar la agenda de la semana, que tengo hoy/manana/esta semana\n'
     '"request_study_method_recommendation": pedir tecnica, metodo o estrategia de estudio\n'
     '"request_guided_academic_help": pedir ayuda para entender o preparar una actividad SIN que Lara la resuelva\n'
     '"enter_socratic_mode": pedir guia con preguntas o modo socratico explicito\n'
@@ -33,6 +36,7 @@ _INTENT_DESCRIPTIONS = (
     '"sync_study_calendar": sincronizar el plan de estudio con Outlook Calendar\n'
     '"sync_study_todo": sincronizar pendientes academicos con Microsoft To Do\n'
     '"register_academic_activity": registrar nueva actividad academica (parcial, tarea, quiz, entrega, proyecto)\n'
+    '"view_tasks": ver, listar o consultar tareas y actividades academicas pendientes\n'
     '"request_weekly_prioritization": pedir priorizacion o radar de la semana\n'
     '"followup_in_context": pregunta de seguimiento o continuacion del tema anterior\n'
     '"out_of_scope": pregunta completamente ajena al ambito academico'

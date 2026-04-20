@@ -1,0 +1,37 @@
+# Control de versiones
+.git
+.gitignore
+
+# Entornos virtuales y cache
+.venv
+__pycache__
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache
+.mypy_cache
+
+# Archivos de entorno (nunca en la imagen)
+.env
+.env.*
+!.env.example
+
+# Archivos temporales y desarrollo
+tmp/
+prueba1.py
+tests/
+
+# Herramientas de administracion (no necesarias en el contenedor)
+scripts/
+migrations/
+
+# Configuracion de desarrollo local
+langgraph.json
+
+# Documentacion y docs
+docs/
+*.md
+
+# IDE
+.vscode/
+.idea/
