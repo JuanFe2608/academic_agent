@@ -1,10 +1,23 @@
 """DTOs, modelos Pydantic y contratos reutilizables del sistema."""
 
 from .common import BaseSchemaModel, Occupation, Ocupacion, Prioridad
+from .channels import AggregatedInput, BufferedMessage
+from .conversation import (
+    ConversationInputType,
+    ConversationRouteAction,
+    ConversationRouteDecision,
+    InputClassification,
+    InputUtility,
+    InteractionState,
+    ScopeAction,
+    ScopeCategory,
+    ScopeDecision,
+)
 from .microsoft_graph import CalendarProvider, CalendarState
 from .onboarding import (
     ConsentState,
     EmailVerificationState,
+    MicrosoftOAuthOnboardingState,
     OnboardingState,
     StudentProfile,
 )
@@ -35,15 +48,24 @@ from .scheduling import (
 
 __all__ = [
     "BaseSchemaModel",
+    "AggregatedInput",
+    "BufferedMessage",
     "CalendarProvider",
     "CalendarState",
     "ConsentState",
     "Constraints",
+    "ConversationInputType",
+    "ConversationRouteAction",
+    "ConversationRouteDecision",
     "EmailVerificationState",
     "Event",
     "EventCategory",
     "EventType",
     "ExtracurricularItem",
+    "InteractionState",
+    "InputClassification",
+    "InputUtility",
+    "MicrosoftOAuthOnboardingState",
     "Occupation",
     "Ocupacion",
     "OnboardingState",
@@ -62,6 +84,9 @@ __all__ = [
     "ReplanState",
     "ScheduleContextType",
     "SchedulePreview",
+    "ScopeAction",
+    "ScopeCategory",
+    "ScopeDecision",
     "StudentProfile",
     "StudyPlanState",
     "StudyRecommendationQuery",

@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
+from zoneinfo import ZoneInfo
 
 from services.priorities.subject_prioritization_service import resolve_prioritized_subjects
 from schemas.personalization import StudyProfile
@@ -24,6 +26,7 @@ def sync_subjects_and_study_plan(
     *,
     schedule_blocks: list,
     subjects: list,
+    academic_activities: list | None = None,
     study_profile: StudyProfile | dict,
     constraints: object,
     timezone: str,
@@ -34,7 +37,9 @@ def sync_subjects_and_study_plan(
     priorities = resolve_prioritized_subjects(
         schedule_blocks=schedule_blocks,
         subjects=subjects,
+        academic_activities=academic_activities,
         primary_technique_id=primary_technique_id,
+        reference_date=_reference_date(timezone),
     )
     study_plan = build_initial_study_plan(
         schedule_blocks=schedule_blocks,
@@ -56,3 +61,10 @@ def _primary_technique_id(study_profile: StudyProfile | dict) -> str | None:
     data = study_profile if isinstance(study_profile, dict) else study_profile.model_dump(mode="python")
     techniques = list(data.get("top_techniques") or [])
     return str(techniques[0]) if techniques else None
+
+
+def _reference_date(timezone: str):
+    try:
+        return datetime.now(ZoneInfo(str(timezone or "America/Bogota"))).date()
+    except Exception:
+        return datetime.now().date()

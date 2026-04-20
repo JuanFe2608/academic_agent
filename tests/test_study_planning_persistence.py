@@ -4,13 +4,20 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
+from datetime import datetime as real_datetime
 
 from langchain_core.messages import HumanMessage
 
+import services.planning.materialization_service as materialization_module
+import services.reminders.service as reminders_module
+import agents.support.flows.planning.persistence_support as persistence_support
 from agents.support.dependencies import (
     set_personalization_service,
+    set_reminders_service,
+    set_study_plan_materialization_service,
     set_study_planning_persistence_service,
 )
+from bootstrap.errors import RepositoryConfigurationError
 from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.collect_priorities.node import collect_priorities
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
@@ -19,6 +26,8 @@ from repositories.planning.repository import (
     InMemoryStudyPlanningRepository,
     PostgresStudyPlanningRepository,
 )
+from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
+from repositories.reminders.repository import InMemoryRemindersRepository
 from schemas.planning import SubjectItem
 from schemas.scheduling import Event
 from services.personalization import (
@@ -28,8 +37,18 @@ from services.personalization import (
 )
 from agents.support.state import AgentState
 from services.planning import StudyPlanningPersistenceService
+from services.planning import StudyPlanMaterializationService
+from services.reminders import StudyPlanRemindersService
 from services.scheduling import WeeklyScheduleBlock
 
+
+class _FrozenDateTime(real_datetime):
+    @classmethod
+    def now(cls, tz=None):
+        base = real_datetime(2026, 1, 5, 8, 0)
+        if tz is not None:
+            return base.replace(tzinfo=tz)
+        return base
 
 
 def _academic_block(day_of_week: str, title: str) -> WeeklyScheduleBlock:
@@ -384,3 +403,271 @@ def test_build_study_plan_persists_recalculated_snapshot() -> None:
         assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 2
     finally:
         set_study_planning_persistence_service(None)
+
+
+def test_phase_11_persists_only_generated_plan_after_priorities_completion(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    set_study_planning_persistence_service(planning_service)
+    try:
+        state = AgentState(
+            phase="priorities",
+            awaiting_user_input=True,
+            user_message_count=0,
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "collecting", "source": "derived_from_schedule"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [
+                    _academic_block("monday", "Calculo"),
+                    _academic_block("wednesday", "Programacion"),
+                ],
+            },
+            messages=[HumanMessage(content="usar horario")],
+        )
+
+        priorities_update = collect_priorities(state)
+
+        assert priorities_update["phase"] == "study_plan"
+        assert planning_repository._priority_profiles == {}
+        assert planning_repository._study_plan_profiles == {}
+
+        next_state = AgentState(**{**state.model_dump(), **priorities_update})
+        plan_update = build_study_plan(next_state)
+
+        assert plan_update["phase"] == "end"
+        assert plan_update["priorities"]["persisted_profile_id"] == 1
+        assert plan_update["study_plan"]["persisted_profile_id"] == 1
+        assert len(planning_repository._priority_profiles) == 1
+        assert len(planning_repository._study_plan_profiles) == 1
+        assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 2
+    finally:
+        set_study_planning_persistence_service(None)
+
+
+def test_phase_11_does_not_materialize_plan_without_phase_12_flag(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION", raising=False)
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    instances_repository = InMemoryStudyPlanInstancesRepository()
+    materialization_service = StudyPlanMaterializationService(
+        repository=instances_repository,
+        horizon_days=14,
+    )
+    set_study_planning_persistence_service(planning_service)
+    set_study_plan_materialization_service(materialization_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "completed", "source": "manual"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    origen="manual",
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert update["study_plan"]["materialized_instance_count"] is None
+        assert instances_repository._instances_by_key == {}
+    finally:
+        set_study_planning_persistence_service(None)
+        set_study_plan_materialization_service(None)
+
+
+def test_phase_12_materializes_and_syncs_reminders_from_generated_plan(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
+    monkeypatch.setattr(reminders_module, "datetime", _FrozenDateTime)
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION", "1")
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_STUDY_PLAN_REMINDERS", raising=False)
+    monkeypatch.delenv("ACADEMIC_AGENT_REMINDER_CHANNELS", raising=False)
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    instances_repository = InMemoryStudyPlanInstancesRepository()
+    materialization_service = StudyPlanMaterializationService(
+        repository=instances_repository,
+        horizon_days=7,
+    )
+    reminders_repository = InMemoryRemindersRepository(
+        instances_repository=instances_repository,
+    )
+    reminders_service = StudyPlanRemindersService(repository=reminders_repository)
+    set_study_planning_persistence_service(planning_service)
+    set_study_plan_materialization_service(materialization_service)
+    set_reminders_service(reminders_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "completed", "source": "manual"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [
+                    _academic_block("monday", "Calculo"),
+                    _academic_block("wednesday", "Programacion"),
+                ],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    origen="manual",
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        instance_count = int(update["study_plan"]["materialized_instance_count"] or 0)
+        assert update["phase"] == "end"
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert instance_count >= 1
+        assert update["study_plan"]["materialized_through_date"] == "2026-01-11"
+        assert update["study_plan"]["rules"]["external_sync_requires_confirmation"] is True
+        assert update["reminders"]["policy"] == {"channels": ["in_app"]}
+        assert update["reminders"]["policy_count"] == 4
+        assert update["reminders"]["schedulable_instance_count"] == instance_count
+        assert update["reminders"]["created_dispatch_count"] == instance_count * 4
+        assert update["reminders"]["last_dispatch_error"] is None
+        assert len(instances_repository._instances_by_key) == instance_count
+        assert len(reminders_repository._dispatches_by_id) == instance_count * 4
+        assert {row["status"] for row in reminders_repository._dispatches_by_id.values()} == {
+            "pending"
+        }
+        assistant_message = update["messages"][-1].content
+        assert "Plan guardado en tu perfil académico." in assistant_message
+        assert "Sesiones materializadas:" in assistant_message
+        assert "Recordatorios activados por canal interno" in assistant_message
+        assert "No he creado eventos en Outlook ni tareas en Microsoft To Do" in assistant_message
+    finally:
+        set_study_planning_persistence_service(None)
+        set_study_plan_materialization_service(None)
+        set_reminders_service(None)
+
+
+def test_phase_12_repository_failures_do_not_break_conversation(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION", "1")
+    monkeypatch.setattr(
+        persistence_support,
+        "get_study_plan_materialization_service",
+        lambda: (_ for _ in ()).throw(RepositoryConfigurationError("missing db")),
+    )
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    set_study_planning_persistence_service(planning_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "completed", "source": "manual"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    origen="manual",
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        assert update["phase"] == "end"
+        assert update["study_plan"]["persisted_profile_id"] == 1
+        assert (
+            update["study_plan"]["materialization_error"]
+            == "study_plan_materialization_service_unavailable"
+        )
+        assert update["messages"][-1].content
+        assert "No pude dejar listas las sesiones fechadas todavía" in update["messages"][-1].content
+    finally:
+        set_study_planning_persistence_service(None)
+
+
+def test_phase_12_reminder_failure_keeps_materialized_plan(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION", "1")
+    monkeypatch.setattr(
+        persistence_support,
+        "get_reminders_service",
+        lambda: (_ for _ in ()).throw(RepositoryConfigurationError("missing reminders")),
+    )
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    instances_repository = InMemoryStudyPlanInstancesRepository()
+    materialization_service = StudyPlanMaterializationService(
+        repository=instances_repository,
+        horizon_days=7,
+    )
+    set_study_planning_persistence_service(planning_service)
+    set_study_plan_materialization_service(materialization_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            student_profile={"persisted_student_id": 15},
+            study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
+            priorities={"status": "completed", "source": "manual"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    origen="manual",
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        assert update["phase"] == "end"
+        assert update["study_plan"]["materialized_instance_count"] >= 1
+        assert (
+            update["reminders"]["last_dispatch_error"]
+            == "study_plan_reminders_service_unavailable"
+        )
+        assert "No pude activar recordatorios todavía" in update["messages"][-1].content
+    finally:
+        set_study_planning_persistence_service(None)
+        set_study_plan_materialization_service(None)

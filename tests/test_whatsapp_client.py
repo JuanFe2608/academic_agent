@@ -188,6 +188,39 @@ def test_extract_inbound_messages_maps_text_and_image_webhook() -> None:
     assert messages[1].media.caption == "mi horario"
 
 
+def test_extract_inbound_messages_maps_sticker_webhook_for_buffer_policy() -> None:
+    payload = {
+        "entry": [
+            {
+                "changes": [
+                    {
+                        "value": {
+                            "messages": [
+                                {
+                                    "from": "573001112233",
+                                    "id": "wamid.sticker",
+                                    "type": "sticker",
+                                    "sticker": {
+                                        "id": "sticker-123",
+                                        "mime_type": "image/webp",
+                                    },
+                                },
+                            ]
+                        }
+                    }
+                ]
+            }
+        ]
+    }
+
+    messages = extract_inbound_messages(payload)
+
+    assert len(messages) == 1
+    assert messages[0].media is not None
+    assert messages[0].media.media_type == "sticker"
+    assert messages[0].media.id == "sticker-123"
+
+
 def test_verify_webhook_challenge_accepts_expected_token() -> None:
     assert (
         verify_webhook_challenge(

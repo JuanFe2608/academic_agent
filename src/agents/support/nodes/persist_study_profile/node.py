@@ -8,6 +8,7 @@ from agents.support.dependencies import (
 )
 from agents.support.nodes.utils import append_message
 from agents.support.personalization.formatter import build_personalization_summary
+from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
 
 
@@ -30,7 +31,7 @@ def persist_study_profile(state: AgentState) -> dict:
         study_profile["persistence_error"] = None
         return {
             "study_profile": study_profile,
-            "phase": "end",
+            "phase": "priorities" if is_post_radar_flow_enabled() else "end",
             "awaiting_user_input": False,
             "messages": append_message(
                 messages,

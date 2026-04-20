@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from agents.support.planning.tracking_service import build_study_session_tracking_service
+from services.planning import build_study_session_tracking_service
 
 
 def main() -> int:

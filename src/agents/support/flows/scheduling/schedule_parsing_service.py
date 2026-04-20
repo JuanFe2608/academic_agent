@@ -22,6 +22,10 @@ from agents.support.scheduling.state_helpers import (
 )
 from agents.support.state import AgentState
 from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
+from services.scheduling.pending_slot_state import (
+    clear_scheduling_pending_interaction,
+    schedule_pending_interaction_update,
+)
 
 
 @dataclass(frozen=True)
@@ -86,6 +90,7 @@ def handle_schedule_parsing_turn(
 
     if academic_result and academic_result.needs_clarification:
         return _build_pending_section_update(
+            state,
             raw_inputs_update,
             messages,
             schedule_state,
@@ -97,6 +102,7 @@ def handle_schedule_parsing_turn(
 
     if work_result and work_result.needs_clarification:
         return _build_pending_section_update(
+            state,
             raw_inputs_update,
             messages,
             schedule_state,
@@ -108,6 +114,7 @@ def handle_schedule_parsing_turn(
 
     if capture_target == "academic":
         return _build_more_prompt_update(
+            state,
             raw_inputs_update,
             messages,
             schedule_state,
@@ -118,6 +125,7 @@ def handle_schedule_parsing_turn(
 
     if capture_target == "work":
         return _build_more_prompt_update(
+            state,
             raw_inputs_update,
             messages,
             schedule_state,
@@ -145,6 +153,7 @@ def handle_schedule_parsing_turn(
             ),
             "awaiting_user_input": True,
             "messages": append_message(messages, "assistant", prompts.work_request),
+            **clear_scheduling_pending_interaction(state),
         }
 
     return {
@@ -163,6 +172,7 @@ def handle_schedule_parsing_turn(
         ),
         "phase": "extras",
         "awaiting_user_input": False,
+        **clear_scheduling_pending_interaction(state),
     }
 
 
@@ -180,6 +190,7 @@ def _build_missing_text_update(
 
 
 def _build_pending_section_update(
+    state: AgentState,
     raw_inputs_update: dict[str, object],
     messages: list,
     schedule_state: object,
@@ -212,10 +223,16 @@ def _build_pending_section_update(
         ),
         "awaiting_user_input": True,
         "messages": append_message(messages, "assistant", prompt),
+        **schedule_pending_interaction_update(
+            state,
+            academic_pending_items=pending_items if target == "academic" else [],
+            work_pending_items=pending_items if target == "work" else [],
+        ),
     }
 
 
 def _build_more_prompt_update(
+    state: AgentState,
     raw_inputs_update: dict[str, object],
     messages: list,
     schedule_state: object,
@@ -242,4 +259,5 @@ def _build_more_prompt_update(
         ),
         "awaiting_user_input": True,
         "messages": append_message(messages, "assistant", prompt),
+        **clear_scheduling_pending_interaction(state),
     }

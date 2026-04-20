@@ -5,12 +5,17 @@ from __future__ import annotations
 from langchain_core.messages import HumanMessage
 
 from agents.support.dependencies import set_personalization_service
-from agents.support.agent import _route_collect_priorities, _route_persist_study_profile
+from agents.support.agent import (
+    _route_collect_priorities,
+    _route_from_phase,
+    _route_persist_study_profile,
+)
 from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.collect_priorities.node import collect_priorities
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
 from agents.support.state import AgentState
 from repositories.personalization.repository import InMemoryPersonalizationRepository
+from schemas.planning import AcademicActivity
 from services.personalization import (
     PersonalizationConfig,
     PersonalizationService,
@@ -69,6 +74,7 @@ def _completed_profile_payload() -> dict[str, object]:
 
 def test_priorities_feature_flag_no_longer_routes_after_persist_study_profile(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),
@@ -95,6 +101,39 @@ def test_priorities_feature_flag_no_longer_routes_after_persist_study_profile(mo
         assert "priorities" not in update
         assert "study_plan" not in update
         assert _route_persist_study_profile(next_state) == "end"
+    finally:
+        set_personalization_service(None)
+
+
+def test_post_radar_flow_routes_to_weekly_priorities_when_flag_is_enabled(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
+    personalization_service = PersonalizationService(
+        config=PersonalizationConfig(enabled=True),
+        repository=InMemoryPersonalizationRepository(),
+    )
+    set_personalization_service(personalization_service)
+    try:
+        state = AgentState(
+            phase="study_profile_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "persisted_profile_id": 9,
+                "blocks": [_academic_block("monday", "Calculo")],
+                "summary_text": "resumen",
+                "conflicts": [],
+            },
+            study_profile=_completed_profile_payload(),
+        )
+
+        update = persist_study_profile(state)
+        next_state = _apply_update(state, update)
+        priority_update = collect_priorities(next_state)
+
+        assert update["phase"] == "priorities"
+        assert _route_persist_study_profile(next_state) == "collect_priorities"
+        assert priority_update["phase"] == "priorities"
+        assert priority_update["priorities"]["capture_stage"] == "ask_update"
+        assert "prioridades de esta semana" in priority_update["messages"][0].content
     finally:
         set_personalization_service(None)
 
@@ -139,6 +178,58 @@ def test_collect_priorities_accepts_manual_subjects_and_rebuilds_plan(monkeypatc
     assert "Calculo" in plan_update["messages"][0].content
 
 
+def test_collect_priorities_starts_from_schedule_activities_and_radar_technique() -> None:
+    state = AgentState(
+        phase="priorities",
+        awaiting_user_input=False,
+        user_message_count=0,
+        priorities={"status": "idle"},
+        schedule={
+            "blocks": [_academic_block("monday", "Calculo")]
+        },
+        academic_activities=[
+            AcademicActivity(
+                activity_type="quiz",
+                subject_name="Programacion",
+                activity_title="Quiz de Programacion",
+                due_date="2026-04-21",
+                estimated_effort_minutes=90,
+            )
+        ],
+        study_profile={"top_techniques": ["repeticion_espaciada"]},
+    )
+
+    update = collect_priorities(state)
+    names = [subject.nombre for subject in update["subjects"]]
+
+    assert "Calculo" in names
+    assert "Programacion" in names
+    assert update["priorities"]["capture_stage"] == "ask_update"
+    assert "Programacion" in update["messages"][0].content
+
+
+def test_collect_priorities_direct_request_starts_at_ranking_step() -> None:
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=0,
+        schedule={
+            "blocks": [
+                _academic_block("monday", "Calculo"),
+                _academic_block("wednesday", "Programacion"),
+            ]
+        },
+        messages=[HumanMessage(content="quiero priorizar esta semana")],
+    )
+
+    update = collect_priorities(state)
+
+    assert update["phase"] == "priorities"
+    assert update["priorities"]["capture_stage"] == "ask_top3"
+    assert update["user_message_count"] == 1
+    assert "materias más importantes" in update["messages"][0].content
+
+
 def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
     state = AgentState(
@@ -167,6 +258,38 @@ def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
     assert plan_update["phase"] == "end"
     assert plan_update["study_plan"]["rules"]["subjects_source"] == "state.subjects"
     assert plan_update["study_plan"]["rules"]["spacing_days"] == 2
+
+
+def test_collect_priorities_routes_completed_snapshot_to_study_plan_when_post_radar_is_enabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
+    state = AgentState(
+        phase="priorities",
+        awaiting_user_input=True,
+        user_message_count=0,
+        priorities={"status": "collecting", "source": "derived_from_schedule"},
+        schedule={
+            "blocks": [
+                _academic_block("monday", "Calculo"),
+                _academic_block("wednesday", "Programacion"),
+            ]
+        },
+        study_profile={"top_techniques": ["pomodoro"]},
+        messages=[HumanMessage(content="usar horario")],
+    )
+
+    update = collect_priorities(state)
+    next_state = _apply_update(state, update)
+
+    assert update["phase"] == "study_plan"
+    assert _route_collect_priorities(next_state) == "build_study_plan"
+    assert _route_from_phase(next_state) == "build_study_plan"
+
+    plan_update = build_study_plan(next_state)
+    assert plan_update["phase"] == "end"
+    assert plan_update["study_plan"]["rules"]["external_sync_requires_confirmation"] is True
+    assert "No he creado eventos en Outlook" in plan_update["messages"][0].content
 
 
 def test_collect_priorities_supports_visible_later_option(monkeypatch) -> None:

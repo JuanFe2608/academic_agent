@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from schemas.planning import SubjectItem
+from datetime import date
+
+from schemas.planning import AcademicActivity, SubjectItem
 from services.priorities import resolve_prioritized_subjects
 from services.scheduling import WeeklyScheduleBlock
 
@@ -75,3 +77,45 @@ def test_resolve_prioritized_subjects_preserves_explicit_urgency_and_load() -> N
     prioritized = next(subject for subject in result.prioritized_subjects if subject.nombre == "Calculo")
     assert prioritized.weekly_sessions >= 3
     assert prioritized.preferred_days == ("monday",)
+
+
+def test_resolve_prioritized_subjects_merges_pending_activities_without_duplicates() -> None:
+    blocks = [_academic_block("monday", "08:00", "10:00", "Calculo")]
+    activities = [
+        AcademicActivity(
+            activity_type="parcial",
+            subject_name="Calculo",
+            activity_title="Parcial de Calculo",
+            due_date="2026-04-20",
+            estimated_effort_minutes=120,
+        ),
+        AcademicActivity(
+            activity_type="quiz",
+            subject_name="Programacion",
+            activity_title="Quiz de Programacion",
+            due_date="2026-04-21",
+            estimated_effort_minutes=60,
+        ),
+    ]
+
+    result = resolve_prioritized_subjects(
+        schedule_blocks=blocks,
+        subjects=[],
+        academic_activities=activities,
+        primary_technique_id="pomodoro",
+        reference_date=date(2026, 4, 18),
+    )
+
+    names = [subject.nombre for subject in result.subject_items]
+    assert result.source == "derived_from_schedule"
+    assert names.count("Calculo") == 1
+    assert "Programacion" in names
+
+    calculo = next(subject for subject in result.subject_items if subject.nombre == "Calculo")
+    programacion = next(subject for subject in result.subject_items if subject.nombre == "Programacion")
+
+    assert calculo.urgencia == "alta"
+    assert calculo.urgency_type == "parcial"
+    assert calculo.carga_semanal_min == 240
+    assert programacion.origen == "academic_activity"
+    assert programacion.urgency_type == "quiz"

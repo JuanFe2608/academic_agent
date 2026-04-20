@@ -16,8 +16,10 @@ from integrations.whatsapp import (
 )
 from schemas.channels import ChannelInboundMessage, ChannelMedia
 from services.channels import (
+    MessageBuffer,
     WhatsAppChannelService,
     agent_message_to_channel_messages,
+    aggregated_input_to_human_message,
     whatsapp_inbound_to_human_message,
 )
 
@@ -184,3 +186,84 @@ def test_whatsapp_inbound_to_human_message_preserves_text_and_image(tmp_path: Pa
     assert human.content[0] == {"type": "text", "text": "mi horario"}
     assert human.content[1]["type"] == "input_image"
     assert human.content[1]["image_url"]["url"] == str(image_path)
+
+
+def test_whatsapp_channel_service_buffers_inbound_messages_until_manual_flush() -> None:
+    client = _fake_client()
+    service = WhatsAppChannelService(
+        client,  # type: ignore[arg-type]
+        message_buffer=MessageBuffer(flush_timeout_seconds=30),
+    )
+
+    first = service.buffer_inbound(
+        ChannelInboundMessage(
+            channel="whatsapp",
+            sender_id="573001112233",
+            message_id="wamid.1",
+            text="Andres",
+        )
+    )
+    second = service.buffer_inbound(
+        ChannelInboundMessage(
+            channel="whatsapp",
+            sender_id="573001112233",
+            message_id="wamid.2",
+            text="Gomez",
+        )
+    )
+
+    assert first == []
+    assert second == []
+
+    aggregated = service.flush_inbound_buffer("573001112233")
+
+    assert aggregated is not None
+    assert aggregated.text == "Andres\nGomez"
+    assert aggregated.message_count == 2
+
+
+def test_whatsapp_channel_service_immediately_flushes_inbound_confirmation() -> None:
+    client = _fake_client()
+    service = WhatsAppChannelService(client)  # type: ignore[arg-type]
+
+    outputs = service.buffer_inbound(
+        ChannelInboundMessage(
+            channel="whatsapp",
+            sender_id="573001112233",
+            message_id="wamid.confirm",
+            text="si",
+        )
+    )
+
+    assert len(outputs) == 1
+    assert outputs[0].text == "si"
+    assert outputs[0].flush_reason == "confirmation"
+
+
+def test_aggregated_input_to_human_message_preserves_text_and_image(tmp_path: Path) -> None:
+    image_path = tmp_path / "incoming.png"
+    image_path.write_bytes(b"image")
+    client = _fake_client()
+    service = WhatsAppChannelService(client)  # type: ignore[arg-type]
+
+    outputs = service.buffer_inbound(
+        ChannelInboundMessage(
+            channel="whatsapp",
+            sender_id="573001112233",
+            message_id="wamid.image",
+            text="mi horario",
+            media=[
+                ChannelMedia(
+                    media_type="image",
+                    reference=str(image_path),
+                    mime_type="image/png",
+                )
+            ],
+        )
+    )
+
+    human = aggregated_input_to_human_message(outputs[0])
+
+    assert isinstance(human.content, list)
+    assert human.content[0] == {"type": "text", "text": "mi horario"}
+    assert human.content[1]["type"] == "input_image"

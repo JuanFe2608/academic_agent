@@ -6,6 +6,7 @@ from langchain_core.messages import HumanMessage
 
 import agents.support.agent as agent_module
 from agents.support.agent import (
+    _route_after_fixed_schedule_management,
     _route_after_schedule_repair,
     _route_after_schedule_edit,
     _route_after_parse_schedules,
@@ -142,7 +143,47 @@ def test_route_welcome_reopens_with_schedule_repair_when_drift_pending(
     assert _route_welcome(state) == "repair_fixed_schedule"
 
 
+def test_route_welcome_routes_prioritization_request_when_post_radar_flag_enabled(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: False)
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=0,
+        messages=[HumanMessage(content="quiero priorizar mis materias")],
+    )
+
+    assert _route_welcome(state) == "collect_priorities"
+
+
+def test_route_welcome_blocks_prioritization_request_without_post_radar_flag(
+    monkeypatch,
+) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
+    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: False)
+    state = AgentState(
+        phase="end",
+        awaiting_user_input=False,
+        user_message_count=0,
+        messages=[HumanMessage(content="quiero priorizar mis materias")],
+    )
+
+    assert _route_welcome(state) == "answer_scope_boundary"
+
+
 def test_route_after_schedule_repair_can_restart_schedule_capture() -> None:
     state = AgentState(phase="schedules", awaiting_user_input=False)
 
     assert _route_after_schedule_repair(state) == "request_schedules"
+
+
+def test_route_after_fixed_schedule_management_waits_for_confirmation() -> None:
+    waiting = AgentState(phase="fixed_schedule_management", awaiting_user_input=True)
+    continuing = AgentState(phase="fixed_schedule_management", awaiting_user_input=False)
+
+    assert _route_after_fixed_schedule_management(waiting) == "end"
+    assert _route_after_fixed_schedule_management(continuing) == "manage_fixed_schedule"

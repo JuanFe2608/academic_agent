@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import argparse
 
-from agents.support.tools.db import get_microsoft_todo_sync_service
+from agents.support.dependencies import get_microsoft_todo_sync_service
 
 
 def main() -> int:

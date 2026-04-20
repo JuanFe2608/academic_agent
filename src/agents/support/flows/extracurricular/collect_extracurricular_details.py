@@ -23,6 +23,7 @@ from services.scheduling.extracurricular_state import (
 from services.scheduling.pending_extracurricular_support import (
     build_extracurricular_pending_prompt as shared_build_extracurricular_pending_prompt,
 )
+from services.scheduling.pending_slot_state import extracurricular_pending_interaction_update
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
     reset_schedule_review_state,
@@ -100,10 +101,18 @@ def _build_extras_update(
             "assistant",
             prompt,
         )
-    return {
+    update = {
         **update_scheduling_state(state, **scheduling_changes),
         **update_conversation_state(state, **conversation_changes),
     }
+    if "extras_pending_items" in scheduling_changes:
+        update.update(
+            extracurricular_pending_interaction_update(
+                state,
+                pending_items=scheduling_changes.get("extras_pending_items") or [],
+            )
+        )
+    return update
 
 
 def collect_extracurricular_details(state: AgentState) -> dict:

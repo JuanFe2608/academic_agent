@@ -26,6 +26,7 @@ from rag.retrieval.hybrid import HybridRagRetriever
 from repositories.rag import RagRepositoryError, build_rag_repository
 from schemas.rag import StudyRecommendationQuery, StudyRecommendationResult
 
+from .applied_method_service import is_applied_study_method_message
 from .models import StudyRecommendationRetriever, StudyRecommendationServiceStatus
 
 _DIRECT_STUDY_RECOMMENDATION_TERMS = {
@@ -301,6 +302,8 @@ def build_study_recommendation_service() -> StudyRecommendationService:
 def is_study_recommendation_message(text: str | None) -> bool:
     """Detect direct user questions about study techniques or methods."""
 
+    if is_applied_study_method_message(text):
+        return True
     normalized = slugify_identifier(str(text or ""))
     if not normalized:
         return False

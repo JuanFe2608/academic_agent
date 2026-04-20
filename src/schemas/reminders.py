@@ -15,6 +15,10 @@ class RemindersState(BaseSchemaModel):
     enabled: bool = True
     policy: dict[str, object] = Field(default_factory=dict)
     persisted_policy_ids: list[int] = Field(default_factory=list)
+    policy_count: Optional[int] = None
+    schedulable_instance_count: Optional[int] = None
+    created_dispatch_count: Optional[int] = None
+    canceled_dispatch_count: Optional[int] = None
     last_dispatch_error: Optional[str] = None
     last_sync_at: Optional[str] = None
 

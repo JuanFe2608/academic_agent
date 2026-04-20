@@ -29,9 +29,19 @@ def build_extracurricular_pending_prompt(
     if name:
         lines.append(name)
     lines.append(f"- Me falta: {missing_text}.")
-    lines.append(
-        f"📩 Puedes responder solo con lo que falta o enviármela de nuevo completa así: {example}."
-    )
+    if missing_text == "dia o dias exactos":
+        lines.append("📅 Puedes responder solo con el día o los días. Ejemplo: Lunes.")
+    elif missing_text == "hora de inicio y fin":
+        lines.append(
+            "🕒 Puedes responder solo con lo que falta. Puedes responder solo con el rango horario. "
+            f"Ejemplo: 07:00 a 09:00. Si prefieres, envíamela completa así: {example}."
+        )
+    elif missing_text == "nombre de la actividad":
+        lines.append("📝 Puedes responder solo con el nombre. Ejemplo: Gimnasio.")
+    else:
+        lines.append(
+            f"📩 Puedes responder solo con lo que falta o enviármela de nuevo completa así: {example}."
+        )
     return "\n".join(lines)
 
 

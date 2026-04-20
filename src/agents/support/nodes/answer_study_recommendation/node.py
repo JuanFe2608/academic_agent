@@ -6,6 +6,12 @@ from agents.support.dependencies import get_study_recommendation_service
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
 from schemas.rag import StudyRecommendationQuery
+from services.study_recommendations import (
+    AppliedStudyMethodService,
+    build_applied_method_request_from_text,
+    format_applied_study_method_for_user,
+    is_applied_study_method_message,
+)
 
 
 def answer_study_recommendation(state: AgentState) -> dict:
@@ -23,15 +29,24 @@ def answer_study_recommendation(state: AgentState) -> dict:
 
     study_profile = dict(state.get("study_profile", {}))
     try:
-        result = get_study_recommendation_service().answer_query(
-            StudyRecommendationQuery(
-                query_text=last_text,
-                student_signals=list(study_profile.get("weakness_tags") or []),
-                top_techniques=list(study_profile.get("top_techniques") or []),
-                max_chunks=4,
-            )
+        recommendation_service = get_study_recommendation_service()
+        applied_answer = _answer_applied_method_if_possible(
+            text=last_text,
+            study_profile=study_profile,
+            recommendation_service=recommendation_service,
         )
-        answer = result.answer.strip()
+        if applied_answer:
+            answer = applied_answer
+        else:
+            result = recommendation_service.answer_query(
+                StudyRecommendationQuery(
+                    query_text=last_text,
+                    student_signals=list(study_profile.get("weakness_tags") or []),
+                    top_techniques=list(study_profile.get("top_techniques") or []),
+                    max_chunks=4,
+                )
+            )
+            answer = result.answer.strip()
     except Exception:
         answer = (
             "No pude preparar una respuesta confiable sobre esa tecnica en este momento. "
@@ -45,6 +60,25 @@ def answer_study_recommendation(state: AgentState) -> dict:
         "awaiting_user_input": False,
         "messages": append_message(messages, "assistant", answer),
     }
+
+
+def _answer_applied_method_if_possible(
+    *,
+    text: str,
+    study_profile: dict,
+    recommendation_service,
+) -> str | None:
+    if not is_applied_study_method_message(text):
+        return None
+    service = AppliedStudyMethodService(recommendation_service)
+    request = build_applied_method_request_from_text(
+        text,
+        study_profile=study_profile,
+    )
+    result = service.apply_to_activity(request)
+    if not result.applied:
+        return None
+    return format_applied_study_method_for_user(result)
 
 
 __all__ = ["answer_study_recommendation"]

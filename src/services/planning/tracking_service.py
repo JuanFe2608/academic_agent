@@ -380,6 +380,82 @@ class StudySessionTrackingService:
             )
         return self._apply_mutation(mutation, instance)
 
+    def record_partial_progress(
+        self,
+        *,
+        student_id: int | None,
+        study_plan_event_instance_id: int | None,
+        actor_type: object = "student",
+        reported_at: object = None,
+        completion_pct: object = None,
+        comprehension_score: object = None,
+        energy_score: object = None,
+        notes: object = None,
+        checkin_payload: object = None,
+    ) -> TrackStudySessionResult:
+        instance, error = self._get_instance(student_id, study_plan_event_instance_id)
+        if error is not None:
+            return error
+        if instance.status == "completed":
+            return self.record_feedback(
+                student_id=student_id,
+                study_plan_event_instance_id=study_plan_event_instance_id,
+                actor_type=actor_type,
+                reported_at=reported_at,
+                completion_pct=completion_pct,
+                comprehension_score=comprehension_score,
+                energy_score=energy_score,
+                notes=notes,
+                checkin_payload=checkin_payload,
+            )
+        if instance.status not in {"scheduled", "in_progress"}:
+            return _invalid_transition(
+                instance,
+                error_code="invalid_status_transition",
+                detail=f"No puedes registrar avance parcial con status={instance.status!r}.",
+            )
+
+        try:
+            actor = normalize_actor_type(actor_type)
+            now_value = _now_for_instance(instance)
+            reported = normalize_timestamp(reported_at, default=now_value)
+            payload = normalize_payload(checkin_payload)
+            normalized_notes = normalize_notes(notes)
+            normalized_completion_pct = normalize_completion_pct(completion_pct, default=50)
+            normalized_comprehension = normalize_optional_score(
+                "comprehension_score",
+                comprehension_score,
+            )
+            normalized_energy = normalize_optional_score("energy_score", energy_score)
+            payload.setdefault("progress_kind", "partial")
+            mutation = StudySessionMutation(
+                student_id=int(student_id),
+                study_plan_event_instance_id=int(study_plan_event_instance_id),
+                checkin_type="feedback",
+                actor_type=actor,
+                reported_at=reported,
+                actual_start_at=None,
+                actual_end_at=None,
+                completion_pct=normalized_completion_pct,
+                comprehension_score=normalized_comprehension,
+                energy_score=normalized_energy,
+                notes=normalized_notes,
+                checkin_payload=payload,
+                next_status="in_progress",
+                instance_completion_pct=normalized_completion_pct,
+                instance_completed_at=None,
+            )
+        except ValueError as exc:
+            return TrackStudySessionResult(
+                tracked=False,
+                instance_id=instance.id,
+                previous_status=instance.status,
+                resulting_status=instance.status,
+                error_code="invalid_tracking_payload",
+                detail=str(exc),
+            )
+        return self._apply_mutation(mutation, instance)
+
     def mark_due_sessions_missed(
         self,
         *,
@@ -420,6 +496,32 @@ class StudySessionTrackingService:
             marked_count=len(recorded),
             instance_ids=[item.instance.id for item in recorded],
         )
+
+    def list_candidate_sessions(
+        self,
+        *,
+        student_id: int | None,
+        as_of: object = None,
+        days_before: int = 7,
+        days_after: int = 14,
+        limit: int = 50,
+    ) -> list[StudyPlanInstanceSnapshot]:
+        if not student_id:
+            return []
+        effective_as_of = normalize_timestamp(
+            as_of,
+            default=datetime.now(ZoneInfo("UTC")),
+        )
+        try:
+            return self.repository.list_candidate_instances(
+                student_id=int(student_id),
+                as_of=effective_as_of,
+                days_before=max(0, int(days_before)),
+                days_after=max(0, int(days_after)),
+                limit=max(1, int(limit)),
+            )
+        except (StudySessionTrackingRepositoryError, RepositoryConfigurationError):
+            return []
 
     def _get_instance(
         self,

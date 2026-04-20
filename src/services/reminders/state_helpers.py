@@ -23,6 +23,10 @@ def reminders_state_to_update(
         "enabled": normalized.enabled,
         "policy": dict(normalized.policy),
         "persisted_policy_ids": list(normalized.persisted_policy_ids),
+        "policy_count": normalized.policy_count,
+        "schedulable_instance_count": normalized.schedulable_instance_count,
+        "created_dispatch_count": normalized.created_dispatch_count,
+        "canceled_dispatch_count": normalized.canceled_dispatch_count,
         "last_dispatch_error": normalized.last_dispatch_error,
         "last_sync_at": normalized.last_sync_at,
     }

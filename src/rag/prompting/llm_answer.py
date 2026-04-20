@@ -44,11 +44,14 @@ class LlmGroundedAnswerGenerator:
     ) -> str | None:
         """Invoke the configured chat model and return sanitized plain text."""
 
-        prompt = render_grounded_answer_prompt(
-            package=package,
-            prompt_context=prompt_context,
-            max_context_chars=self.max_context_chars,
-        )
+        if not package.has_sufficient_sources:
+            prompt = render_no_sources_prompt(package)
+        else:
+            prompt = render_grounded_answer_prompt(
+                package=package,
+                prompt_context=prompt_context,
+                max_context_chars=self.max_context_chars,
+            )
         response = self.llm.invoke(prompt)
         text = _response_to_text(response)
         return _sanitize_answer(text, max_chars=self.max_answer_chars)
@@ -94,17 +97,19 @@ def render_grounded_answer_prompt(
     relations_text = _fit_text("\n".join(relation_blocks), max_chars=1200) or "- Ninguna."
 
     return (
-        "Eres LARA, un agente academico. Responde al usuario usando el CONTEXTO RAG "
-        "solo como evidencia de apoyo, no como respuesta directa.\n\n"
-        "Reglas obligatorias:\n"
+        "Eres LARA, un agente academico especializado en metodos y tecnicas de estudio.\n\n"
+        "REGLAS:\n"
         "- Responde en espanol claro y natural.\n"
-        "- Usa solo hechos respaldados por el contexto RAG y las relaciones listadas.\n"
-        "- No copies un chunk completo ni lo pegues como respuesta final; sintetiza y adapta.\n"
-        "- Si la evidencia no alcanza, dilo y pide el dato minimo faltante.\n"
-        "- No inventes estudios, fuentes, tecnicas ni relaciones.\n"
-        "- No menciones IDs de chunks en el texto final.\n"
-        "- Mantente dentro de gestion academica, metodos de estudio y planificacion.\n"
-        "- Entrega una respuesta breve: 2 a 5 frases, con siguiente paso accionable si aplica.\n\n"
+        "- Usa el CONTEXTO RAG como punto de partida si contiene informacion relevante "
+        "para la pregunta. Si no la tiene o es insuficiente, responde con tu propio "
+        "conocimiento academico sobre tecnicas y metodos de estudio.\n"
+        "- Sintetiza y adapta, no copies chunks literalmente.\n"
+        "- No menciones IDs de chunks ni nombres de archivos.\n"
+        "- No inventes estudios ni fuentes citadas. Si puedes usar conocimiento general "
+        "de pedagogia y tecnicas de aprendizaje.\n"
+        "- Mantente en el dominio: gestion academica, metodos de estudio, planificacion.\n"
+        "- Respuesta breve: 2 a 5 frases + siguiente paso accionable si aplica.\n"
+        "- Si el contexto RAG es relevante, usalo. Si no, ignoralo y responde igual.\n\n"
         "PREGUNTA DEL USUARIO:\n"
         f"{query.query_text.strip() or '(sin pregunta textual)'}\n\n"
         "ENTENDIMIENTO DEL QUERY:\n"
@@ -123,6 +128,29 @@ def render_grounded_answer_prompt(
         "RELACIONES RAG RELEVANTES:\n"
         f"{relations_text}\n\n"
         "RESPUESTA FINAL:"
+    )
+
+
+def render_no_sources_prompt(package: GroundedContextPackage) -> str:
+    """Prompt para cuando el RAG no retornó fuentes suficientes."""
+
+    query = package.query
+    understanding = package.understanding
+    return (
+        "Eres LARA, un agente academico especializado en metodos y tecnicas de estudio.\n\n"
+        "No se encontro contexto especifico en la base de conocimiento. "
+        "Responde desde tu conocimiento general sobre el tema academico preguntado, "
+        "dentro del dominio de metodos de estudio y planificacion academica.\n\n"
+        "REGLAS:\n"
+        "- Responde en espanol claro y natural.\n"
+        "- Usa tu conocimiento general de pedagogia y tecnicas de aprendizaje.\n"
+        "- No inventes estudios ni fuentes citadas.\n"
+        "- Mantente en el dominio: gestion academica, metodos de estudio, planificacion.\n"
+        "- Respuesta breve: 2 a 5 frases + siguiente paso accionable si aplica.\n\n"
+        "PREGUNTA DEL USUARIO:\n"
+        f"{query.query_text.strip() or '(sin pregunta textual)'}\n\n"
+        f"INTENCION DETECTADA: {understanding.intent}\n\n"
+        "RESPUESTA:"
     )
 
 

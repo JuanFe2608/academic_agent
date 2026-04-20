@@ -4,14 +4,8 @@ from __future__ import annotations
 
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
-
-_SCOPE_BOUNDARY_MESSAGE = (
-    "Estoy enfocada en ayudarte con temas académicos: agenda, plan de estudio, "
-    "recordatorios, replanificación y técnicas de estudio 📚\n\n"
-    "No puedo responder sobre temas generales como personajes públicos, noticias o entretenimiento. "
-    "Puedes preguntarme, por ejemplo: qué es Pomodoro, cómo aplicar Feynman, cómo organizar una semana "
-    "de estudio o cómo ajustar tu plan para un parcial."
-)
+from services.conversation.scope_policy import decide_scope, render_scope_response
+from services.conversation.state_helpers import update_interaction_state
 
 
 def answer_scope_boundary(state: AgentState) -> dict:
@@ -27,12 +21,22 @@ def answer_scope_boundary(state: AgentState) -> dict:
     if not has_new_input:
         return {"phase": "end", "awaiting_user_input": False}
 
+    decision = decide_scope(last_text)
+    interaction_update = update_interaction_state(
+        state,
+        active_intent=decision.intent,
+        current_domain=decision.domain,
+        router_confidence=decision.confidence,
+        clarification_needed=decision.action == "redirect",
+    )
+
     return {
         "phase": "end",
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": False,
-        "messages": append_message(messages, "assistant", _SCOPE_BOUNDARY_MESSAGE),
+        "messages": append_message(messages, "assistant", render_scope_response(decision)),
+        **interaction_update,
     }
 
 

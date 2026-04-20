@@ -23,6 +23,7 @@ from services.scheduling.pending_schedule_support import (
     build_schedule_pending_prompt,
     coerce_pending_schedule_items as _coerce_pending_schedule_items,
 )
+from services.scheduling.pending_slot_state import schedule_pending_interaction_update
 
 
 def coerce_schedule_pending_items(
@@ -179,5 +180,10 @@ def _build_capture_pending_update(
                 "assistant",
                 prompt,
             ),
+        ),
+        **schedule_pending_interaction_update(
+            state,
+            academic_pending_items=academic_pending_items,
+            work_pending_items=work_pending_items,
         ),
     }

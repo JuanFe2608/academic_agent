@@ -4,8 +4,8 @@ from __future__ import annotations
 
 import json
 from contextlib import contextmanager
-from dataclasses import dataclass
-from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+from datetime import date, datetime, timedelta
 from typing import Any, Iterator, Protocol
 
 from repositories.common import RepositoryConfigurationError, postgres_connection, require_database_url
@@ -29,6 +29,9 @@ class StudyPlanInstanceSnapshot:
     completed_at: datetime | None
     timezone: str
     source_instance_key: str
+    planned_date: date | None = None
+    title: str = ""
+    payload: dict[str, object] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -76,6 +79,16 @@ class StudySessionTrackingRepository(Protocol):
         *,
         mutation: StudySessionMutation,
     ) -> RecordedStudySessionMutation: ...
+
+    def list_candidate_instances(
+        self,
+        *,
+        student_id: int,
+        as_of: datetime,
+        days_before: int,
+        days_after: int,
+        limit: int,
+    ) -> list[StudyPlanInstanceSnapshot]: ...
 
     def mark_due_sessions_missed(
         self,
@@ -166,6 +179,33 @@ class InMemoryStudySessionTrackingRepository:
             checkin_id=checkin_id,
         )
 
+    def list_candidate_instances(
+        self,
+        *,
+        student_id: int,
+        as_of: datetime,
+        days_before: int,
+        days_after: int,
+        limit: int,
+    ) -> list[StudyPlanInstanceSnapshot]:
+        if self.instances_repository is None:
+            return []
+
+        window_start = as_of - timedelta(days=max(0, int(days_before)))
+        window_end = as_of + timedelta(days=max(0, int(days_after)))
+        candidates: list[StudyPlanInstanceSnapshot] = []
+        for payload in self.instances_repository._instances_by_key.values():
+            if payload["student_id"] != student_id:
+                continue
+            if payload["status"] not in {"scheduled", "in_progress", "completed", "skipped", "missed"}:
+                continue
+            if payload["starts_at"] > window_end or payload["ends_at"] < window_start:
+                continue
+            candidates.append(_snapshot_from_instance_payload(payload))
+
+        candidates.sort(key=lambda item: (item.starts_at, item.id))
+        return candidates[: max(1, int(limit))]
+
     def mark_due_sessions_missed(
         self,
         *,
@@ -241,7 +281,9 @@ class PostgresStudySessionTrackingRepository:
                     completion_pct,
                     completed_at,
                     timezone,
-                    source_instance_key
+                    source_instance_key,
+                    planned_date,
+                    instance_payload
                 FROM study_plan_event_instances
                 WHERE student_id = %s
                   AND id = %s
@@ -268,7 +310,9 @@ class PostgresStudySessionTrackingRepository:
                     completion_pct,
                     completed_at,
                     timezone,
-                    source_instance_key
+                    source_instance_key,
+                    planned_date,
+                    instance_payload
                 FROM study_plan_event_instances
                 WHERE student_id = %s
                   AND id = %s
@@ -301,7 +345,9 @@ class PostgresStudySessionTrackingRepository:
                         completion_pct,
                         completed_at,
                         timezone,
-                        source_instance_key
+                        source_instance_key,
+                        planned_date,
+                        instance_payload
                     """,
                     (
                         mutation.next_status,
@@ -355,6 +401,50 @@ class PostgresStudySessionTrackingRepository:
             checkin_id=int(_row_value(checkin_row, "id")),
         )
 
+    def list_candidate_instances(
+        self,
+        *,
+        student_id: int,
+        as_of: datetime,
+        days_before: int,
+        days_after: int,
+        limit: int,
+    ) -> list[StudyPlanInstanceSnapshot]:
+        window_start = as_of - timedelta(days=max(0, int(days_before)))
+        window_end = as_of + timedelta(days=max(0, int(days_after)))
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    id,
+                    student_id,
+                    study_plan_profile_id,
+                    status,
+                    starts_at,
+                    ends_at,
+                    completion_pct,
+                    completed_at,
+                    timezone,
+                    source_instance_key,
+                    planned_date,
+                    instance_payload
+                FROM study_plan_event_instances
+                WHERE student_id = %s
+                  AND status IN ('scheduled', 'in_progress', 'completed', 'skipped', 'missed')
+                  AND starts_at <= %s
+                  AND ends_at >= %s
+                ORDER BY starts_at, id
+                LIMIT %s
+                """,
+                (
+                    student_id,
+                    window_end,
+                    window_start,
+                    max(1, int(limit)),
+                ),
+            ).fetchall()
+        return [_snapshot_from_row(row) for row in rows]
+
     def mark_due_sessions_missed(
         self,
         *,
@@ -385,7 +475,9 @@ class PostgresStudySessionTrackingRepository:
                 completion_pct,
                 completed_at,
                 timezone,
-                source_instance_key
+                source_instance_key,
+                planned_date,
+                instance_payload
             FROM study_plan_event_instances
             WHERE {' AND '.join(filters)}
             ORDER BY ends_at, id
@@ -436,7 +528,9 @@ class PostgresStudySessionTrackingRepository:
                         completion_pct,
                         completed_at,
                         timezone,
-                        source_instance_key
+                        source_instance_key,
+                        planned_date,
+                        instance_payload
                     """,
                     (
                         mutation.student_id,
@@ -498,6 +592,7 @@ def build_study_session_tracking_repository(
 
 
 def _snapshot_from_instance_payload(payload: dict[str, Any]) -> StudyPlanInstanceSnapshot:
+    instance_payload = dict(payload.get("instance_payload") or {})
     return StudyPlanInstanceSnapshot(
         id=int(payload["id"]),
         student_id=int(payload["student_id"]),
@@ -511,10 +606,14 @@ def _snapshot_from_instance_payload(payload: dict[str, Any]) -> StudyPlanInstanc
         completed_at=payload["completed_at"],
         timezone=str(payload["timezone"]),
         source_instance_key=str(payload["source_instance_key"]),
+        planned_date=payload.get("planned_date"),
+        title=_title_from_payload(instance_payload),
+        payload=instance_payload,
     )
 
 
 def _snapshot_from_row(row: Any) -> StudyPlanInstanceSnapshot:
+    payload = dict(_row_value(row, "instance_payload", {}) or {})
     return StudyPlanInstanceSnapshot(
         id=int(_row_value(row, "id")),
         student_id=int(_row_value(row, "student_id")),
@@ -530,6 +629,9 @@ def _snapshot_from_row(row: Any) -> StudyPlanInstanceSnapshot:
         completed_at=_row_value(row, "completed_at"),
         timezone=str(_row_value(row, "timezone")),
         source_instance_key=str(_row_value(row, "source_instance_key")),
+        planned_date=_row_value(row, "planned_date"),
+        title=_title_from_payload(payload),
+        payload=payload,
     )
 
 
@@ -549,8 +651,15 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
         "completed_at": 7,
         "timezone": 8,
         "source_instance_key": 9,
+        "planned_date": 10,
+        "instance_payload": 11,
     }
     index = mapping.get(key)
     if index is None or len(row) <= index:
         return default
     return row[index]
+
+
+def _title_from_payload(payload: dict[str, Any]) -> str:
+    event_payload = dict(payload.get("event") or {})
+    return str(event_payload.get("titulo") or payload.get("title") or "Sesion de estudio")

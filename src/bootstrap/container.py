@@ -19,9 +19,17 @@ from services.planning.materialization_service import (
     StudyPlanMaterializationService,
     build_study_plan_materialization_service,
 )
+from services.planning.academic_activity_persistence_service import (
+    AcademicActivityPersistenceService,
+    build_academic_activity_persistence_service,
+)
 from services.planning.persistence_service import (
     StudyPlanningPersistenceService,
     build_study_planning_persistence_service,
+)
+from services.planning.replanning_service import (
+    StudyReplanningService,
+    build_study_replanning_service,
 )
 from services.planning.tracking_service import (
     StudySessionTrackingService,
@@ -47,6 +55,10 @@ from services.sync.outlook_fixed_schedule_sync_service import (
 from services.sync.outlook_fixed_schedule_repair_service import (
     OutlookFixedScheduleRepairService,
     build_outlook_fixed_schedule_repair_service,
+)
+from services.sync.microsoft_oauth_flow_service import (
+    MicrosoftOAuthFlowService,
+    build_microsoft_oauth_flow_service,
 )
 from repositories.microsoft_graph.state_repository import (
     MicrosoftGraphStateRepository,
@@ -110,6 +122,30 @@ class AppContainer:
     ) -> None:
         self._set_override("study_planning_persistence_service", service)
 
+    def get_study_replanning_service(self) -> StudyReplanningService:
+        return self._get_or_build(
+            "study_replanning_service",
+            build_study_replanning_service,
+        )
+
+    def set_study_replanning_service(
+        self,
+        service: StudyReplanningService | None,
+    ) -> None:
+        self._set_override("study_replanning_service", service)
+
+    def get_academic_activity_persistence_service(self) -> AcademicActivityPersistenceService:
+        return self._get_or_build(
+            "academic_activity_persistence_service",
+            build_academic_activity_persistence_service,
+        )
+
+    def set_academic_activity_persistence_service(
+        self,
+        service: AcademicActivityPersistenceService | None,
+    ) -> None:
+        self._set_override("academic_activity_persistence_service", service)
+
     def get_study_plan_materialization_service(self) -> StudyPlanMaterializationService:
         return self._get_or_build(
             "study_plan_materialization_service",
@@ -163,6 +199,18 @@ class AppContainer:
 
     def set_microsoft_oauth_client(self, client: MicrosoftOAuthClient | None) -> None:
         self._set_override("microsoft_oauth_client", client)
+
+    def get_microsoft_oauth_flow_service(self) -> MicrosoftOAuthFlowService:
+        return self._get_or_build(
+            "microsoft_oauth_flow_service",
+            self._build_microsoft_oauth_flow_service,
+        )
+
+    def set_microsoft_oauth_flow_service(
+        self,
+        service: MicrosoftOAuthFlowService | None,
+    ) -> None:
+        self._set_override("microsoft_oauth_flow_service", service)
 
     def get_outlook_calendar_sync_service(self) -> OutlookCalendarSyncService:
         return self._get_or_build(
@@ -228,6 +276,12 @@ class AppContainer:
         state_repository = self.get_microsoft_graph_state_repository()
         return build_microsoft_oauth_client_from_env(
             token_store=MicrosoftGraphStateTokenStore(state_repository)
+        )
+
+    def _build_microsoft_oauth_flow_service(self) -> MicrosoftOAuthFlowService:
+        return build_microsoft_oauth_flow_service(
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
         )
 
     def _build_outlook_calendar_sync_service(self) -> OutlookCalendarSyncService:

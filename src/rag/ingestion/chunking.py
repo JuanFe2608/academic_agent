@@ -26,10 +26,14 @@ def chunk_document(document: NormalizedRagDocument) -> list[RagChunk]:
     """Build stable section-level chunks from a normalized document."""
 
     chunks: list[RagChunk] = []
-    for section in split_h2_sections(document.body):
+    for idx, section in enumerate(split_h2_sections(document.body)):
         content = section.content.strip()
         if not content:
             continue
+        if idx > 0 and chunks:
+            overlap = _last_sentences(chunks[-1].content, n=2)
+            if overlap:
+                content = overlap + "\n\n" + content
         chunk_kind = infer_chunk_kind(section.title, document.knowledge_type, content)
         chunk_id = _build_chunk_id(document.document_id, section.position, section.title)
         chunks.append(
@@ -159,6 +163,13 @@ def estimate_tokens(text: str) -> int:
     """Estimate tokens cheaply for deterministic manifests."""
 
     return max(1, round(len(re.findall(r"\S+", text)) * 1.3))
+
+
+def _last_sentences(text: str, *, n: int = 2) -> str:
+    """Extrae las últimas n oraciones de un bloque de texto para usar como overlap."""
+
+    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
+    return " ".join(sentences[-n:]) if sentences else ""
 
 
 def _build_chunk_id(document_id: str, position: int, section_title: str) -> str:

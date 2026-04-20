@@ -52,7 +52,9 @@ def handle_priorities_turn(state: AgentState) -> dict:
     priorities = resolve_prioritized_subjects(
         schedule_blocks=list(schedule_state.blocks),
         subjects=list(state.get("subjects", [])),
+        academic_activities=list(state.get("academic_activities", [])),
         primary_technique_id=_primary_technique_id(study_profile),
+        reference_date=reference_date,
     )
     current_subjects = subject_items_to_update(priorities.subject_items)
     subject_count = len(current_subjects)
@@ -84,6 +86,24 @@ def handle_priorities_turn(state: AgentState) -> dict:
                 ),
             ),
         }
+
+    if _starts_from_direct_prioritization_request(
+        state=state,
+        priorities_state=priorities_state,
+        has_new_input=has_new_input,
+    ):
+        return _ask_top_subjects(
+            state=state,
+            messages=messages,
+            current_count=current_count,
+            last_text=last_text,
+            subjects=current_subjects,
+            source=priorities.source,
+            prompt_version=_prompt_version(config.prompt_version),
+            week_start=week_start,
+            week_end=week_end,
+            draft=_seed_draft(priorities_state.draft, current_subjects),
+        )
 
     command = parse_priority_command(last_text)
     if command == "omitir":
@@ -475,6 +495,23 @@ def _primary_technique_id(study_profile: dict) -> str | None:
     return str(techniques[0]) if techniques else None
 
 
+def _starts_from_direct_prioritization_request(
+    *,
+    state: AgentState,
+    priorities_state,
+    has_new_input: bool,
+) -> bool:
+    """Evita interpretar "quiero priorizar" como respuesta inválida a un prompt."""
+
+    if not has_new_input:
+        return False
+    if str(state.get("phase") or "") == "priorities":
+        return False
+    if priorities_state.capture_stage is not None:
+        return False
+    return priorities_state.status in {"idle", "completed", "skipped"}
+
+
 def _complete_with_schedule(
     *,
     state: AgentState,
@@ -531,7 +568,9 @@ def _handle_legacy_catalog(
             resolve_prioritized_subjects(
                 schedule_blocks=schedule_blocks,
                 subjects=list(state.get("subjects", [])),
+                academic_activities=list(state.get("academic_activities", [])),
                 primary_technique_id=_primary_technique_id(study_profile),
+                reference_date=_reference_date(state.get("timezone", "America/Bogota")),
             ).subject_items
         )
         return _invalid_update(

@@ -2,15 +2,20 @@
 
 from __future__ import annotations
 
+import json
+import os
+from collections.abc import Mapping
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Protocol
+from zoneinfo import ZoneInfo
 
 from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
     MicrosoftOAuthClient,
     build_microsoft_oauth_client_from_env,
 )
+from integrations.whatsapp import WhatsAppClientError, WhatsAppCloudClient
 from bootstrap.errors import RepositoryConfigurationError
 from bootstrap.settings import database_url_from_env
 from repositories.microsoft_graph.state_repository import (
@@ -30,6 +35,11 @@ from integrations.microsoft_graph.models import (
     MicrosoftMailClient,
     MicrosoftMailMessage,
 )
+from schemas.channels import ChannelOutboundMessage
+from services.channels import WhatsAppChannelService
+
+_DEFAULT_DISPATCH_MAX_ATTEMPTS = 3
+_DEFAULT_RETRY_DELAY_MINUTES = 15
 
 
 @dataclass(frozen=True)
@@ -40,6 +50,7 @@ class ReminderSendResult:
     provider_message_id: str | None = None
     error_code: str | None = None
     detail: str | None = None
+    retryable: bool = False
 
 
 @dataclass(frozen=True)
@@ -50,6 +61,7 @@ class RunDueRemindersResult:
     leased_count: int = 0
     sent_count: int = 0
     failed_count: int = 0
+    retryable_count: int = 0
     error_code: str | None = None
     detail: str | None = None
 
@@ -58,6 +70,12 @@ class ReminderChannelSender(Protocol):
     """Contrato mínimo para adaptadores de canal."""
 
     def send(self, dispatch: LeasedReminderDispatch) -> ReminderSendResult: ...
+
+
+class ReminderRecipientResolver(Protocol):
+    """Resuelve el destinatario externo de un dispatch."""
+
+    def recipient_for(self, dispatch: LeasedReminderDispatch) -> str | None: ...
 
 
 class InAppReminderSender:
@@ -73,17 +91,25 @@ class InAppReminderSender:
 class UnsupportedReminderSender:
     """Fallback explícito para canales no implementados todavía."""
 
-    def __init__(self, channel: str) -> None:
+    def __init__(
+        self,
+        channel: str,
+        *,
+        error_code: str | None = None,
+        detail: str | None = None,
+    ) -> None:
         self.channel = channel
+        self.error_code = error_code or f"unsupported_channel:{channel}"
+        self.detail = detail or (
+            "El canal aun no tiene adaptador de entrega. "
+            "Debes conectar un sender externo para usarlo."
+        )
 
     def send(self, dispatch: LeasedReminderDispatch) -> ReminderSendResult:
         return ReminderSendResult(
             sent=False,
-            error_code=f"unsupported_channel:{self.channel}",
-            detail=(
-                "El canal aun no tiene adaptador de entrega. "
-                "Debes conectar un sender externo para usarlo."
-            ),
+            error_code=self.error_code,
+            detail=self.detail,
         )
 
 
@@ -147,6 +173,136 @@ class GraphEmailReminderSender:
             )
 
 
+class PayloadReminderRecipientResolver:
+    """Busca el destinatario WhatsApp dentro del payload del dispatch."""
+
+    _PAYLOAD_KEYS = (
+        "whatsapp_recipient_id",
+        "recipient_id",
+        "to",
+        "phone_number",
+        "conversation_id",
+        "sender_id",
+    )
+
+    def recipient_for(self, dispatch: LeasedReminderDispatch) -> str | None:
+        for key in self._PAYLOAD_KEYS:
+            candidate = str(dispatch.payload.get(key) or "").strip()
+            if candidate:
+                return candidate
+        return None
+
+
+class EnvWhatsAppRecipientResolver:
+    """Resuelve destinatarios WhatsApp desde variables de entorno operativas."""
+
+    def __init__(
+        self,
+        *,
+        recipients_by_student_id: Mapping[str, str] | None = None,
+        default_recipient_id: str | None = None,
+    ) -> None:
+        self.recipients_by_student_id = {
+            str(key).strip(): str(value).strip()
+            for key, value in dict(recipients_by_student_id or {}).items()
+            if str(key).strip() and str(value).strip()
+        }
+        self.default_recipient_id = str(default_recipient_id or "").strip() or None
+
+    @classmethod
+    def from_env(cls) -> "EnvWhatsAppRecipientResolver":
+        return cls(
+            recipients_by_student_id=_recipient_mapping_from_env(),
+            default_recipient_id=os.getenv(
+                "ACADEMIC_AGENT_DEFAULT_WHATSAPP_RECIPIENT_ID",
+                "",
+            ),
+        )
+
+    def recipient_for(self, dispatch: LeasedReminderDispatch) -> str | None:
+        return (
+            self.recipients_by_student_id.get(str(dispatch.student_id))
+            or self.default_recipient_id
+        )
+
+
+class CompositeReminderRecipientResolver:
+    """Prueba resolvers en orden y retorna el primer destinatario disponible."""
+
+    def __init__(self, resolvers: tuple[ReminderRecipientResolver, ...]) -> None:
+        self.resolvers = resolvers
+
+    def recipient_for(self, dispatch: LeasedReminderDispatch) -> str | None:
+        for resolver in self.resolvers:
+            candidate = resolver.recipient_for(dispatch)
+            if candidate:
+                return candidate
+        return None
+
+
+class WhatsAppReminderSender:
+    """Canal WhatsApp para despachar recordatorios académicos reales."""
+
+    def __init__(
+        self,
+        *,
+        channel_service: WhatsAppChannelService,
+        recipient_resolver: ReminderRecipientResolver | None = None,
+    ) -> None:
+        self.channel_service = channel_service
+        self.recipient_resolver = recipient_resolver or default_whatsapp_recipient_resolver()
+
+    def send(self, dispatch: LeasedReminderDispatch) -> ReminderSendResult:
+        recipient_id = self.recipient_resolver.recipient_for(dispatch)
+        if not recipient_id:
+            return ReminderSendResult(
+                sent=False,
+                error_code="missing_whatsapp_recipient",
+                detail=(
+                    "No encontré destinatario WhatsApp para el estudiante. "
+                    "Configura ACADEMIC_AGENT_WHATSAPP_RECIPIENTS o incluye "
+                    "whatsapp_recipient_id en el payload del dispatch."
+                ),
+            )
+
+        try:
+            result = self.channel_service.send_outbound(
+                ChannelOutboundMessage(
+                    channel="whatsapp",
+                    recipient_id=recipient_id,
+                    kind="text",
+                    text=render_whatsapp_reminder_message(dispatch),
+                )
+            )
+        except WhatsAppClientError as exc:
+            return ReminderSendResult(
+                sent=False,
+                error_code="whatsapp_send_error",
+                detail=str(exc),
+                retryable=_is_retryable_whatsapp_error(exc),
+            )
+        except Exception as exc:  # pragma: no cover - protege el worker operativo
+            return ReminderSendResult(
+                sent=False,
+                error_code="whatsapp_send_unexpected_error",
+                detail=str(exc),
+                retryable=True,
+            )
+
+        if result.status != "sent":
+            return ReminderSendResult(
+                sent=False,
+                error_code="whatsapp_send_failed",
+                detail=result.detail,
+                retryable=True,
+            )
+
+        return ReminderSendResult(
+            sent=True,
+            provider_message_id=result.provider_message_id,
+        )
+
+
 class ReminderDispatchRunner:
     """Leasing + envío + actualización durable de dispatches."""
 
@@ -157,6 +313,8 @@ class ReminderDispatchRunner:
         in_app_sender: ReminderChannelSender | None = None,
         email_sender: ReminderChannelSender | None = None,
         whatsapp_sender: ReminderChannelSender | None = None,
+        max_attempts: int = _DEFAULT_DISPATCH_MAX_ATTEMPTS,
+        retry_delay_minutes: int = _DEFAULT_RETRY_DELAY_MINUTES,
     ) -> None:
         self.repository = repository
         self.senders = {
@@ -164,6 +322,8 @@ class ReminderDispatchRunner:
             "email": email_sender or UnsupportedReminderSender("email"),
             "whatsapp": whatsapp_sender or UnsupportedReminderSender("whatsapp"),
         }
+        self.max_attempts = max(1, int(max_attempts))
+        self.retry_delay = timedelta(minutes=max(1, int(retry_delay_minutes)))
 
     def run_due_dispatches(
         self,
@@ -186,6 +346,7 @@ class ReminderDispatchRunner:
 
         sent_count = 0
         failed_count = 0
+        retryable_count = 0
         for dispatch in leased:
             sender = self.senders.get(dispatch.channel, UnsupportedReminderSender(dispatch.channel))
             result = sender.send(dispatch)
@@ -198,17 +359,27 @@ class ReminderDispatchRunner:
                     )
                     sent_count += 1
                 else:
+                    retry_at = self._retry_at_for_failure(
+                        dispatch=dispatch,
+                        result=result,
+                        as_of=effective_as_of,
+                    )
                     self.repository.mark_dispatch_failed(
                         dispatch_id=dispatch.id,
                         failure_reason=result.error_code or "reminder_dispatch_failed",
+                        retry_at=retry_at,
                     )
-                    failed_count += 1
+                    if retry_at is None:
+                        failed_count += 1
+                    else:
+                        retryable_count += 1
             except (RemindersRepositoryError, RepositoryConfigurationError) as exc:
                 return RunDueRemindersResult(
                     processed=False,
                     leased_count=len(leased),
                     sent_count=sent_count,
                     failed_count=failed_count,
+                    retryable_count=retryable_count,
                     error_code="reminder_dispatch_update_error",
                     detail=str(exc),
                 )
@@ -218,7 +389,22 @@ class ReminderDispatchRunner:
             leased_count=len(leased),
             sent_count=sent_count,
             failed_count=failed_count,
+            retryable_count=retryable_count,
         )
+
+    def _retry_at_for_failure(
+        self,
+        *,
+        dispatch: LeasedReminderDispatch,
+        result: ReminderSendResult,
+        as_of: datetime,
+    ) -> datetime | None:
+        if not result.retryable:
+            return None
+        next_attempt_count = int(dispatch.attempt_count) + 1
+        if next_attempt_count >= self.max_attempts:
+            return None
+        return as_of + self.retry_delay
 
 
 def build_reminder_dispatch_runner() -> ReminderDispatchRunner:
@@ -234,6 +420,79 @@ def build_reminder_dispatch_runner() -> ReminderDispatchRunner:
             state_repository=state_repository,
             oauth_client=oauth_client,
         ),
+        whatsapp_sender=_build_whatsapp_sender_from_env(),
+        max_attempts=_dispatch_max_attempts_from_env(),
+        retry_delay_minutes=_dispatch_retry_delay_minutes_from_env(),
+    )
+
+
+def default_whatsapp_recipient_resolver() -> ReminderRecipientResolver:
+    """Resolver por defecto: payload primero, configuración operativa después."""
+
+    return CompositeReminderRecipientResolver(
+        (
+            PayloadReminderRecipientResolver(),
+            EnvWhatsAppRecipientResolver.from_env(),
+        )
+    )
+
+
+def render_whatsapp_reminder_message(dispatch: LeasedReminderDispatch) -> str:
+    """Renderiza un recordatorio académico breve para WhatsApp."""
+
+    title = str(dispatch.payload.get("title") or "Sesion de estudio").strip()
+    reminder_type = str(dispatch.payload.get("reminder_type") or "").strip()
+    starts_at = _format_dispatch_datetime(
+        dispatch.payload.get("starts_at"),
+        fallback=dispatch.scheduled_for,
+        timezone_name=str(dispatch.payload.get("timezone") or "America/Bogota"),
+    )
+    ends_at = _format_dispatch_datetime(
+        dispatch.payload.get("ends_at"),
+        fallback=dispatch.scheduled_for,
+        timezone_name=str(dispatch.payload.get("timezone") or "America/Bogota"),
+    )
+    lead_minutes = _int_payload(dispatch.payload.get("lead_minutes"))
+
+    if reminder_type == "pre_session" or dispatch.dispatch_type.startswith("pre_session"):
+        lead_text = _lead_text(lead_minutes)
+        return "\n".join(
+            [
+                "Recordatorio de estudio",
+                f"Sesion: {title}",
+                f"Inicio: {starts_at}",
+                f"Faltan {lead_text}.",
+                "Prepara el material y protege este bloque.",
+            ]
+        )
+
+    if reminder_type == "followup" or dispatch.dispatch_type.startswith("followup"):
+        return "\n".join(
+            [
+                "Seguimiento de estudio",
+                f"Sesion: {title}",
+                f"Bloque: {starts_at} - {ends_at}",
+                "Responde completada, parcial u omitida para actualizar tu avance.",
+            ]
+        )
+
+    if reminder_type == "missed_session" or dispatch.dispatch_type.startswith("missed_session"):
+        return "\n".join(
+            [
+                "Revision de sesion",
+                f"Sesion: {title}",
+                f"Terminaba: {ends_at}",
+                "No tengo confirmacion de esta sesion.",
+                "Responde no pude si necesitas replanificarla.",
+            ]
+        )
+
+    return "\n".join(
+        [
+            "Recordatorio academico",
+            f"Sesion: {title}",
+            f"Fecha: {starts_at}",
+        ]
     )
 
 
@@ -254,3 +513,124 @@ def _email_body(dispatch: LeasedReminderDispatch) -> str:
         f"Canal: {dispatch.channel}\n"
         f"Dispatch ID: {dispatch.id}\n"
     )
+
+
+def _build_whatsapp_sender_from_env() -> ReminderChannelSender:
+    try:
+        return WhatsAppReminderSender(
+            channel_service=WhatsAppChannelService(WhatsAppCloudClient.from_env()),
+            recipient_resolver=default_whatsapp_recipient_resolver(),
+        )
+    except WhatsAppClientError as exc:
+        return UnsupportedReminderSender(
+            "whatsapp",
+            error_code="whatsapp_config_error",
+            detail=str(exc),
+        )
+
+
+def _recipient_mapping_from_env() -> dict[str, str]:
+    raw_value = os.getenv("ACADEMIC_AGENT_WHATSAPP_RECIPIENTS", "").strip()
+    if not raw_value:
+        return {}
+    if raw_value.startswith("{"):
+        try:
+            parsed = json.loads(raw_value)
+        except json.JSONDecodeError:
+            return {}
+        if not isinstance(parsed, Mapping):
+            return {}
+        return {
+            str(key).strip(): str(value).strip()
+            for key, value in parsed.items()
+            if str(key).strip() and str(value).strip()
+        }
+
+    mapping: dict[str, str] = {}
+    for item in raw_value.split(","):
+        if "=" not in item:
+            continue
+        key, value = item.split("=", maxsplit=1)
+        key = key.strip()
+        value = value.strip()
+        if key and value:
+            mapping[key] = value
+    return mapping
+
+
+def _dispatch_max_attempts_from_env() -> int:
+    raw_value = os.getenv("ACADEMIC_AGENT_REMINDER_DISPATCH_MAX_ATTEMPTS", "").strip()
+    if not raw_value:
+        return _DEFAULT_DISPATCH_MAX_ATTEMPTS
+    try:
+        return max(1, int(raw_value))
+    except ValueError:
+        return _DEFAULT_DISPATCH_MAX_ATTEMPTS
+
+
+def _dispatch_retry_delay_minutes_from_env() -> int:
+    raw_value = os.getenv("ACADEMIC_AGENT_REMINDER_RETRY_DELAY_MINUTES", "").strip()
+    if not raw_value:
+        return _DEFAULT_RETRY_DELAY_MINUTES
+    try:
+        return max(1, int(raw_value))
+    except ValueError:
+        return _DEFAULT_RETRY_DELAY_MINUTES
+
+
+def _format_dispatch_datetime(
+    value: object,
+    *,
+    fallback: datetime,
+    timezone_name: str,
+) -> str:
+    parsed = _parse_datetime(value) or fallback
+    try:
+        zone = ZoneInfo(timezone_name)
+    except Exception:
+        zone = timezone.utc
+
+    if parsed.tzinfo is None:
+        parsed = parsed.replace(tzinfo=zone)
+    else:
+        parsed = parsed.astimezone(zone)
+    return parsed.strftime("%Y-%m-%d %H:%M")
+
+
+def _parse_datetime(value: object) -> datetime | None:
+    if isinstance(value, datetime):
+        return value
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip()
+    if not normalized:
+        return None
+    if normalized.endswith("Z"):
+        normalized = f"{normalized[:-1]}+00:00"
+    try:
+        return datetime.fromisoformat(normalized)
+    except ValueError:
+        return None
+
+
+def _int_payload(value: object, default: int = 0) -> int:
+    try:
+        return max(0, int(value))
+    except (TypeError, ValueError):
+        return default
+
+
+def _lead_text(minutes: int) -> str:
+    if minutes == 1:
+        return "1 minuto"
+    if minutes and minutes % 60 == 0:
+        hours = minutes // 60
+        return "1 hora" if hours == 1 else f"{hours} horas"
+    return f"{minutes} minutos"
+
+
+def _is_retryable_whatsapp_error(exc: WhatsAppClientError) -> bool:
+    status_code = getattr(exc, "status_code", None)
+    if status_code is None:
+        return True
+    return status_code == 408 or status_code == 429 or status_code >= 500

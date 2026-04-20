@@ -20,7 +20,9 @@ from agents.support.nodes.collect_extracurricular_details import (
 )
 from agents.support.nodes.collect_profile import collect_profile
 from agents.support.nodes.confirm_profile import confirm_profile
+from agents.support.nodes.guided_academic_support import guided_academic_support
 from agents.support.nodes.handle_academic_update import handle_academic_update
+from agents.support.nodes.manage_fixed_schedule import manage_fixed_schedule
 from agents.support.nodes.persist_profile import persist_profile
 from agents.support.nodes.persist_study_profile import persist_study_profile
 from agents.support.nodes.parse_schedules_to_events import parse_schedules_to_events
@@ -28,9 +30,13 @@ from agents.support.nodes.persist_schedule import persist_schedule
 from agents.support.nodes.render_schedule_preview import render_schedule_preview
 from agents.support.nodes.repair_fixed_schedule import repair_fixed_schedule
 from agents.support.nodes.renew_fixed_schedule import renew_fixed_schedule
+from agents.support.nodes.request_microsoft_oauth import request_microsoft_oauth
+from agents.support.nodes.request_replan import request_replan
 from agents.support.nodes.request_schedules import request_schedules
 from agents.support.nodes.send_email_verification import send_email_verification
 from agents.support.nodes.sync_fixed_schedule import sync_fixed_schedule
+from agents.support.nodes.sync_study_calendar import sync_study_calendar
+from agents.support.nodes.sync_study_todo import sync_study_todo
 from agents.support.nodes.validate_schedule import validate_schedule
 from agents.support.nodes.verify_email_code import verify_email_code
 from agents.support.nodes.welcome_consent import welcome_consent
@@ -45,10 +51,14 @@ from agents.support.onboarding.validators import (
     get_missing_profile_fields,
     profile_requires_email_verification,
 )
+from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
 from services.personalization import is_personalization_enabled
-from services.priorities import is_academic_update_message
-from services.study_recommendations import is_study_recommendation_message
+from services.sync.microsoft_oauth_flow_service import is_microsoft_oauth_required
+from services.conversation.router import (
+    route_conversation_input,
+    route_name_for_conversation_decision,
+)
 
 
 def _should_wait(state: AgentState) -> bool:
@@ -89,11 +99,16 @@ def _route_welcome(state: AgentState) -> str:
     if conversation.phase == "end" and _has_new_user_input(state) and requires_fixed_schedule_repair(state):
         return "repair_fixed_schedule"
     if conversation.phase == "end" and _has_new_user_input(state):
-        if is_academic_update_message(_current_user_text(state)):
-            return "handle_academic_update"
-        if is_study_recommendation_message(_current_user_text(state)):
-            return "answer_study_recommendation"
-        return "answer_scope_boundary"
+        decision = route_conversation_input(
+            _current_user_text(state),
+            interaction=state.interaction_state,
+            phase=conversation.phase,
+            recent_messages=_recent_user_texts(state),
+        )
+        route_name = route_name_for_conversation_decision(decision)
+        if route_name == "collect_priorities" and not is_post_radar_flow_enabled():
+            return "answer_scope_boundary"
+        return route_name
     if conversation.phase == "end":
         return "end"
     if conversation.phase != "consent":
@@ -116,6 +131,8 @@ def _route_from_phase(state: AgentState) -> str:
         return "send_email_verification"
     if phase == "email_verification":
         return "verify_email_code"
+    if phase == "microsoft_oauth":
+        return "request_microsoft_oauth"
     if phase == "profile_confirm":
         return "confirm_profile"
     if phase == "profile_persist":
@@ -141,6 +158,18 @@ def _route_from_phase(state: AgentState) -> str:
         return "renew_fixed_schedule"
     if phase == "schedule_repair":
         return "repair_fixed_schedule"
+    if phase == "fixed_schedule_management":
+        return "manage_fixed_schedule"
+    if phase == "academic_activity_management":
+        return "handle_academic_update"
+    if phase == "replan":
+        return "request_replan"
+    if phase == "calendar_sync":
+        return "sync_study_calendar"
+    if phase == "todo_sync":
+        return "sync_study_todo"
+    if phase == "guided_academic_support":
+        return "guided_academic_support"
     if phase == "sync":
         if is_personalization_enabled():
             if planning.study_profile.status != "completed":
@@ -152,7 +181,15 @@ def _route_from_phase(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile_persist":
         return "persist_study_profile"
-    if phase in {"priorities", "study_plan", "running"}:
+    if phase == "priorities":
+        if is_post_radar_flow_enabled():
+            return "collect_priorities"
+        return "end"
+    if phase == "study_plan":
+        if is_post_radar_flow_enabled():
+            return "build_study_plan"
+        return "end"
+    if phase == "running":
         return "end"
     return "welcome_consent"
 
@@ -169,6 +206,8 @@ def _route_collect_profile(state: AgentState) -> str:
     profile = onboarding.student_profile
     if profile_requires_email_verification(profile.model_dump(mode="python")):
         return "send_email_verification"
+    if _should_gate_profile_with_microsoft_oauth(state):
+        return "request_microsoft_oauth"
     if not get_missing_profile_fields(profile.model_dump(mode="python")):
         return "confirm_profile"
     return "collect_profile"
@@ -196,6 +235,19 @@ def _route_verify_email_code(state: AgentState) -> str:
     if phase == "profile":
         return "collect_profile"
     return "verify_email_code"
+
+
+def _route_request_microsoft_oauth(state: AgentState) -> str:
+    """Mantiene el bloqueo OAuth o retorna al perfil cuando ya se autorizo."""
+
+    if _should_wait(state):
+        return "end"
+    phase = state.conversation_state.phase
+    if phase == "profile":
+        return "collect_profile"
+    if phase == "microsoft_oauth":
+        return "request_microsoft_oauth"
+    return "end"
 
 
 def _route_confirm_profile(state: AgentState) -> str:
@@ -392,6 +444,18 @@ def _route_after_schedule_repair(state: AgentState) -> str:
     return "end"
 
 
+def _route_after_fixed_schedule_management(state: AgentState) -> str:
+    """Mantiene la gestion de horario fijo mientras espera datos o confirmacion."""
+
+    if _should_wait(state):
+        return "end"
+    if _has_pending_replan(state):
+        return "request_replan"
+    if state.conversation_state.phase == "fixed_schedule_management":
+        return "manage_fixed_schedule"
+    return "end"
+
+
 def _route_collect_study_profile(state: AgentState) -> str:
     """Controla la transición entre radar principal, desempate y persistencia."""
 
@@ -432,17 +496,25 @@ def _route_persist_study_profile(state: AgentState) -> str:
         return "collect_study_profile_tiebreaker"
     if phase == "study_profile":
         return "collect_study_profile"
+    if phase == "priorities" and is_post_radar_flow_enabled():
+        return "collect_priorities"
     return "end"
 
 
 def _route_collect_priorities(state: AgentState) -> str:
-    """Flujo posterior al Radar desactivado hasta la siguiente refactorizacion."""
+    """Mantiene la captura semanal hasta que quede esperando input del usuario."""
 
+    if _should_wait(state):
+        return "end"
+    if state.conversation_state.phase == "priorities" and is_post_radar_flow_enabled():
+        return "collect_priorities"
+    if state.conversation_state.phase == "study_plan" and is_post_radar_flow_enabled():
+        return "build_study_plan"
     return "end"
 
 
 def _route_build_study_plan(state: AgentState) -> str:
-    """Flujo posterior al Radar desactivado hasta la siguiente refactorizacion."""
+    """Cierra la generación interna del plan semanal."""
 
     return "end"
 
@@ -450,7 +522,58 @@ def _route_build_study_plan(state: AgentState) -> str:
 def _route_handle_academic_update(state: AgentState) -> str:
     """Cierra actualizaciones puntuales sin activar planning posterior al Radar."""
 
+    if _should_wait(state):
+        return "end"
+    if _has_pending_replan(state):
+        return "request_replan"
     return "end"
+
+
+def _route_after_replan(state: AgentState) -> str:
+    """Mantiene el subflujo de replanificacion mientras espera confirmacion."""
+
+    if _should_wait(state):
+        return "end"
+    if state.conversation_state.phase == "replan":
+        return "request_replan"
+    return "end"
+
+
+def _route_after_study_calendar_sync(state: AgentState) -> str:
+    """Mantiene el flujo de calendario mientras espera confirmacion."""
+
+    if _should_wait(state):
+        return "end"
+    if state.conversation_state.phase == "calendar_sync":
+        return "sync_study_calendar"
+    return "end"
+
+
+def _route_after_study_todo_sync(state: AgentState) -> str:
+    """Mantiene el flujo de To Do mientras espera confirmacion."""
+
+    if _should_wait(state):
+        return "end"
+    if state.conversation_state.phase == "todo_sync":
+        return "sync_study_todo"
+    return "end"
+
+
+def _should_gate_profile_with_microsoft_oauth(state: AgentState) -> bool:
+    """Indica si el perfil llego al punto donde OAuth debe bloquear."""
+
+    if not is_microsoft_oauth_required():
+        return False
+    if state.onboarding_state.onboarding.microsoft_oauth.status == "authorized":
+        return False
+    profile = state.onboarding_state.student_profile
+    return bool(
+        profile.full_name
+        and profile.student_code
+        and profile.age
+        and profile.institutional_email
+        and profile.email_verified
+    )
 
 
 def _has_block_type(blocks: list, block_type: str) -> bool:
@@ -480,6 +603,17 @@ def _has_new_user_input(state: AgentState) -> bool:
     return has_new_input
 
 
+def _has_pending_replan(state: AgentState) -> bool:
+    """Indica si hay una solicitud o propuesta de replanificacion activa."""
+
+    replan = state.planning_state.replan
+    has_plan_base = bool(state.planning_state.study_plan.plan_events)
+    return bool(
+        ((replan.trigger or replan.change_request) and has_plan_base)
+        or (replan.status == "proposed" and replan.active_proposal)
+    )
+
+
 def _current_user_text(state: AgentState) -> str:
     """Devuelve el ultimo texto real del usuario en este turno."""
 
@@ -493,6 +627,19 @@ def _current_user_text(state: AgentState) -> str:
     return last_text
 
 
+def _recent_user_texts(state: AgentState) -> list[str]:
+    """Extrae el contenido de los ultimos 2 mensajes del usuario."""
+
+    messages = state.conversation_state.messages or []
+    user_texts = []
+    for msg in messages:
+        content = getattr(msg, "content", None)
+        if content and getattr(msg, "type", "") in ("human", "user"):
+            text = content if isinstance(content, str) else str(content)
+            user_texts.append(text.strip())
+    return user_texts[-2:]
+
+
 def build_agent() -> StateGraph:
     """Construye el grafo de soporte hasta la validacion."""
     graph = StateGraph(AgentState)
@@ -501,6 +648,7 @@ def build_agent() -> StateGraph:
     graph.add_node("collect_profile", collect_profile)
     graph.add_node("send_email_verification", send_email_verification)
     graph.add_node("verify_email_code", verify_email_code)
+    graph.add_node("request_microsoft_oauth", request_microsoft_oauth)
     graph.add_node("confirm_profile", confirm_profile)
     graph.add_node("persist_profile", persist_profile)
     graph.add_node("request_schedules", request_schedules)
@@ -515,12 +663,17 @@ def build_agent() -> StateGraph:
     graph.add_node("sync_fixed_schedule", sync_fixed_schedule)
     graph.add_node("renew_fixed_schedule", renew_fixed_schedule)
     graph.add_node("repair_fixed_schedule", repair_fixed_schedule)
+    graph.add_node("manage_fixed_schedule", manage_fixed_schedule)
     graph.add_node("collect_study_profile", collect_study_profile)
     graph.add_node("collect_study_profile_tiebreaker", collect_study_profile_tiebreaker)
     graph.add_node("persist_study_profile", persist_study_profile)
     graph.add_node("collect_priorities", collect_priorities)
     graph.add_node("build_study_plan", build_study_plan)
     graph.add_node("handle_academic_update", handle_academic_update)
+    graph.add_node("request_replan", request_replan)
+    graph.add_node("sync_study_calendar", sync_study_calendar)
+    graph.add_node("sync_study_todo", sync_study_todo)
+    graph.add_node("guided_academic_support", guided_academic_support)
     graph.add_node("answer_study_recommendation", answer_study_recommendation)
     graph.add_node("answer_scope_boundary", answer_scope_boundary)
 
@@ -534,6 +687,7 @@ def build_agent() -> StateGraph:
             "collect_profile": "collect_profile",
             "send_email_verification": "send_email_verification",
             "verify_email_code": "verify_email_code",
+            "request_microsoft_oauth": "request_microsoft_oauth",
             "confirm_profile": "confirm_profile",
             "persist_profile": "persist_profile",
             "request_schedules": "request_schedules",
@@ -547,12 +701,17 @@ def build_agent() -> StateGraph:
             "sync_fixed_schedule": "sync_fixed_schedule",
             "renew_fixed_schedule": "renew_fixed_schedule",
             "repair_fixed_schedule": "repair_fixed_schedule",
+            "manage_fixed_schedule": "manage_fixed_schedule",
             "collect_study_profile": "collect_study_profile",
             "collect_study_profile_tiebreaker": "collect_study_profile_tiebreaker",
             "persist_study_profile": "persist_study_profile",
             "collect_priorities": "collect_priorities",
             "build_study_plan": "build_study_plan",
             "handle_academic_update": "handle_academic_update",
+            "request_replan": "request_replan",
+            "sync_study_calendar": "sync_study_calendar",
+            "sync_study_todo": "sync_study_todo",
+            "guided_academic_support": "guided_academic_support",
             "answer_study_recommendation": "answer_study_recommendation",
             "answer_scope_boundary": "answer_scope_boundary",
             "end": END,
@@ -564,6 +723,7 @@ def build_agent() -> StateGraph:
         {
             "collect_profile": "collect_profile",
             "send_email_verification": "send_email_verification",
+            "request_microsoft_oauth": "request_microsoft_oauth",
             "confirm_profile": "confirm_profile",
             "end": END,
         },
@@ -584,6 +744,15 @@ def build_agent() -> StateGraph:
             "send_email_verification": "send_email_verification",
             "collect_profile": "collect_profile",
             "verify_email_code": "verify_email_code",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "request_microsoft_oauth",
+        _route_request_microsoft_oauth,
+        {
+            "request_microsoft_oauth": "request_microsoft_oauth",
+            "collect_profile": "collect_profile",
             "end": END,
         },
     )
@@ -705,6 +874,15 @@ def build_agent() -> StateGraph:
         },
     )
     graph.add_conditional_edges(
+        "manage_fixed_schedule",
+        _route_after_fixed_schedule_management,
+        {
+            "manage_fixed_schedule": "manage_fixed_schedule",
+            "request_replan": "request_replan",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
         "collect_study_profile",
         _route_collect_study_profile,
         {
@@ -757,10 +935,36 @@ def build_agent() -> StateGraph:
         _route_handle_academic_update,
         {
             "build_study_plan": "build_study_plan",
+            "request_replan": "request_replan",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "request_replan",
+        _route_after_replan,
+        {
+            "request_replan": "request_replan",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "sync_study_calendar",
+        _route_after_study_calendar_sync,
+        {
+            "sync_study_calendar": "sync_study_calendar",
+            "end": END,
+        },
+    )
+    graph.add_conditional_edges(
+        "sync_study_todo",
+        _route_after_study_todo_sync,
+        {
+            "sync_study_todo": "sync_study_todo",
             "end": END,
         },
     )
     graph.add_edge("answer_study_recommendation", END)
+    graph.add_edge("guided_academic_support", END)
     graph.add_edge("answer_scope_boundary", END)
 
     return graph.compile()

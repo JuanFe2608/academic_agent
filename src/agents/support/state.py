@@ -18,6 +18,7 @@ from pydantic import Field, field_validator
 
 from agents.support.media import add_sanitized_messages, materialize_image_reference, sanitize_messages
 from schemas.common import BaseSchemaModel as _BaseSchemaModel
+from schemas.conversation import InteractionState as _InteractionState
 from schemas.microsoft_graph import CalendarState as _CalendarState
 from schemas.onboarding import (
     ConsentState as _ConsentState,
@@ -26,6 +27,7 @@ from schemas.onboarding import (
 )
 from schemas.personalization import StudyProfile as _StudyProfile
 from schemas.planning import (
+    AcademicActivity as _AcademicActivity,
     Constraints as _Constraints,
     PrioritiesState as _PrioritiesState,
     ReplanState as _ReplanState,
@@ -48,6 +50,7 @@ Phase = Literal[
     "profile",
     "email_verification_send",
     "email_verification",
+    "microsoft_oauth",
     "profile_confirm",
     "profile_persist",
     "schedules",
@@ -59,6 +62,11 @@ Phase = Literal[
     "schedule_sync",
     "schedule_renewal",
     "schedule_repair",
+    "fixed_schedule_management",
+    "academic_activity_management",
+    "calendar_sync",
+    "todo_sync",
+    "guided_academic_support",
     "sync",
     "study_profile",
     "study_profile_tiebreaker",
@@ -129,6 +137,7 @@ class _PlanningDomainState(_BaseSchemaModel):
     """Vista tipada de personalización, planificación y recordatorios."""
 
     subjects: list[_SubjectItem] = Field(default_factory=list)
+    academic_activities: list[_AcademicActivity] = Field(default_factory=list)
     study_profile: _StudyProfile = Field(default_factory=_StudyProfile)
     priorities: _PrioritiesState = Field(default_factory=_PrioritiesState)
     study_plan: _StudyPlanState = Field(default_factory=_StudyPlanState)
@@ -152,6 +161,7 @@ class _PartitionedAgentState(_BaseSchemaModel):
     """
 
     conversation: _ConversationState = Field(default_factory=_ConversationState)
+    interaction: _InteractionState = Field(default_factory=_InteractionState)
     onboarding: _OnboardingDomainState = Field(default_factory=_OnboardingDomainState)
     scheduling: _SchedulingDomainState = Field(default_factory=_SchedulingDomainState)
     planning: _PlanningDomainState = Field(default_factory=_PlanningDomainState)
@@ -175,6 +185,7 @@ class AgentState(_BaseSchemaModel):
             "user_message_count",
             "awaiting_user_input",
         ),
+        "interaction": ("interaction",),
         "onboarding": (
             "consent",
             "student_profile",
@@ -196,6 +207,7 @@ class AgentState(_BaseSchemaModel):
         ),
         "planning": (
             "subjects",
+            "academic_activities",
             "study_profile",
             "priorities",
             "study_plan",
@@ -222,6 +234,7 @@ class AgentState(_BaseSchemaModel):
     profile_edit_target: str | None = None
     user_message_count: int = 0
     awaiting_user_input: bool = False
+    interaction: _InteractionState = Field(default_factory=_InteractionState)
     consent: _ConsentState = Field(default_factory=_ConsentState)
     student_profile: _StudentProfile = Field(default_factory=_StudentProfile)
     onboarding: _OnboardingState = Field(default_factory=_OnboardingState)
@@ -239,6 +252,7 @@ class AgentState(_BaseSchemaModel):
     schedule: _ScheduleFlowState = Field(default_factory=_ScheduleFlowState)
     calendar: _CalendarState = Field(default_factory=_CalendarState)
     subjects: list[_SubjectItem] = Field(default_factory=list)
+    academic_activities: list[_AcademicActivity] = Field(default_factory=list)
     study_profile: _StudyProfile = Field(default_factory=_StudyProfile)
     priorities: _PrioritiesState = Field(default_factory=_PrioritiesState)
     study_plan: _StudyPlanState = Field(default_factory=_StudyPlanState)
@@ -284,6 +298,12 @@ class AgentState(_BaseSchemaModel):
         return _ConversationState(**self._group_payload("conversation"))
 
     @property
+    def interaction_state(self) -> _InteractionState:
+        """Subestado tipado de interaccion operativa."""
+
+        return _InteractionState.model_validate(self.interaction)
+
+    @property
     def onboarding_state(self) -> _OnboardingDomainState:
         """Subestado tipado del dominio de onboarding."""
 
@@ -317,6 +337,7 @@ class AgentState(_BaseSchemaModel):
 
         return _PartitionedAgentState(
             conversation=self.conversation_state,
+            interaction=self.interaction_state,
             onboarding=self.onboarding_state,
             scheduling=self.scheduling_state,
             planning=self.planning_state,
@@ -344,6 +365,7 @@ class AgentState(_BaseSchemaModel):
         fresh = make_initial_state(timezone=self.timezone)
         payload = {
             **fresh.legacy_group_payload("conversation"),
+            **fresh.legacy_group_payload("interaction"),
             **fresh.legacy_group_payload("onboarding"),
             **fresh.legacy_group_payload("scheduling"),
             **fresh.legacy_group_payload("planning"),

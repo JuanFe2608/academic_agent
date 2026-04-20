@@ -151,6 +151,36 @@ def test_materialization_service_supersedes_future_instances_from_previous_plan(
     assert previous_plan_statuses == {"superseded"}
 
 
+def test_materialization_service_is_idempotent_for_same_plan(monkeypatch) -> None:
+    monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
+    repository = InMemoryStudyPlanInstancesRepository()
+    service = StudyPlanMaterializationService(repository=repository, horizon_days=7)
+    study_plan = {
+        "plan_events": [_study_event("Lunes", "Estudio Calculo", "evt-calculo")],
+        "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+    }
+
+    first = service.materialize_plan_instances(
+        student_id=9,
+        study_plan_profile_id=101,
+        study_plan=study_plan,
+        timezone="America/Bogota",
+    )
+    second = service.materialize_plan_instances(
+        student_id=9,
+        study_plan_profile_id=101,
+        study_plan=study_plan,
+        timezone="America/Bogota",
+    )
+
+    assert first.materialized is True
+    assert second.materialized is True
+    assert first.materialized_instance_count == 1
+    assert second.materialized_instance_count == 1
+    assert second.superseded_instance_count == 0
+    assert len(repository._instances_by_key) == 1
+
+
 def test_persist_study_profile_does_not_materialize_instances_after_radar(
     monkeypatch,
 ) -> None:

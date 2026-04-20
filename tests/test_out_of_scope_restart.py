@@ -102,3 +102,35 @@ def test_welcome_consent_does_not_accept_initial_yes_before_welcome() -> None:
     assert update["awaiting_user_input"] is True
     assert "consent" not in update
     assert "Soy Lara" in update["messages"][0].content
+
+
+def test_welcome_consent_accepts_consent_after_welcome_was_sent() -> None:
+    state = AgentState(
+        messages=[HumanMessage(content="sí")],
+        user_message_count=0,
+        awaiting_user_input=True,
+        welcome_sent=True,
+    )
+
+    update = welcome_consent(state)
+
+    assert update["phase"] == "profile"
+    assert update["consent"]["accepted"] is True
+    assert update["awaiting_user_input"] is False
+    assert "continuemos con tu perfil" in update["messages"][0].content.lower()
+
+
+def test_welcome_consent_rejects_consent_after_welcome_was_sent() -> None:
+    state = AgentState(
+        messages=[HumanMessage(content="no")],
+        user_message_count=0,
+        awaiting_user_input=True,
+        welcome_sent=True,
+    )
+
+    update = welcome_consent(state)
+
+    assert update["phase"] == "end"
+    assert update["consent"]["accepted"] is False
+    assert update["awaiting_user_input"] is False
+    assert "sin consentimiento no puedo continuar" in update["messages"][0].content.lower()

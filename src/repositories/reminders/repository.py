@@ -83,6 +83,7 @@ class LeasedReminderDispatch:
     channel: str
     scheduled_for: datetime
     payload: dict[str, object]
+    attempt_count: int = 0
 
 
 class RemindersRepository(Protocol):
@@ -126,6 +127,7 @@ class RemindersRepository(Protocol):
         *,
         dispatch_id: int,
         failure_reason: str,
+        retry_at: datetime | None = None,
     ) -> None: ...
 
 
@@ -258,6 +260,8 @@ class InMemoryRemindersRepository:
                 "status": "pending",
                 "provider_message_id": None,
                 "failure_reason": None,
+                "attempt_count": 0,
+                "next_attempt_at": None,
                 "payload": dict(dispatch.payload),
                 "created_at": datetime.now(tz=dispatch.scheduled_for.tzinfo),
                 "updated_at": datetime.now(tz=dispatch.scheduled_for.tzinfo),
@@ -302,13 +306,21 @@ class InMemoryRemindersRepository:
             (
                 row
                 for row in self._dispatches_by_id.values()
-                if row["status"] == "pending" and row["scheduled_for"] <= as_of
+                if (
+                    row["status"] == "pending" and row["scheduled_for"] <= as_of
+                )
+                or (
+                    row["status"] == "retryable"
+                    and row.get("next_attempt_at") is not None
+                    and row["next_attempt_at"] <= as_of
+                )
             ),
             key=lambda item: (item["scheduled_for"], item["id"]),
         )
         for row in pending[: max(1, int(limit))]:
             row["status"] = "leased"
             row["leased_at"] = as_of
+            row["next_attempt_at"] = None
             row["updated_at"] = datetime.now(tz=as_of.tzinfo)
             leased.append(_leased_dispatch_from_row(row))
         return leased
@@ -325,6 +337,7 @@ class InMemoryRemindersRepository:
         row["sent_at"] = sent_at
         row["provider_message_id"] = provider_message_id
         row["failure_reason"] = None
+        row["next_attempt_at"] = None
         row["updated_at"] = datetime.now(tz=sent_at.tzinfo)
 
     def mark_dispatch_failed(
@@ -332,10 +345,15 @@ class InMemoryRemindersRepository:
         *,
         dispatch_id: int,
         failure_reason: str,
+        retry_at: datetime | None = None,
     ) -> None:
         row = self._dispatches_by_id[dispatch_id]
-        row["status"] = "failed"
+        row["status"] = "retryable" if retry_at is not None else "failed"
         row["failure_reason"] = failure_reason
+        row["attempt_count"] = int(row.get("attempt_count") or 0) + 1
+        row["next_attempt_at"] = retry_at
+        if retry_at is not None:
+            row["leased_at"] = None
         row["updated_at"] = datetime.now(tz=row["scheduled_for"].tzinfo)
 
 
@@ -530,8 +548,15 @@ class PostgresRemindersRepository:
                 WITH due AS (
                     SELECT id
                     FROM reminder_dispatches
-                    WHERE status = 'pending'
-                      AND scheduled_for <= %s
+                    WHERE (
+                        status = 'pending'
+                        AND scheduled_for <= %s
+                    )
+                    OR (
+                        status = 'retryable'
+                        AND next_attempt_at IS NOT NULL
+                        AND next_attempt_at <= %s
+                    )
                     ORDER BY scheduled_for, id
                     LIMIT %s
                     FOR UPDATE SKIP LOCKED
@@ -539,14 +564,16 @@ class PostgresRemindersRepository:
                 UPDATE reminder_dispatches AS rd
                 SET status = 'leased',
                     leased_at = %s,
+                    next_attempt_at = NULL,
                     updated_at = NOW()
                 FROM due
                 WHERE rd.id = due.id
                 RETURNING rd.id, rd.student_id, rd.reminder_policy_id,
                           rd.study_plan_event_instance_id, rd.dispatch_type,
-                          rd.channel, rd.scheduled_for, rd.payload
+                          rd.channel, rd.scheduled_for, rd.payload,
+                          rd.attempt_count
                 """,
-                (as_of, max(1, int(limit)), as_of),
+                (as_of, as_of, max(1, int(limit)), as_of),
             ).fetchall()
             conn.commit()
         return [_leased_dispatch_from_row(row) for row in rows]
@@ -566,6 +593,7 @@ class PostgresRemindersRepository:
                     sent_at = %s,
                     provider_message_id = %s,
                     failure_reason = NULL,
+                    next_attempt_at = NULL,
                     updated_at = NOW()
                 WHERE id = %s
                 """,
@@ -578,17 +606,21 @@ class PostgresRemindersRepository:
         *,
         dispatch_id: int,
         failure_reason: str,
+        retry_at: datetime | None = None,
     ) -> None:
         with self._connect() as conn:
             conn.execute(
                 """
                 UPDATE reminder_dispatches
-                SET status = 'failed',
+                SET status = CASE WHEN %s IS NULL THEN 'failed' ELSE 'retryable' END,
                     failure_reason = %s,
+                    attempt_count = attempt_count + 1,
+                    next_attempt_at = %s,
+                    leased_at = CASE WHEN %s IS NULL THEN leased_at ELSE NULL END,
                     updated_at = NOW()
                 WHERE id = %s
                 """,
-                (failure_reason, dispatch_id),
+                (retry_at, failure_reason, retry_at, retry_at, dispatch_id),
             )
             conn.commit()
 
@@ -628,6 +660,7 @@ def _leased_dispatch_from_row(row: Any) -> LeasedReminderDispatch:
         channel=str(_row_value(row, "channel")),
         scheduled_for=_row_value(row, "scheduled_for"),
         payload=payload,
+        attempt_count=int(_row_value(row, "attempt_count", 0) or 0),
     )
 
 
@@ -655,10 +688,10 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
         "dispatch_type": 4,
         "scheduled_for": 6,
         "payload": 7,
+        "attempt_count": 8,
         "total": 0,
     }
     index = mapping.get(key)
     if index is None or len(row) <= index:
         return default
     return row[index]
-

@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from contextlib import contextmanager
 from dataclasses import dataclass, field, replace
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Iterator, Protocol
 
 from repositories.common import RepositoryConfigurationError, postgres_connection, require_database_url
@@ -34,6 +34,22 @@ class MicrosoftGraphConnectionRecord:
     display_name: str | None = None
     auth_metadata: dict[str, object] = field(default_factory=dict)
     id: int | None = None
+
+
+@dataclass(frozen=True)
+class MicrosoftOAuthPendingStateRecord:
+    """State OAuth pendiente para validar callbacks Microsoft."""
+
+    state_token: str
+    student_id: int
+    institutional_email: str | None
+    expires_at: datetime
+    scopes: tuple[str, ...]
+    authorization_url: str | None = None
+    status: str = "pending"
+    last_error: str | None = None
+    id: int | None = None
+    created_at: datetime | None = None
 
 
 @dataclass(frozen=True)
@@ -83,6 +99,39 @@ class MicrosoftGraphStateRepository(Protocol):
     ) -> MicrosoftGraphConnectionRecord: ...
 
     def delete_connection(self, *, student_id: int) -> None: ...
+
+    def upsert_oauth_pending_state(
+        self,
+        *,
+        record: MicrosoftOAuthPendingStateRecord,
+    ) -> MicrosoftOAuthPendingStateRecord: ...
+
+    def get_oauth_pending_state(
+        self,
+        *,
+        state_token: str,
+    ) -> MicrosoftOAuthPendingStateRecord | None: ...
+
+    def get_latest_oauth_pending_state(
+        self,
+        *,
+        student_id: int,
+    ) -> MicrosoftOAuthPendingStateRecord | None: ...
+
+    def mark_oauth_pending_state_completed(
+        self,
+        *,
+        state_token: str,
+    ) -> None: ...
+
+    def mark_oauth_pending_state_failed(
+        self,
+        *,
+        state_token: str,
+        last_error: str,
+    ) -> None: ...
+
+    def delete_oauth_pending_state(self, *, state_token: str) -> None: ...
 
     def list_calendar_event_links(
         self,
@@ -136,10 +185,12 @@ class InMemoryMicrosoftGraphStateRepository:
 
     def __init__(self) -> None:
         self._connections: dict[int, MicrosoftGraphConnectionRecord] = {}
+        self._oauth_pending_states: dict[str, MicrosoftOAuthPendingStateRecord] = {}
         self._calendar_links: dict[tuple[int, str], OutlookCalendarEventLinkRecord] = {}
         self._todo_links: dict[tuple[int, str], MicrosoftTodoTaskLinkRecord] = {}
         self._student_emails: dict[int, str] = {}
         self._next_connection_id = 1
+        self._next_oauth_pending_id = 1
         self._next_calendar_link_id = 1
         self._next_todo_link_id = 1
 
@@ -165,6 +216,76 @@ class InMemoryMicrosoftGraphStateRepository:
 
     def delete_connection(self, *, student_id: int) -> None:
         self._connections.pop(student_id, None)
+
+    def upsert_oauth_pending_state(
+        self,
+        *,
+        record: MicrosoftOAuthPendingStateRecord,
+    ) -> MicrosoftOAuthPendingStateRecord:
+        existing = self._oauth_pending_states.get(record.state_token)
+        record_id = existing.id if existing and existing.id is not None else self._next_oauth_pending_id
+        if existing is None or existing.id is None:
+            self._next_oauth_pending_id += 1
+        stored = replace(
+            record,
+            id=record_id,
+            created_at=record.created_at or datetime.now(timezone.utc),
+        )
+        self._oauth_pending_states[record.state_token] = stored
+        return stored
+
+    def get_oauth_pending_state(
+        self,
+        *,
+        state_token: str,
+    ) -> MicrosoftOAuthPendingStateRecord | None:
+        return self._oauth_pending_states.get(state_token)
+
+    def get_latest_oauth_pending_state(
+        self,
+        *,
+        student_id: int,
+    ) -> MicrosoftOAuthPendingStateRecord | None:
+        records = [
+            record
+            for record in self._oauth_pending_states.values()
+            if record.student_id == student_id and record.status == "pending"
+        ]
+        records.sort(
+            key=lambda item: item.created_at or datetime.min,
+            reverse=True,
+        )
+        return records[0] if records else None
+
+    def mark_oauth_pending_state_completed(
+        self,
+        *,
+        state_token: str,
+    ) -> None:
+        existing = self._oauth_pending_states.get(state_token)
+        if existing is not None:
+            self._oauth_pending_states[state_token] = replace(
+                existing,
+                status="completed",
+                last_error=None,
+            )
+
+    def mark_oauth_pending_state_failed(
+        self,
+        *,
+        state_token: str,
+        last_error: str,
+    ) -> None:
+        existing = self._oauth_pending_states.get(state_token)
+        if existing is not None:
+            self._oauth_pending_states[state_token] = replace(
+                existing,
+                status="failed",
+                last_error=last_error,
+            )
+
+    def delete_oauth_pending_state(self, *, state_token: str) -> None:
+        self._oauth_pending_states.pop(state_token, None)
 
     def list_calendar_event_links(
         self,
@@ -395,6 +516,158 @@ class PostgresMicrosoftGraphStateRepository:
             conn.execute(
                 "DELETE FROM microsoft_graph_connections WHERE student_id = %s",
                 (student_id,),
+            )
+            conn.commit()
+
+    def upsert_oauth_pending_state(
+        self,
+        *,
+        record: MicrosoftOAuthPendingStateRecord,
+    ) -> MicrosoftOAuthPendingStateRecord:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                INSERT INTO microsoft_oauth_pending_states (
+                    student_id,
+                    institutional_email,
+                    state_token,
+                    scopes_json,
+                    authorization_url,
+                    expires_at,
+                    status,
+                    last_error
+                ) VALUES (%s, %s, %s, %s::jsonb, %s, %s, %s, %s)
+                ON CONFLICT (state_token) DO UPDATE SET
+                    institutional_email = EXCLUDED.institutional_email,
+                    scopes_json = EXCLUDED.scopes_json,
+                    authorization_url = EXCLUDED.authorization_url,
+                    expires_at = EXCLUDED.expires_at,
+                    status = EXCLUDED.status,
+                    last_error = EXCLUDED.last_error,
+                    updated_at = NOW()
+                RETURNING
+                    id,
+                    student_id,
+                    institutional_email,
+                    state_token,
+                    scopes_json,
+                    authorization_url,
+                    expires_at,
+                    status,
+                    last_error,
+                    created_at
+                """,
+                (
+                    record.student_id,
+                    record.institutional_email,
+                    record.state_token,
+                    json.dumps(list(record.scopes)),
+                    record.authorization_url,
+                    record.expires_at,
+                    record.status,
+                    record.last_error,
+                ),
+            ).fetchone()
+            conn.commit()
+        return _oauth_pending_state_from_row(row)
+
+    def get_oauth_pending_state(
+        self,
+        *,
+        state_token: str,
+    ) -> MicrosoftOAuthPendingStateRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    id,
+                    student_id,
+                    institutional_email,
+                    state_token,
+                    scopes_json,
+                    authorization_url,
+                    expires_at,
+                    status,
+                    last_error,
+                    created_at
+                FROM microsoft_oauth_pending_states
+                WHERE state_token = %s
+                """,
+                (state_token,),
+            ).fetchone()
+        return _oauth_pending_state_from_row(row) if row is not None else None
+
+    def get_latest_oauth_pending_state(
+        self,
+        *,
+        student_id: int,
+    ) -> MicrosoftOAuthPendingStateRecord | None:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    id,
+                    student_id,
+                    institutional_email,
+                    state_token,
+                    scopes_json,
+                    authorization_url,
+                    expires_at,
+                    status,
+                    last_error,
+                    created_at
+                FROM microsoft_oauth_pending_states
+                WHERE student_id = %s
+                  AND status = 'pending'
+                ORDER BY created_at DESC
+                LIMIT 1
+                """,
+                (student_id,),
+            ).fetchone()
+        return _oauth_pending_state_from_row(row) if row is not None else None
+
+    def mark_oauth_pending_state_completed(
+        self,
+        *,
+        state_token: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE microsoft_oauth_pending_states
+                SET status = 'completed',
+                    last_error = NULL,
+                    updated_at = NOW()
+                WHERE state_token = %s
+                """,
+                (state_token,),
+            )
+            conn.commit()
+
+    def mark_oauth_pending_state_failed(
+        self,
+        *,
+        state_token: str,
+        last_error: str,
+    ) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                """
+                UPDATE microsoft_oauth_pending_states
+                SET status = 'failed',
+                    last_error = %s,
+                    updated_at = NOW()
+                WHERE state_token = %s
+                """,
+                (last_error, state_token),
+            )
+            conn.commit()
+
+    def delete_oauth_pending_state(self, *, state_token: str) -> None:
+        with self._connect() as conn:
+            conn.execute(
+                "DELETE FROM microsoft_oauth_pending_states WHERE state_token = %s",
+                (state_token,),
             )
             conn.commit()
 
@@ -700,6 +973,21 @@ def _connection_from_row(row: Any) -> MicrosoftGraphConnectionRecord:
     )
 
 
+def _oauth_pending_state_from_row(row: Any) -> MicrosoftOAuthPendingStateRecord:
+    return MicrosoftOAuthPendingStateRecord(
+        id=int(_oauth_row_value(row, "id")),
+        student_id=int(_oauth_row_value(row, "student_id")),
+        institutional_email=_optional_str(_oauth_row_value(row, "institutional_email")),
+        state_token=str(_oauth_row_value(row, "state_token")),
+        scopes=tuple(str(item) for item in (_oauth_row_value(row, "scopes_json") or [])),
+        authorization_url=_optional_str(_oauth_row_value(row, "authorization_url")),
+        expires_at=_oauth_row_value(row, "expires_at"),
+        status=str(_oauth_row_value(row, "status")),
+        last_error=_optional_str(_oauth_row_value(row, "last_error")),
+        created_at=_oauth_row_value(row, "created_at"),
+    )
+
+
 def _calendar_link_from_row(row: Any) -> OutlookCalendarEventLinkRecord:
     return OutlookCalendarEventLinkRecord(
         id=int(_row_value(row, "id")),
@@ -797,3 +1085,25 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
         return default
     return row[index]
 
+
+def _oauth_row_value(row: Any, key: str, default: Any = None) -> Any:
+    if row is None:
+        return default
+    if isinstance(row, dict):
+        return row.get(key, default)
+    mapping = {
+        "id": 0,
+        "student_id": 1,
+        "institutional_email": 2,
+        "state_token": 3,
+        "scopes_json": 4,
+        "authorization_url": 5,
+        "expires_at": 6,
+        "status": 7,
+        "last_error": 8,
+        "created_at": 9,
+    }
+    index = mapping.get(key)
+    if index is None or len(row) <= index:
+        return default
+    return row[index]

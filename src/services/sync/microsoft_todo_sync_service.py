@@ -40,6 +40,23 @@ _TODO_ACTIONABLE_STATUSES = {"missed", "skipped"}
 
 
 @dataclass(frozen=True)
+class MicrosoftTodoSyncPreviewResult:
+    """Vista previa no destructiva de la proyección hacia Microsoft To Do."""
+
+    previewed: bool
+    create_count: int = 0
+    update_count: int = 0
+    delete_count: int = 0
+    actionable_count: int = 0
+    active_task_count: int = 0
+    target_task_count: int = 0
+    task_list_id: str | None = None
+    synced_task_map: dict[str, str] = field(default_factory=dict)
+    error_code: str | None = None
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
 class MicrosoftTodoSyncResult:
     """Resultado de una corrida de sync hacia Microsoft To Do."""
 
@@ -69,6 +86,117 @@ class MicrosoftTodoSyncService:
             token_store=MicrosoftGraphStateTokenStore(effective_state_repository)
         )
         self.client = client or GraphMicrosoftTodoClient()
+
+    def preview_actionable_sessions(
+        self,
+        *,
+        student_id: int | None,
+        task_list_id: str | None,
+        study_plan_profile_id: int | None = None,
+    ) -> MicrosoftTodoSyncPreviewResult:
+        """Calcula cambios To Do sin crear, actualizar ni borrar tareas."""
+
+        if not student_id:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code="missing_student_id",
+                detail="No encontré el estudiante persistido para sincronizar Microsoft To Do.",
+            )
+
+        try:
+            connection = self.state_repository.get_connection(student_id=int(student_id))
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError) as exc:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code="microsoft_graph_state_error",
+                detail=str(exc),
+            )
+        if connection is None:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code="microsoft_connection_not_found",
+                detail=(
+                    "No existe una conexión Microsoft persistida para este estudiante. "
+                    "Completa OAuth antes de sincronizar Microsoft To Do."
+                ),
+            )
+
+        token_result = self.auth_client.get_valid_access_token(student_id=int(student_id))
+        if not token_result.ok or token_result.token is None:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code=token_result.error_code or "microsoft_oauth_error",
+                detail=token_result.detail,
+            )
+
+        try:
+            connection = self.state_repository.get_connection(student_id=int(student_id))
+            effective_task_list_id = _preview_task_list_id(
+                connection=connection,
+                explicit_task_list_id=task_list_id,
+                client=self.client,
+                access_token=token_result.token.access_token,
+            )
+            if not effective_task_list_id:
+                return MicrosoftTodoSyncPreviewResult(
+                    previewed=False,
+                    error_code="missing_task_list_id",
+                    detail=(
+                        "No pude resolver una lista de Microsoft To Do para proyectar "
+                        "tus tareas accionables."
+                    ),
+                )
+            instances = self.repository.list_instances(
+                student_id=int(student_id),
+                study_plan_profile_id=study_plan_profile_id,
+            )
+            existing_links = self.state_repository.list_todo_task_links(
+                student_id=int(student_id),
+                task_list_id=effective_task_list_id,
+            )
+        except (
+            MicrosoftGraphSyncRepositoryError,
+            MicrosoftGraphStateRepositoryError,
+            RepositoryConfigurationError,
+        ) as exc:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code="microsoft_todo_repository_error",
+                detail=str(exc),
+            )
+        except MicrosoftGraphClientError as exc:
+            return MicrosoftTodoSyncPreviewResult(
+                previewed=False,
+                error_code=getattr(exc, "error_code", "microsoft_todo_sync_error"),
+                detail=getattr(exc, "detail", str(exc)),
+            )
+
+        existing_link_map = {link.source_instance_key: link for link in existing_links}
+        actionable = [
+            instance for instance in instances if instance.status in _TODO_ACTIONABLE_STATUSES
+        ]
+        active_keys = {instance.source_instance_key for instance in actionable}
+        create_count = sum(
+            1 for instance in actionable if instance.source_instance_key not in existing_link_map
+        )
+        update_count = len(actionable) - create_count
+        delete_count = sum(
+            1 for link in existing_links if link.source_instance_key not in active_keys
+        )
+
+        return MicrosoftTodoSyncPreviewResult(
+            previewed=True,
+            create_count=create_count,
+            update_count=update_count,
+            delete_count=delete_count,
+            actionable_count=len(actionable),
+            active_task_count=len(existing_links),
+            target_task_count=len(actionable),
+            task_list_id=effective_task_list_id,
+            synced_task_map={
+                link.source_instance_key: link.external_task_id for link in existing_links
+            },
+        )
 
     def sync_actionable_sessions(
         self,
@@ -338,6 +466,29 @@ def _select_default_task_list(
     return task_lists[0] if task_lists else None
 
 
+def _preview_task_list_id(
+    *,
+    connection: MicrosoftGraphConnectionRecord | None,
+    explicit_task_list_id: str | None,
+    client: MicrosoftTodoClient,
+    access_token: str,
+) -> str | None:
+    normalized = str(explicit_task_list_id or "").strip()
+    if normalized:
+        return normalized
+    if connection is None:
+        return None
+    persisted_task_list_id = str(connection.todo_task_list_id or "").strip()
+    if persisted_task_list_id:
+        return persisted_task_list_id
+    selected_task_list = _select_default_task_list(
+        client.list_task_lists(access_token=access_token)
+    )
+    if selected_task_list is None:
+        return None
+    return selected_task_list.id
+
+
 def _instance_id_for_key(
     *,
     instances: list[MicrosoftSyncableStudyInstance],
@@ -350,6 +501,7 @@ def _instance_id_for_key(
 
 
 __all__ = [
+    "MicrosoftTodoSyncPreviewResult",
     "MicrosoftTodoSyncResult",
     "MicrosoftTodoSyncService",
     "build_microsoft_todo_sync_service",

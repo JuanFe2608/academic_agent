@@ -27,7 +27,6 @@ from services.reminders.state_helpers import ensure_reminders_state
 DEFAULT_REMINDER_CHANNELS = ("in_app",)
 _SUPPORTED_CHANNELS = {"in_app", "email", "whatsapp"}
 _DEFAULT_QUIET_HOURS = {"start": "22:00", "end": "06:00"}
-_DEFERRED_REMINDER_TYPES = {"missed_session"}
 _DEFAULT_POLICY_BLUEPRINTS: tuple[dict[str, object], ...] = (
     {
         "reminder_type": "pre_session",
@@ -322,8 +321,6 @@ def _build_dispatches(
         for policy in persisted_policies:
             if not policy.enabled:
                 continue
-            if policy.reminder_type in _DEFERRED_REMINDER_TYPES:
-                continue
             scheduled_for = _scheduled_for_instance(
                 policy=policy,
                 instance=instance,
@@ -365,6 +362,8 @@ def _scheduled_for_instance(
     if policy.reminder_type == "followup":
         offset = policy.followup_minutes if policy.followup_minutes is not None else policy.lead_minutes
         return instance.ends_at + timedelta(minutes=offset)
+    if policy.reminder_type == "missed_session":
+        return instance.ends_at + timedelta(minutes=policy.lead_minutes)
     return None
 
 

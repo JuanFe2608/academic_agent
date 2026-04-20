@@ -47,7 +47,16 @@ def build_schedule_pending_prompt(
     if title:
         lines.append(title)
     lines.append(f"- Me falta: {missing_text}.")
-    if missing_text == "AM o PM en el horario":
+    if missing_text == "dia o dias exactos":
+        lines.append(
+            "📅 Puedes responder solo con el día o los días. Ejemplo: Lunes."
+        )
+    elif missing_text == "hora de inicio y fin":
+        lines.append(
+            "🕒 Puedes responder solo con el rango horario. Ejemplo: 07:00 a 09:00. "
+            f"Si prefieres, {pronoun.lower()} completa así: {example}."
+        )
+    elif missing_text == "AM o PM en el horario":
         lines.append(
             f"🕒 Puedes responder solo con ese dato o {pronoun.lower()} de nuevo completa así: {example}."
         )

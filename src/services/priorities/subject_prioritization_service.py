@@ -9,16 +9,27 @@ si el estado todavía viene parcialmente vacío.
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import date
 
 from services.scheduling.constants import DAY_ORDER
 from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
 from schemas.common import Prioridad
-from schemas.planning import SubjectItem
+from schemas.planning import AcademicActivity, SubjectItem
 
 from .state_helpers import ensure_subject_items
 
 PRIORITY_WEIGHT = {"alta": 3, "media": 2, "baja": 1}
 URGENCY_WEIGHT = {None: 0, "baja": 1, "media": 2, "alta": 3}
+_ACTIVITY_DEFAULT_EFFORT_MINUTES = {
+    "parcial": 150,
+    "quiz": 75,
+    "tarea": 90,
+    "taller": 90,
+    "entrega": 120,
+    "exposicion": 120,
+    "proyecto": 180,
+    "estudio_pendiente": 60,
+}
 
 
 @dataclass(frozen=True)
@@ -49,7 +60,9 @@ def resolve_prioritized_subjects(
     *,
     schedule_blocks: list[WeeklyScheduleBlock | dict],
     subjects: list[SubjectItem | dict] | None,
+    academic_activities: list[AcademicActivity | dict] | None = None,
     primary_technique_id: str | None = None,
+    reference_date: date | None = None,
 ) -> PrioritizationResult:
     """Resuelve materias normalizadas y su orden de planificación.
 
@@ -60,12 +73,17 @@ def resolve_prioritized_subjects(
 
     active_blocks = _active_blocks(schedule_blocks)
     academic_stats = _academic_subject_stats(active_blocks)
+    activity_stats = _academic_activity_stats(
+        academic_activities,
+        reference_date=reference_date or date.today(),
+    )
     explicit_subjects = ensure_subject_items(subjects)
 
     if explicit_subjects:
         normalized_items, prioritized_subjects = _build_from_explicit_subjects(
             explicit_subjects,
             academic_stats=academic_stats,
+            activity_stats=activity_stats,
             primary_technique_id=primary_technique_id,
         )
         return PrioritizationResult(
@@ -74,15 +92,16 @@ def resolve_prioritized_subjects(
             source="state.subjects",
         )
 
-    if academic_stats:
+    if academic_stats or activity_stats:
         normalized_items, prioritized_subjects = _build_from_academic_schedule(
             academic_stats,
+            activity_stats=activity_stats,
             primary_technique_id=primary_technique_id,
         )
         return PrioritizationResult(
             subject_items=normalized_items,
             prioritized_subjects=prioritized_subjects,
-            source="derived_from_schedule",
+            source="derived_from_schedule" if academic_stats else "academic_activities",
         )
 
     fallback = SubjectItem(
@@ -109,22 +128,26 @@ def _build_from_explicit_subjects(
     subjects: list[SubjectItem],
     *,
     academic_stats: dict[str, dict[str, object]],
+    activity_stats: dict[str, dict[str, object]],
     primary_technique_id: str | None,
 ) -> tuple[list[SubjectItem], list[PrioritizedSubject]]:
     normalized_items: list[SubjectItem] = []
     prioritized_subjects: list[PrioritizedSubject] = []
+    seen_keys: set[str] = set()
 
     for subject in subjects:
         if not subject.nombre.strip():
             continue
-        stats = academic_stats.get(_normalize_title(subject.nombre), {})
-        carga = _resolve_subject_load(subject, stats)
-        normalized = subject.model_copy(
-            update={
-                "dificultad": max(1, min(int(subject.dificultad), 5)),
-                "carga_semanal_min": carga,
-                "origen": subject.origen or "manual",
-            }
+        key = _normalize_title(subject.nombre)
+        seen_keys.add(key)
+        stats = academic_stats.get(key, {})
+        activity = activity_stats.get(key, {})
+        carga = _merge_activity_load(_resolve_subject_load(subject, stats), activity)
+        normalized = _merge_subject_activity_signals(
+            subject,
+            activity,
+            carga_semanal_min=carga,
+            origen=subject.origen or "manual",
         )
         preferred_days = tuple(stats.get("days", ()))
         normalized_items.append(normalized)
@@ -132,6 +155,19 @@ def _build_from_explicit_subjects(
             _to_prioritized_subject(
                 normalized,
                 preferred_days=preferred_days,
+                primary_technique_id=primary_technique_id,
+            )
+        )
+
+    for key, activity in activity_stats.items():
+        if key in seen_keys:
+            continue
+        subject = _subject_from_activity_stats(activity)
+        normalized_items.append(subject)
+        prioritized_subjects.append(
+            _to_prioritized_subject(
+                subject,
+                preferred_days=tuple(),
                 primary_technique_id=primary_technique_id,
             )
         )
@@ -145,18 +181,29 @@ def _build_from_explicit_subjects(
 def _build_from_academic_schedule(
     academic_stats: dict[str, dict[str, object]],
     *,
+    activity_stats: dict[str, dict[str, object]],
     primary_technique_id: str | None,
 ) -> tuple[list[SubjectItem], list[PrioritizedSubject]]:
     subject_items: list[SubjectItem] = []
     prioritized_subjects: list[PrioritizedSubject] = []
+    seen_keys: set[str] = set()
 
-    for stats in academic_stats.values():
-        carga = int(stats["minutes"])
+    for key, stats in academic_stats.items():
+        seen_keys.add(key)
+        activity = activity_stats.get(key, {})
+        carga = _merge_activity_load(int(stats["minutes"]), activity)
+        base_priority = _priority_from_class_minutes(carga or int(stats["minutes"]))
         subject = SubjectItem(
             nombre=str(stats["title"]),
-            prioridad=_priority_from_class_minutes(carga),
+            prioridad=base_priority,
             dificultad=3,
             urgencia=None,
+            carga_semanal_min=carga,
+            origen="derived_from_schedule",
+        )
+        subject = _merge_subject_activity_signals(
+            subject,
+            activity,
             carga_semanal_min=carga,
             origen="derived_from_schedule",
         )
@@ -165,6 +212,19 @@ def _build_from_academic_schedule(
             _to_prioritized_subject(
                 subject,
                 preferred_days=tuple(stats["days"]),
+                primary_technique_id=primary_technique_id,
+            )
+        )
+
+    for key, activity in activity_stats.items():
+        if key in seen_keys:
+            continue
+        subject = _subject_from_activity_stats(activity)
+        subject_items.append(subject)
+        prioritized_subjects.append(
+            _to_prioritized_subject(
+                subject,
+                preferred_days=tuple(),
                 primary_technique_id=primary_technique_id,
             )
         )
@@ -253,6 +313,135 @@ def _academic_subject_stats(
     )
 
 
+def _academic_activity_stats(
+    activities: list[AcademicActivity | dict] | None,
+    *,
+    reference_date: date,
+) -> dict[str, dict[str, object]]:
+    stats: dict[str, dict[str, object]] = {}
+    for raw_activity in list(activities or []):
+        try:
+            activity = (
+                raw_activity
+                if isinstance(raw_activity, AcademicActivity)
+                else AcademicActivity(**dict(raw_activity))
+            )
+        except Exception:
+            continue
+        if activity.status != "pending" or not activity.subject_name.strip():
+            continue
+
+        key = _normalize_title(activity.subject_name)
+        effort = _activity_effort_minutes(activity)
+        due_priority = _priority_from_due_date(
+            activity.due_date,
+            reference_date=reference_date,
+        )
+        activity_priority = _stronger_priority(activity.priority_level, due_priority)
+        difficulty = activity.difficulty_level or _default_activity_difficulty(activity)
+        entry = stats.setdefault(
+            key,
+            {
+                "title": activity.subject_name.strip(),
+                "effort_minutes": 0,
+                "priority": None,
+                "urgency": None,
+                "difficulty": 3,
+                "urgency_type": None,
+                "urgency_due_at": None,
+            },
+        )
+        entry["effort_minutes"] = int(entry["effort_minutes"]) + effort
+        entry["priority"] = _stronger_priority(
+            entry.get("priority"),
+            activity_priority,
+        )
+        entry["urgency"] = _stronger_priority(
+            entry.get("urgency"),
+            due_priority,
+        )
+        entry["difficulty"] = max(int(entry.get("difficulty") or 3), int(difficulty))
+        if _is_nearer_due_date(activity.due_date, entry.get("urgency_due_at")):
+            entry["urgency_due_at"] = activity.due_date
+            entry["urgency_type"] = activity.activity_type
+
+    return dict(
+        sorted(
+            stats.items(),
+            key=lambda item: (
+                str(item[1].get("urgency_due_at") or "9999-12-31"),
+                -PRIORITY_WEIGHT.get(item[1].get("priority"), 0),
+                str(item[1].get("title") or "").lower(),
+            ),
+        )
+    )
+
+
+def _merge_subject_activity_signals(
+    subject: SubjectItem,
+    activity: dict[str, object],
+    *,
+    carga_semanal_min: int | None,
+    origen: str,
+) -> SubjectItem:
+    if not activity:
+        return subject.model_copy(
+            update={
+                "dificultad": max(1, min(int(subject.dificultad), 5)),
+                "carga_semanal_min": carga_semanal_min,
+                "origen": origen,
+            }
+        )
+
+    priority = _stronger_priority(subject.prioridad, activity.get("priority"))
+    urgency = _stronger_priority(subject.urgencia, activity.get("urgency"))
+    difficulty = max(
+        max(1, min(int(subject.dificultad), 5)),
+        max(1, min(int(activity.get("difficulty") or 3), 5)),
+    )
+    updates: dict[str, object] = {
+        "prioridad": priority or subject.prioridad,
+        "dificultad": difficulty,
+        "urgencia": urgency,
+        "carga_semanal_min": carga_semanal_min,
+        "origen": origen,
+    }
+    due_at = activity.get("urgency_due_at")
+    if due_at and _is_nearer_due_date(due_at, subject.urgency_due_at):
+        updates["urgency_type"] = activity.get("urgency_type")
+        updates["urgency_due_at"] = due_at
+        updates["priority_source"] = subject.priority_source or "academic_activity_seed"
+    return subject.model_copy(update=updates)
+
+
+def _subject_from_activity_stats(activity: dict[str, object]) -> SubjectItem:
+    carga = max(30, int(activity.get("effort_minutes") or 0))
+    priority = activity.get("priority") or _priority_from_class_minutes(carga)
+    return SubjectItem(
+        nombre=str(activity.get("title") or "Actividad academica").strip(),
+        prioridad=priority,  # type: ignore[arg-type]
+        dificultad=max(1, min(int(activity.get("difficulty") or 3), 5)),
+        urgencia=activity.get("urgency"),  # type: ignore[arg-type]
+        carga_semanal_min=carga,
+        origen="academic_activity",
+        urgency_type=str(activity.get("urgency_type") or "") or None,
+        urgency_due_at=str(activity.get("urgency_due_at") or "") or None,
+        priority_source="academic_activity_seed",
+    )
+
+
+def _merge_activity_load(
+    base_minutes: int | None,
+    activity: dict[str, object],
+) -> int | None:
+    effort = int(activity.get("effort_minutes") or 0)
+    if effort <= 0:
+        return base_minutes
+    if base_minutes is None:
+        return max(30, effort)
+    return max(30, int(base_minutes) + effort)
+
+
 def _resolve_subject_load(subject: SubjectItem, stats: dict[str, object]) -> int | None:
     if subject.carga_semanal_min is not None:
         return max(30, int(subject.carga_semanal_min))
@@ -326,6 +515,79 @@ def _priority_from_class_minutes(minutes: int) -> Prioridad:
     if minutes >= 90:
         return "media"
     return "baja"
+
+
+def _activity_effort_minutes(activity: AcademicActivity) -> int:
+    if activity.estimated_effort_minutes:
+        return max(15, int(activity.estimated_effort_minutes))
+    return _ACTIVITY_DEFAULT_EFFORT_MINUTES.get(activity.activity_type, 90)
+
+
+def _default_activity_difficulty(activity: AcademicActivity) -> int:
+    if activity.activity_type in {"parcial", "proyecto"}:
+        return 4
+    return 3
+
+
+def _priority_from_due_date(
+    due_date: str | None,
+    *,
+    reference_date: date,
+) -> Prioridad | None:
+    parsed = _parse_date(due_date)
+    if parsed is None:
+        return None
+    days_left = (parsed - reference_date).days
+    if days_left < 0:
+        return None
+    if days_left <= 3:
+        return "alta"
+    if days_left <= 7:
+        return "media"
+    return "baja"
+
+
+def _stronger_priority(
+    current: object,
+    candidate: object,
+) -> Prioridad | None:
+    current_value = _priority_or_none(current)
+    candidate_value = _priority_or_none(candidate)
+    if current_value is None:
+        return candidate_value
+    if candidate_value is None:
+        return current_value
+    return (
+        candidate_value
+        if PRIORITY_WEIGHT[candidate_value] > PRIORITY_WEIGHT[current_value]
+        else current_value
+    )
+
+
+def _priority_or_none(value: object) -> Prioridad | None:
+    if value in {"alta", "media", "baja"}:
+        return value  # type: ignore[return-value]
+    return None
+
+
+def _is_nearer_due_date(candidate: object, current: object) -> bool:
+    candidate_date = _parse_date(candidate)
+    if candidate_date is None:
+        return False
+    current_date = _parse_date(current)
+    return current_date is None or candidate_date < current_date
+
+
+def _parse_date(value: object) -> date | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    if not text:
+        return None
+    try:
+        return date.fromisoformat(text[:10])
+    except ValueError:
+        return None
 
 
 def _normalize_title(title: str) -> str:

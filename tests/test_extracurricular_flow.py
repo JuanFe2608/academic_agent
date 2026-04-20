@@ -297,7 +297,11 @@ def test_collect_extracurricular_details_keeps_valid_items_and_requests_only_mis
     assert "ya registré" in prompt
     assert "iglesia" in prompt
     assert "hora de inicio y fin" in prompt
-    assert "puedes responder solo con lo que falta" in prompt
+    assert "responder solo con el rango horario" in prompt
+    assert update["interaction"]["pending_entity_type"] == "extracurricular_item"
+    assert update["interaction"]["pending_action"] == "complete_extracurricular_item"
+    assert update["interaction"]["pending_entity_payload"]["name"] == "Iglesia"
+    assert update["interaction"]["missing_fields_json"] == ["time_range"]
 
 
 def test_collect_extracurricular_details_remembers_pending_day_when_user_replies_with_only_time() -> None:
@@ -338,6 +342,8 @@ def test_collect_extracurricular_details_remembers_pending_day_when_user_replies
     assert second_update["extras_collect_stage"] == "awaiting_more"
     assert second_update["awaiting_user_input"] is True
     assert second_update["extras_pending_items"] == []
+    assert second_update["interaction"]["pending_entity_type"] is None
+    assert second_update["interaction"]["missing_fields_json"] == []
     assert [item.nombre for item in second_update["extracurricular"]] == [
         "Gimnasio",
         "Centro Comercial",

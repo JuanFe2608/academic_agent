@@ -60,6 +60,32 @@ def set_study_planning_persistence_service(
     get_app_container().set_study_planning_persistence_service(service)
 
 
+def get_study_replanning_service() -> StudyReplanningService:
+    """Retorna una instancia reusable del servicio de replanificacion."""
+
+    return get_app_container().get_study_replanning_service()
+
+
+def set_study_replanning_service(service: StudyReplanningService | None) -> None:
+    """Permite inyectar replanificacion durante pruebas."""
+
+    get_app_container().set_study_replanning_service(service)
+
+
+def get_academic_activity_persistence_service() -> AcademicActivityPersistenceService:
+    """Retorna una instancia reusable de persistencia de actividades."""
+
+    return get_app_container().get_academic_activity_persistence_service()
+
+
+def set_academic_activity_persistence_service(
+    service: AcademicActivityPersistenceService | None,
+) -> None:
+    """Permite inyectar persistencia de actividades durante pruebas."""
+
+    get_app_container().set_academic_activity_persistence_service(service)
+
+
 def get_study_plan_materialization_service() -> StudyPlanMaterializationService:
     """Retorna una instancia reusable del servicio de materialización."""
 
@@ -138,6 +164,20 @@ def set_microsoft_oauth_client(client: MicrosoftOAuthClient | None) -> None:
     get_app_container().set_microsoft_oauth_client(client)
 
 
+def get_microsoft_oauth_flow_service() -> MicrosoftOAuthFlowService:
+    """Retorna el flujo OAuth Microsoft bloqueante del onboarding."""
+
+    return get_app_container().get_microsoft_oauth_flow_service()
+
+
+def set_microsoft_oauth_flow_service(
+    service: MicrosoftOAuthFlowService | None,
+) -> None:
+    """Permite inyectar el flujo OAuth Microsoft durante pruebas."""
+
+    get_app_container().set_microsoft_oauth_flow_service(service)
+
+
 def get_outlook_calendar_sync_service() -> OutlookCalendarSyncService:
     """Retorna el servicio reusable de sincronización Outlook."""
 
@@ -195,8 +235,10 @@ def set_microsoft_todo_sync_service(
 
 
 __all__ = [
+    "get_academic_activity_persistence_service",
     "get_microsoft_graph_state_repository",
     "get_microsoft_oauth_client",
+    "get_microsoft_oauth_flow_service",
     "get_microsoft_todo_sync_service",
     "get_onboarding_service",
     "get_outlook_calendar_sync_service",
@@ -207,10 +249,13 @@ __all__ = [
     "get_schedule_service",
     "get_study_plan_materialization_service",
     "get_study_planning_persistence_service",
+    "get_study_replanning_service",
     "get_study_recommendation_service",
     "get_tracking_service",
+    "set_academic_activity_persistence_service",
     "set_microsoft_graph_state_repository",
     "set_microsoft_oauth_client",
+    "set_microsoft_oauth_flow_service",
     "set_microsoft_todo_sync_service",
     "set_onboarding_service",
     "set_outlook_calendar_sync_service",
@@ -221,6 +266,7 @@ __all__ = [
     "set_schedule_service",
     "set_study_plan_materialization_service",
     "set_study_planning_persistence_service",
+    "set_study_replanning_service",
     "set_study_recommendation_service",
     "set_tracking_service",
 ]

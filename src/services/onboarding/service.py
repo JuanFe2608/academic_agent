@@ -222,6 +222,55 @@ class OnboardingService:
 
         return PersistStudentResult(persisted=True, student_id=student_id)
 
+    def persist_verified_identity(self, profile: Any) -> PersistStudentResult:
+        """Crea o actualiza la identidad minima antes del OAuth bloqueante."""
+
+        if not bool(_profile_value(profile, "email_verified", False)):
+            return PersistStudentResult(
+                persisted=False,
+                error_code="email_not_verified",
+                detail="El correo institucional aun no ha sido verificado.",
+            )
+        required_fields = (
+            "full_name",
+            "student_code",
+            "age",
+            "institutional_email",
+        )
+        missing = [
+            field
+            for field in required_fields
+            if _profile_value(profile, field) in (None, "")
+        ]
+        if missing:
+            return PersistStudentResult(
+                persisted=False,
+                error_code="missing_identity_fields",
+                detail=f"Faltan campos de identidad para OAuth: {', '.join(missing)}.",
+            )
+        try:
+            student_id = self.repository.upsert_verified_student_identity(profile)
+        except DuplicateInstitutionalEmailError as exc:
+            return PersistStudentResult(
+                persisted=False,
+                error_code="duplicate_email",
+                detail=str(exc),
+            )
+        except DuplicateStudentCodeError as exc:
+            return PersistStudentResult(
+                persisted=False,
+                error_code="duplicate_student_code",
+                detail=str(exc),
+            )
+        except (OnboardingRepositoryError, RepositoryConfigurationError) as exc:
+            return PersistStudentResult(
+                persisted=False,
+                error_code="persistence_error",
+                detail=str(exc),
+            )
+
+        return PersistStudentResult(persisted=True, student_id=student_id)
+
     def _resolve_verification_code(self) -> str:
         fixed_code = str(self.config.fixed_verification_code or "").strip()
         if self.config.verification_mode == "fixed" and fixed_code:

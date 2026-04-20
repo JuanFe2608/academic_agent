@@ -203,6 +203,124 @@ def test_microsoft_todo_sync_service_projects_missed_sessions(monkeypatch) -> No
     assert persisted_links[0].external_task_id.startswith("todo:")
 
 
+def test_microsoft_todo_sync_preview_does_not_call_upsert(monkeypatch) -> None:
+    monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
+    instances_repository = InMemoryStudyPlanInstancesRepository()
+    materialization_service = StudyPlanMaterializationService(
+        repository=instances_repository,
+        horizon_days=7,
+    )
+    materialization_service.materialize_plan_instances(
+        student_id=7,
+        study_plan_profile_id=31,
+        study_plan={
+            "plan_events": [_study_event("Lunes", "Estudio Calculo", "evt-calculo")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+    tracking_service = StudySessionTrackingService(
+        repository=InMemoryStudySessionTrackingRepository(
+            instances_repository=instances_repository
+        )
+    )
+    tracking_service.mark_due_sessions_missed(
+        student_id=7,
+        as_of="2026-01-05T19:00:00-05:00",
+        grace_minutes=30,
+    )
+
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    client = _FakeMicrosoftTodoClient()
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(
+            instances_repository=instances_repository
+        ),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    preview = service.preview_actionable_sessions(
+        student_id=7,
+        task_list_id="todo-list-1",
+        study_plan_profile_id=31,
+    )
+
+    assert preview.previewed is True
+    assert preview.create_count == 1
+    assert preview.update_count == 0
+    assert preview.delete_count == 0
+    assert preview.actionable_count == 1
+    assert client.upserts == []
+    assert client.deletes == []
+
+
+def test_microsoft_todo_sync_service_deletes_tasks_when_session_is_resolved(
+    monkeypatch,
+) -> None:
+    monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
+    instances_repository = InMemoryStudyPlanInstancesRepository()
+    materialization_service = StudyPlanMaterializationService(
+        repository=instances_repository,
+        horizon_days=7,
+    )
+    materialization_service.materialize_plan_instances(
+        student_id=7,
+        study_plan_profile_id=31,
+        study_plan={
+            "plan_events": [_study_event("Lunes", "Estudio Calculo", "evt-calculo")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+    tracking_service = StudySessionTrackingService(
+        repository=InMemoryStudySessionTrackingRepository(
+            instances_repository=instances_repository
+        )
+    )
+    tracking_service.mark_due_sessions_missed(
+        student_id=7,
+        as_of="2026-01-05T19:00:00-05:00",
+        grace_minutes=30,
+    )
+
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    client = _FakeMicrosoftTodoClient()
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(
+            instances_repository=instances_repository
+        ),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    first_result = service.sync_actionable_sessions(
+        student_id=7,
+        task_list_id="todo-list-1",
+        study_plan_profile_id=31,
+    )
+    for payload in instances_repository._instances_by_key.values():
+        payload["status"] = "completed"
+
+    second_result = service.sync_actionable_sessions(
+        student_id=7,
+        task_list_id="todo-list-1",
+        study_plan_profile_id=31,
+    )
+
+    assert first_result.upserted_count == 1
+    assert second_result.synced is True
+    assert second_result.upserted_count == 0
+    assert second_result.deleted_count == 1
+    assert len(client.deletes) == 1
+    assert state_repository.list_todo_task_links(
+        student_id=7,
+        task_list_id="todo-list-1",
+    ) == []
+
+
 def test_microsoft_todo_sync_service_persists_default_task_list_when_missing(
     monkeypatch,
 ) -> None:

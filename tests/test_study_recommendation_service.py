@@ -16,6 +16,8 @@ from rag.retrieval.models import (
 )
 from schemas.rag import RagRelation, StudyRecommendationQuery
 from services.study_recommendations import (
+    AppliedStudyMethodRequest,
+    AppliedStudyMethodService,
     StudyRecommendationService,
     build_study_recommendation_service,
 )
@@ -44,26 +46,7 @@ class _FakeRetriever:
                     source_document_id="technique.pomodoro",
                 )
             )
-        chunk = RagRetrievedChunk(
-            chunk_id="technique.pomodoro::answer",
-            document_id="technique.pomodoro",
-            knowledge_type="technique",
-            document_type="study_technique",
-            entity_id="pomodoro",
-            section_title="Respuesta corta reusable para RAG",
-            chunk_kind="answer_ready",
-            content=(
-                "## Respuesta corta reusable para RAG\n"
-                "Pomodoro organiza el estudio en bloques cortos con pausas."
-            ),
-            metadata={
-                "confidence_level": "alto",
-                "evidence_level": "alto",
-                "source_path": "raw/techniques/tecnica_pomodoro_rag.md",
-            },
-            token_estimate=24,
-            final_score=3.5,
-        )
+        chunk = _method_chunk(query.query_text) if query.intent == "adapt_method" else _pomodoro_chunk()
         return GroundedContextPackage(
             query=query,
             understanding=QueryUnderstanding(
@@ -142,6 +125,57 @@ def test_validate_technique_combination_returns_caution_when_relation_blocks_pai
     assert result.cautions[0].startswith("Evitar combinar Pomodoro con Feynman")
 
 
+def test_applied_method_service_generates_activity_steps_from_radar_and_rag_sources() -> None:
+    retriever = _FakeRetriever()
+    service = StudyRecommendationService(
+        settings=_settings(enabled=True),
+        retriever=retriever,
+    )
+
+    result = AppliedStudyMethodService(service).apply_to_activity(
+        AppliedStudyMethodRequest(
+            subject_name="Calculo",
+            subject_type="teorica",
+            activity_type="parcial",
+            available_minutes=90,
+            urgency="alta",
+            student_signals=["procrastinacion"],
+            top_techniques=["pomodoro"],
+        )
+    )
+
+    assert result.applied is True
+    assert result.selected_method_id == "metodo_parcial_teorico"
+    assert result.selected_technique_id is None
+    assert result.source_chunks == ["study_method.metodo_parcial_teorico::steps"]
+    assert "metodo para parcial teorico" in result.summary
+    assert any("Lista temas probables" in step for step in result.steps)
+    assert retriever.queries[0].intent == "adapt_method"
+    assert retriever.queries[0].top_techniques == ["pomodoro"]
+    assert retriever.queries[0].student_signals == ["procrastination"]
+
+
+def test_applied_method_service_does_not_invent_steps_without_grounded_sources() -> None:
+    service = StudyRecommendationService(
+        settings=_settings(enabled=False),
+        retriever=None,
+        unavailable_reason="rag_disabled",
+    )
+
+    result = AppliedStudyMethodService(service).apply_to_activity(
+        AppliedStudyMethodRequest(
+            subject_name="Calculo",
+            activity_type="parcial",
+            top_techniques=["pomodoro"],
+        )
+    )
+
+    assert result.applied is False
+    assert result.steps == []
+    assert result.error_code == "missing_grounded_sources"
+    assert result.source_chunks == []
+
+
 def test_service_returns_fallback_when_rag_is_disabled() -> None:
     service = StudyRecommendationService(
         settings=_settings(enabled=False),
@@ -210,4 +244,73 @@ def _settings(*, enabled: bool) -> RagSettings:
         top_k_lexical=4,
         top_k_final=3,
         min_score=0.0,
+    )
+
+
+def _pomodoro_chunk() -> RagRetrievedChunk:
+    return RagRetrievedChunk(
+        chunk_id="technique.pomodoro::answer",
+        document_id="technique.pomodoro",
+        knowledge_type="technique",
+        document_type="study_technique",
+        entity_id="pomodoro",
+        section_title="Respuesta corta reusable para RAG",
+        chunk_kind="answer_ready",
+        content=(
+            "## Respuesta corta reusable para RAG\n"
+            "Pomodoro organiza el estudio en bloques cortos con pausas."
+        ),
+        metadata={
+            "confidence_level": "alto",
+            "evidence_level": "alto",
+            "source_path": "raw/techniques/tecnica_pomodoro_rag.md",
+        },
+        token_estimate=24,
+        final_score=3.5,
+    )
+
+
+def _method_chunk(query_text: str = "") -> RagRetrievedChunk:
+    if "evaluacion numerica" in query_text:
+        return RagRetrievedChunk(
+            chunk_id="study_method.metodo_evaluacion_numerica_breve::steps",
+            document_id="study_method.metodo_evaluacion_numerica_breve",
+            knowledge_type="study_method",
+            document_type="study_method",
+            entity_id="metodo_evaluacion_numerica_breve",
+            section_title="Pasos operativos",
+            chunk_kind="steps",
+            content=(
+                "## Pasos operativos\n"
+                "El metodo de evaluacion numerica breve clasifica ejercicios, "
+                "resuelve uno guiado y luego practica sin mirar el procedimiento."
+            ),
+            metadata={
+                "confidence_level": "alto",
+                "evidence_level": "alto",
+                "source_path": "raw/methods/metodo_evaluacion_numerica_breve.md",
+            },
+            token_estimate=28,
+            final_score=3.8,
+        )
+    return RagRetrievedChunk(
+        chunk_id="study_method.metodo_parcial_teorico::steps",
+        document_id="study_method.metodo_parcial_teorico",
+        knowledge_type="study_method",
+        document_type="study_method",
+        entity_id="metodo_parcial_teorico",
+        section_title="Pasos operativos",
+        chunk_kind="steps",
+        content=(
+            "## Pasos operativos\n"
+            "El metodo para parcial teorico empieza por listar temas probables, "
+            "responder sin mirar apuntes y corregir vacios."
+        ),
+        metadata={
+            "confidence_level": "alto",
+            "evidence_level": "alto",
+            "source_path": "raw/methods/metodo_parcial_teorico.md",
+        },
+        token_estimate=28,
+        final_score=3.8,
     )

@@ -145,6 +145,66 @@ def test_parse_schedules_to_events_prompts_to_add_more_before_moving_on() -> Non
     assert "escribe el número" in prompt
 
 
+def test_parse_schedules_to_events_registers_pending_fixed_schedule_interaction() -> None:
+    state = AgentState(
+        phase="schedules",
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Miercoles Matematicas"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+    )
+
+    update = parse_node.parse_schedules_to_events(state)
+
+    assert update["phase"] == "schedules"
+    assert update["awaiting_user_input"] is True
+    assert update["academic_pending_items"]
+    assert update["interaction"]["pending_entity_type"] == "fixed_schedule_item"
+    assert update["interaction"]["pending_action"] == "complete_fixed_schedule_item"
+    assert update["interaction"]["pending_entity_payload"]["schedule_type"] == "academic"
+    assert update["interaction"]["missing_fields_json"] == ["time_range"]
+    assert "responder solo con el rango horario" in update["messages"][0].content.lower()
+
+
+def test_parse_schedules_to_events_missing_day_prompt_asks_only_for_day() -> None:
+    state = AgentState(
+        phase="schedules",
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Matematicas 9 a 11"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+    )
+
+    update = parse_node.parse_schedules_to_events(state)
+
+    assert update["interaction"]["missing_fields_json"] == ["day"]
+    assert "responder solo con el día" in update["messages"][0].content.lower()
+
+
+def test_request_schedules_resolves_fixed_schedule_pending_with_short_reply_and_clears_interaction() -> None:
+    pending_state = AgentState(
+        phase="schedules",
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Miercoles Matematicas"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+    )
+    pending_update = parse_node.parse_schedules_to_events(pending_state)
+    state_payload = pending_state.model_dump(mode="python")
+    state_payload.update(pending_update)
+    state_payload["messages"] = [HumanMessage(content="9 a 11")]
+    state_payload["awaiting_user_input"] = True
+    state_payload["user_message_count"] = 0
+
+    update = request_schedules(AgentState(**state_payload))
+
+    assert update["academic_pending_items"] == []
+    assert update["schedule"]["capture_stage"] == "awaiting_more"
+    assert update["interaction"]["pending_entity_type"] is None
+    assert update["interaction"]["missing_fields_json"] == []
+    blocks = [block for block in update["schedule"]["blocks"] if block.block_type == "academic"]
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in blocks] == [
+        ("Matematicas", "wednesday", "09:00", "11:00"),
+    ]
+
+
 def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -> None:
     state = AgentState(
         phase="schedules",

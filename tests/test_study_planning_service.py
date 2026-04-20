@@ -12,7 +12,7 @@ from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.persist_study_profile.node import persist_study_profile
 from agents.support.state import AgentState
 from repositories.personalization.repository import InMemoryPersonalizationRepository
-from schemas.planning import SubjectItem
+from schemas.planning import AcademicActivity, SubjectItem
 from schemas.rag import StudyRecommendationResult
 from services.personalization import (
     PersonalizationConfig,
@@ -145,6 +145,24 @@ class _StudyRecommendationServiceStub:
             answer=self.session_answer,
             recommended_techniques=[str(kwargs.get("technique_id") or "pomodoro")],
             source_chunks=list(self.session_source_chunks),
+            confidence="media",
+            groundedness_notes=["sources:cited"],
+        )
+
+    def answer_query(self, query):
+        self.calls.append({"method": "answer_query", "query": query})
+        method_id = (
+            "metodo_evaluacion_numerica_breve"
+            if "evaluacion numerica" in query.query_text
+            else "metodo_parcial_teorico"
+        )
+        return StudyRecommendationResult(
+            answer=(
+                "El metodo aplicado permite clasificar o listar el trabajo, "
+                "responder sin mirar apuntes y corregir vacios."
+            ),
+            recommended_methods=[method_id],
+            source_chunks=[f"study_method.{method_id}::steps"],
             confidence="media",
             groundedness_notes=["sources:cited"],
         )
@@ -419,9 +437,12 @@ def test_build_study_plan_adds_rag_session_guidance_when_service_is_ready() -> N
         update = build_study_plan(state)
 
         guidance = update["study_plan"]["rules"]["rag_session_guidance"]
+        assert update["study_plan"]["rules"]["external_sync_status"] == "not_requested"
+        assert update["study_plan"]["rules"]["external_sync_requires_confirmation"] is True
         assert guidance["primary_technique_id"] == "pomodoro"
         assert guidance["subject_name"] == "Calculo"
         assert guidance["source_chunks"] == ["technique.pomodoro::session"]
+        assert "No he creado eventos en Outlook" in update["messages"][0].content
         assert "Guía sugerida para la primera sesión:" in update["messages"][0].content
         assert "Empieza la sesion" in update["messages"][0].content
         assert recommendation_service.calls[0]["method"] == "recommend_for_session"
@@ -429,6 +450,57 @@ def test_build_study_plan_adds_rag_session_guidance_when_service_is_ready() -> N
             "procrastination",
             "distraction",
         ]
+    finally:
+        set_study_recommendation_service(None)
+
+
+def test_build_study_plan_adds_applied_method_guidance_for_pending_activity() -> None:
+    recommendation_service = _StudyRecommendationServiceStub(ready=True)
+    set_study_recommendation_service(recommendation_service)
+    try:
+        state = AgentState(
+            phase="study_plan",
+            study_profile={
+                "top_techniques": ["pomodoro"],
+                "weakness_tags": ["procrastination"],
+            },
+            schedule={
+                "blocks": [_academic_block("monday", "08:00", "10:00", "Calculo")],
+            },
+            subjects=[
+                SubjectItem(
+                    nombre="Calculo",
+                    prioridad="alta",
+                    dificultad=4,
+                    urgencia="alta",
+                    carga_semanal_min=180,
+                    is_priority_confirmed=True,
+                )
+            ],
+            academic_activities=[
+                AcademicActivity(
+                    activity_type="parcial",
+                    subject_name="Calculo",
+                    due_date="2026-04-24",
+                    estimated_effort_minutes=90,
+                    priority_level="alta",
+                    difficulty_level=4,
+                )
+            ],
+        )
+
+        update = build_study_plan(state)
+
+        guidance = update["study_plan"]["rules"]["applied_method_guidance"]
+        item = guidance["items"][0]
+        assert guidance["status"] == "generated"
+        assert guidance["activity_count"] == 1
+        assert item["selected_method_id"] == "metodo_evaluacion_numerica_breve"
+        assert item["subject_name"] == "Calculo"
+        assert item["session_event_ids"]
+        assert "Clasifica los ejercicios" in item["steps"][1]
+        assert "Método aplicado para una actividad prioritaria:" in update["messages"][0].content
+        assert any(call["method"] == "answer_query" for call in recommendation_service.calls)
     finally:
         set_study_recommendation_service(None)
 

@@ -14,11 +14,14 @@ from integrations.whatsapp import (
     WhatsAppMessageSend,
 )
 from schemas.channels import (
+    AggregatedInput,
+    BufferedMessage,
     ChannelInboundMessage,
     ChannelMedia,
     ChannelOutboundMessage,
     ChannelSendResult,
 )
+from services.channels.message_buffer import MessageBuffer
 from utils.media_artifacts import materialize_image_reference
 
 _WHATSAPP_IMAGE_CAPTION_LIMIT = 1024
@@ -27,8 +30,14 @@ _WHATSAPP_IMAGE_CAPTION_LIMIT = 1024
 class WhatsAppChannelService:
     """Orquesta envio y recepcion de mensajes WhatsApp sin acoplar el agente."""
 
-    def __init__(self, client: WhatsAppCloudClient) -> None:
+    def __init__(
+        self,
+        client: WhatsAppCloudClient,
+        *,
+        message_buffer: MessageBuffer | None = None,
+    ) -> None:
         self.client = client
+        self.message_buffer = message_buffer or MessageBuffer()
 
     def send_agent_messages(
         self,
@@ -96,6 +105,34 @@ class WhatsAppChannelService:
             media=media,
             raw_payload=inbound.raw_message or {},
         )
+
+    def buffer_inbound(
+        self,
+        inbound: ChannelInboundMessage,
+        *,
+        conversation_id: str | None = None,
+        confirmation_pending: bool = False,
+    ) -> list[AggregatedInput]:
+        """Agrega un inbound normalizado y devuelve payloads listos para el grafo."""
+
+        buffered = BufferedMessage.from_channel_inbound(
+            inbound,
+            conversation_id=conversation_id,
+        )
+        return self.message_buffer.add_message(
+            buffered,
+            confirmation_pending=confirmation_pending,
+        )
+
+    def flush_inbound_buffer(
+        self,
+        conversation_id: str,
+        *,
+        reason: str = "manual",
+    ) -> AggregatedInput | None:
+        """Fuerza el flush del buffer de una conversacion."""
+
+        return self.message_buffer.flush(conversation_id, reason=reason)
 
     def _send_image(self, outbound: ChannelOutboundMessage) -> WhatsAppMessageSend:
         media = outbound.media
@@ -231,6 +268,24 @@ def whatsapp_inbound_to_human_message(inbound: ChannelInboundMessage) -> HumanMe
     return HumanMessage(content=content)
 
 
+def aggregated_input_to_human_message(aggregated: AggregatedInput) -> HumanMessage:
+    """Convierte un payload agregado del buffer al mensaje que consume el grafo."""
+
+    inbound = ChannelInboundMessage(
+        channel=aggregated.channel,
+        sender_id=aggregated.sender_id,
+        message_id=aggregated.latest_message_id,
+        text=aggregated.text,
+        media=list(aggregated.media),
+        raw_payload={
+            "conversation_id": aggregated.conversation_id,
+            "flush_reason": aggregated.flush_reason,
+            "message_count": aggregated.message_count,
+        },
+    )
+    return whatsapp_inbound_to_human_message(inbound)
+
+
 def _message_content(message: BaseMessage | dict[str, Any] | str) -> Any:
     if isinstance(message, BaseMessage):
         return message.content
@@ -302,7 +357,7 @@ def _download_filename(inbound: WhatsAppInboundMessage) -> str | None:
 
 
 def _channel_media_type(value: str) -> str:
-    return value if value in {"image", "document", "audio", "video"} else "document"
+    return value if value in {"image", "document", "audio", "video", "sticker"} else "document"
 
 
 def _is_http_url(value: str) -> bool:
@@ -312,5 +367,6 @@ def _is_http_url(value: str) -> bool:
 __all__ = [
     "WhatsAppChannelService",
     "agent_message_to_channel_messages",
+    "aggregated_input_to_human_message",
     "whatsapp_inbound_to_human_message",
 ]

@@ -53,6 +53,21 @@ class OutlookCalendarSyncResult:
     detail: str | None = None
 
 
+@dataclass(frozen=True)
+class OutlookCalendarSyncPreviewResult:
+    """Previsualizacion local antes de tocar Outlook Calendar."""
+
+    previewed: bool
+    create_count: int = 0
+    update_count: int = 0
+    delete_count: int = 0
+    active_instance_count: int = 0
+    target_instance_count: int = 0
+    synced_event_map: dict[str, str] = field(default_factory=dict)
+    error_code: str | None = None
+    detail: str | None = None
+
+
 class OutlookCalendarSyncService:
     """Sincroniza instancias materializadas hacia Outlook Calendar."""
 
@@ -71,6 +86,108 @@ class OutlookCalendarSyncService:
             token_store=MicrosoftGraphStateTokenStore(effective_state_repository)
         )
         self.client = client or GraphOutlookCalendarClient()
+
+    def preview_student_calendar_sync(
+        self,
+        *,
+        student_id: int | None,
+        calendar_state: CalendarState | dict | None = None,
+        calendar_id: str | None = None,
+        study_plan_profile_id: int | None = None,
+    ) -> OutlookCalendarSyncPreviewResult:
+        """Calcula impacto local de sync sin llamar a Microsoft Graph."""
+
+        if not student_id:
+            return OutlookCalendarSyncPreviewResult(
+                previewed=False,
+                error_code="missing_student_id",
+                detail="No encontré el estudiante persistido para sincronizar Outlook Calendar.",
+            )
+
+        normalized_calendar = _ensure_calendar_state(calendar_state)
+        validation_error = _validate_calendar_state(normalized_calendar)
+        if validation_error is not None:
+            return OutlookCalendarSyncPreviewResult(
+                previewed=False,
+                synced_event_map=dict(normalized_calendar.synced_event_map),
+                error_code=validation_error.error_code,
+                detail=validation_error.detail,
+            )
+
+        try:
+            connection = self.state_repository.get_connection(student_id=int(student_id))
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError) as exc:
+            return OutlookCalendarSyncPreviewResult(
+                previewed=False,
+                error_code="microsoft_graph_state_error",
+                detail=str(exc),
+            )
+        if connection is None:
+            return OutlookCalendarSyncPreviewResult(
+                previewed=False,
+                error_code="microsoft_connection_not_found",
+                detail=(
+                    "No existe una conexión Microsoft persistida para este estudiante. "
+                    "Completa OAuth antes de sincronizar el calendario."
+                ),
+            )
+
+        try:
+            instances = self.repository.list_instances(
+                student_id=int(student_id),
+                study_plan_profile_id=study_plan_profile_id,
+            )
+            storage_calendar_id = _storage_calendar_id(
+                _connection_with_resolved_calendar(
+                    connection=connection,
+                    explicit_calendar_id=_resolve_calendar_id(
+                        calendar_id,
+                        normalized_calendar.calendar_id,
+                    ),
+                )
+            )
+            existing_links = self.state_repository.list_calendar_event_links(
+                student_id=int(student_id),
+                calendar_id=storage_calendar_id,
+            )
+        except (
+            MicrosoftGraphSyncRepositoryError,
+            MicrosoftGraphStateRepositoryError,
+            RepositoryConfigurationError,
+        ) as exc:
+            return OutlookCalendarSyncPreviewResult(
+                previewed=False,
+                error_code="outlook_calendar_repository_error",
+                detail=str(exc),
+            )
+
+        existing_link_map = {link.source_instance_key: link for link in existing_links}
+        upsert_instances = [
+            instance
+            for instance in instances
+            if instance.status in _CALENDAR_UPSERT_STATUSES
+        ]
+        delete_instances = [
+            instance
+            for instance in instances
+            if instance.status in _CALENDAR_DELETE_STATUSES
+            and instance.source_instance_key in existing_link_map
+        ]
+        update_count = sum(
+            1 for instance in upsert_instances if instance.source_instance_key in existing_link_map
+        )
+        create_count = len(upsert_instances) - update_count
+        return OutlookCalendarSyncPreviewResult(
+            previewed=True,
+            create_count=create_count,
+            update_count=update_count,
+            delete_count=len(delete_instances),
+            active_instance_count=len(upsert_instances),
+            target_instance_count=len(instances),
+            synced_event_map={
+                link.source_instance_key: link.external_event_id for link in existing_links
+            },
+        )
 
     def sync_student_calendar(
         self,
@@ -342,6 +459,16 @@ def _persist_calendar_default(
     return state_repository.upsert_connection(
         record=replace(connection, calendar_id=explicit_calendar_id)
     )
+
+
+def _connection_with_resolved_calendar(
+    *,
+    connection: MicrosoftGraphConnectionRecord,
+    explicit_calendar_id: str | None,
+) -> MicrosoftGraphConnectionRecord:
+    if not explicit_calendar_id or connection.calendar_id == explicit_calendar_id:
+        return connection
+    return replace(connection, calendar_id=explicit_calendar_id)
 
 
 def _storage_calendar_id(connection: MicrosoftGraphConnectionRecord) -> str:

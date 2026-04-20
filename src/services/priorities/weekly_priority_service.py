@@ -43,6 +43,12 @@ _EVENT_TYPE_KEYWORDS = {
     "actividad": {"actividad", "laboratorio", "taller"},
 }
 _ACADEMIC_EVENT_WORDS = set().union(*_EVENT_TYPE_KEYWORDS.values())
+_ACADEMIC_ACTIVITY_MANAGEMENT_WORDS = {
+    "estudio pendiente",
+    "sesion de estudio",
+    "pendiente estudiar",
+    "actividades pendientes",
+}
 _MISSED_STUDY_WORDS = {
     "no pude estudiar",
     "no estudie",
@@ -599,6 +605,7 @@ def is_academic_update_message(text: str | None) -> bool:
         any(token in normalized for token in _MISSED_STUDY_WORDS)
         or any(token in normalized for token in _COMPLETION_WORDS)
         or any(word in normalized for word in _ACADEMIC_EVENT_WORDS)
+        or any(word in normalized for word in _ACADEMIC_ACTIVITY_MANAGEMENT_WORDS)
     )
 
 

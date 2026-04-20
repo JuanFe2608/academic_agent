@@ -2,12 +2,45 @@
 
 from __future__ import annotations
 
+from uuid import uuid4
 from typing import Literal, Optional
 
 from pydantic import Field
 
 from .common import BaseSchemaModel, Prioridad
 from .scheduling import Event
+
+AcademicActivityType = Literal[
+    "parcial",
+    "quiz",
+    "tarea",
+    "taller",
+    "entrega",
+    "exposicion",
+    "proyecto",
+    "estudio_pendiente",
+]
+AcademicActivityStatus = Literal["pending", "completed", "deleted"]
+
+
+class AcademicActivity(BaseSchemaModel):
+    """Actividad academica puntual registrada por conversacion."""
+
+    activity_id: str = Field(default_factory=lambda: uuid4().hex)
+    activity_type: AcademicActivityType
+    subject_name: str
+    activity_title: Optional[str] = None
+    due_date: Optional[str] = None
+    due_time: Optional[str] = None
+    estimated_effort_minutes: Optional[int] = Field(default=None, ge=1)
+    priority_level: Optional[Prioridad] = None
+    difficulty_level: Optional[int] = Field(default=None, ge=1, le=5)
+    status: AcademicActivityStatus = "pending"
+    source_text: Optional[str] = None
+    created_at: Optional[str] = None
+    updated_at: Optional[str] = None
+    persisted_activity_id: Optional[int] = None
+    persistence_error: Optional[str] = None
 
 
 class SubjectItem(BaseSchemaModel):
@@ -72,8 +105,12 @@ class StudyPlanState(BaseSchemaModel):
 class ReplanState(BaseSchemaModel):
     """Estado de replanificacion automatica y propuestas."""
 
+    status: Optional[str] = None
     trigger: Optional[str] = None
+    request: Optional[dict[str, object]] = None
     change_request: Optional[dict[str, object]] = None
+    active_proposal: Optional[dict[str, object]] = None
+    applied_payload: Optional[dict[str, object]] = None
     proposals: list[list[Event]] = Field(default_factory=list)
     selected_index: Optional[int] = None
     pending_prompt: Optional[str] = None
@@ -91,6 +128,9 @@ class Constraints(BaseSchemaModel):
 
 
 __all__ = [
+    "AcademicActivity",
+    "AcademicActivityStatus",
+    "AcademicActivityType",
     "Constraints",
     "PrioritiesState",
     "ReplanState",

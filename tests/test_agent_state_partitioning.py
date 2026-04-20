@@ -23,20 +23,31 @@ def test_agent_state_field_groups_cover_all_top_level_fields_once() -> None:
 def test_agent_state_partitions_expose_typed_domain_views() -> None:
     state = AgentState(
         phase="schedules",
+        interaction={"active_intent": "capture_fixed_schedule", "current_domain": "agenda"},
         student_profile={"full_name": "Ana Perez", "occupation": "solo_estudio"},
         raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
         schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
         study_profile={"status": "collecting", "current_question_index": 2},
+        academic_activities=[
+            {
+                "activity_type": "parcial",
+                "subject_name": "Algebra",
+                "due_date": "2026-04-24",
+            }
+        ],
         extras_has_any=True,
     )
 
     partitions = state.partitions
 
     assert partitions.conversation.phase == "schedules"
+    assert partitions.interaction.active_intent == "capture_fixed_schedule"
+    assert partitions.interaction.current_domain == "agenda"
     assert partitions.onboarding.student_profile.full_name == "Ana Perez"
     assert partitions.scheduling.raw_inputs.horario_academico_text == "Lunes 08:00-10:00 Algebra"
     assert partitions.scheduling.extras_has_any is True
     assert partitions.scheduling.schedule.capture_target == "academic"
+    assert partitions.planning.academic_activities[0].subject_name == "Algebra"
     assert partitions.planning.study_profile.status == "collecting"
     assert partitions.planning.study_profile.current_question_index == 2
     assert partitions.integrations.calendar.authorized is False
@@ -47,6 +58,7 @@ def test_restart_payload_for_new_attempt_resets_domain_state_without_breaking_ru
         phase="end",
         user_status="out_of_scope",
         timezone="America/Lima",
+        interaction={"active_intent": "out_of_scope", "noise_turn_count": 2},
         student_profile={"full_name": "Ana Perez"},
         raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
         study_profile={"status": "completed", "top_techniques": ["pomodoro"]},
@@ -68,8 +80,11 @@ def test_restart_payload_for_new_attempt_resets_domain_state_without_breaking_ru
     assert payload["user_message_count"] == 3
     assert payload["last_user_text"] == "quiero reiniciar"
     assert payload["profile_edit_target"] is None
+    assert payload["interaction"]["active_intent"] is None
+    assert payload["interaction"]["noise_turn_count"] == 0
     assert payload["student_profile"]["full_name"] is None
     assert payload["raw_inputs"]["horario_academico_text"] is None
+    assert payload["academic_activities"] == []
     assert payload["study_profile"]["status"] == "idle"
     assert payload["messages"][0].content == "quiero reiniciar"
 
@@ -79,6 +94,7 @@ def test_make_initial_state_accepts_timezone_override() -> None:
 
     assert state.timezone == "America/Lima"
     assert state.partitions.conversation.timezone == "America/Lima"
+    assert state.partitions.interaction.interaction_mode == "guided"
 
 
 def test_agent_state_exposes_derivation_candidates_for_legacy_fields() -> None:

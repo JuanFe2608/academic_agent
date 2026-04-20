@@ -9,7 +9,11 @@ from agents.support.dependencies import (
 )
 from agents.support.state import AgentState
 from bootstrap.errors import RepositoryConfigurationError
-from services.planning import update_study_plan_state
+from services.planning import (
+    StudyPlanOperationalPolicy,
+    load_study_plan_operational_policy,
+    update_study_plan_state,
+)
 from services.priorities import update_priorities_state
 from services.reminders import update_reminders_state
 
@@ -89,11 +93,19 @@ def _materialize_instances_for_update(
     student_id: int,
     study_plan_profile_id: int | None,
 ) -> dict:
+    policy = load_study_plan_operational_policy()
+    if not policy.materialization_enabled:
+        return update
     study_plan = update.get("study_plan", state.get("study_plan", {}))
     try:
         service = get_study_plan_materialization_service()
     except RepositoryConfigurationError:
-        return update
+        merged = dict(update)
+        merged["study_plan"] = update_study_plan_state(
+            study_plan,
+            materialization_error="study_plan_materialization_service_unavailable",
+        )
+        return merged
 
     result = service.materialize_plan_instances(
         student_id=student_id,
@@ -117,6 +129,7 @@ def _materialize_instances_for_update(
             update=merged,
             student_id=student_id,
             study_plan_profile_id=study_plan_profile_id,
+            policy=policy,
         )
 
     merged["study_plan"] = update_study_plan_state(
@@ -134,12 +147,28 @@ def _sync_reminders_for_update(
     update: dict,
     student_id: int,
     study_plan_profile_id: int | None,
+    policy: StudyPlanOperationalPolicy,
 ) -> dict:
-    reminders_state = update.get("reminders", state.get("reminders", {}))
+    reminders_state = _reminders_state_for_policy(
+        update.get("reminders", state.get("reminders", {})),
+        policy=policy,
+    )
+    if not policy.reminders_enabled:
+        merged = dict(update)
+        merged["reminders"] = update_reminders_state(
+            reminders_state,
+            last_dispatch_error=None,
+        )
+        return merged
     try:
         service = get_reminders_service()
     except RepositoryConfigurationError:
-        return update
+        merged = dict(update)
+        merged["reminders"] = update_reminders_state(
+            reminders_state,
+            last_dispatch_error="study_plan_reminders_service_unavailable",
+        )
+        return merged
 
     result = service.sync_reminders_for_study_plan(
         student_id=student_id,
@@ -153,6 +182,10 @@ def _sync_reminders_for_update(
         merged["reminders"] = update_reminders_state(
             reminders_state,
             persisted_policy_ids=result.persisted_policy_ids,
+            policy_count=result.policy_count,
+            schedulable_instance_count=result.schedulable_instance_count,
+            created_dispatch_count=result.created_dispatch_count,
+            canceled_dispatch_count=result.canceled_dispatch_count,
             last_dispatch_error=None,
             last_sync_at=result.synced_at,
         )
@@ -163,3 +196,20 @@ def _sync_reminders_for_update(
         last_dispatch_error=result.error_code or "study_plan_reminders_sync_error",
     )
     return merged
+
+
+def _reminders_state_for_policy(
+    reminders_state: object,
+    *,
+    policy: StudyPlanOperationalPolicy,
+) -> dict[str, object]:
+    if hasattr(reminders_state, "model_dump"):
+        data = dict(reminders_state.model_dump(mode="python"))
+    elif isinstance(reminders_state, dict):
+        data = dict(reminders_state)
+    else:
+        data = {}
+    policy_payload = dict(data.get("policy") or {})
+    policy_payload.setdefault("channels", list(policy.reminder_channels))
+    data["policy"] = policy_payload
+    return data

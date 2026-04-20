@@ -58,7 +58,7 @@ def _media_from_payload(
     message_type: str,
     payload: dict[str, Any],
 ) -> WhatsAppInboundMedia | None:
-    if message_type not in {"image", "document", "audio", "video"}:
+    if message_type not in {"image", "document", "audio", "video", "sticker"}:
         return None
     media_id = str(payload.get("id") or "").strip()
     if not media_id:
