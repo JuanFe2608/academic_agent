@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from agents.support.nodes.utils import append_message
 from agents.support.state import AgentState
+from utils.avatar_assets import AVATAR_TIENES_ACTIVIDAD, with_avatar
 
 _PRIORITY_EMOJI = {"alta": "🔴", "media": "🟡", "baja": "🟢"}
 _PRIORITY_LABEL = {"alta": "Alta prioridad", "media": "Prioridad media", "baja": "Prioridad baja"}
@@ -32,7 +33,7 @@ def view_tasks(state: AgentState) -> dict:
         "messages": append_message(
             messages,
             "assistant",
-            _format_tasks(activities),
+            with_avatar(_format_tasks(activities), AVATAR_TIENES_ACTIVIDAD),
         ),
     }
 

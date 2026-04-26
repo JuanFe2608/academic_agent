@@ -31,7 +31,7 @@ def test_collect_profile_accepts_student_code_and_prompts_age() -> None:
     assert update["student_profile"]["academic_program"] == "Ingenieria de Sistemas y Computacion"
     assert update["student_profile"]["supported_program"] is True
     assert update["user_status"] == "valid"
-    assert "cuantos anos tienes" in update["messages"][0].content.lower()
+    assert "que edad tienes" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_rejects_name_with_special_characters() -> None:
@@ -116,7 +116,8 @@ def test_collect_profile_records_slot_errors_by_field() -> None:
     assert "necesito tu edad en numero" in update["messages"][0].content.lower()
 
 
-def test_collect_profile_moves_to_email_verification_after_valid_institutional_email() -> None:
+def test_collect_profile_stores_email_unverified_and_continues_to_next_field() -> None:
+    """El email queda sin verificar hasta que OAuth completa; el flujo pide los campos restantes."""
     state = AgentState(
         phase="profile",
         student_profile={
@@ -126,21 +127,18 @@ def test_collect_profile_moves_to_email_verification_after_valid_institutional_e
         },
         awaiting_user_input=True,
         user_message_count=0,
-        messages=[HumanMessage(content="ANA@UCATOLICA.EDU.CO")],
+        messages=[HumanMessage(content="ANA@OUTLOOK.COM")],
     )
 
     update = collect_profile(state)
-    payload = state.model_dump()
-    payload.update(update)
-    next_state = AgentState(**payload)
 
-    assert update["student_profile"]["institutional_email"] == "ana@ucatolica.edu.co"
+    assert update["student_profile"]["institutional_email"] == "ana@outlook.com"
     assert update["student_profile"]["email_verified"] is False
-    assert update["awaiting_user_input"] is False
-    assert _route_collect_profile(next_state) == "send_email_verification"
+    assert update["awaiting_user_input"] is True  # aun faltan semestre y promedio
 
 
-def test_collect_profile_accepts_email_and_later_slots_then_routes_to_verification() -> None:
+def test_collect_profile_accepts_email_and_remaining_slots_then_routes_to_confirm() -> None:
+    """Cuando todos los campos quedan llenos en un turno, el router avanza a confirm_profile."""
     state = AgentState(
         phase="profile",
         student_profile={
@@ -153,7 +151,7 @@ def test_collect_profile_accepts_email_and_later_slots_then_routes_to_verificati
         messages=[
             HumanMessage(
                 content=(
-                    "Mi correo es ANA@UCATOLICA.EDU.CO, voy en octavo "
+                    "Mi correo es ANA@OUTLOOK.COM, voy en octavo "
                     "semestre y mi promedio es 85"
                 )
             )
@@ -165,12 +163,12 @@ def test_collect_profile_accepts_email_and_later_slots_then_routes_to_verificati
     payload.update(update)
     next_state = AgentState(**payload)
 
-    assert update["student_profile"]["institutional_email"] == "ana@ucatolica.edu.co"
+    assert update["student_profile"]["institutional_email"] == "ana@outlook.com"
     assert update["student_profile"]["email_verified"] is False
     assert update["student_profile"]["semester"] == 8
     assert update["student_profile"]["average_grade"] == 85.0
     assert update["awaiting_user_input"] is False
-    assert _route_collect_profile(next_state) == "send_email_verification"
+    assert _route_collect_profile(next_state) == "collect_profile"
 
 
 def test_collect_profile_rejects_invalid_institutional_email() -> None:
@@ -190,14 +188,12 @@ def test_collect_profile_rejects_invalid_institutional_email() -> None:
 
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
-    assert "ese correo no parece valido" in update["messages"][0].content.lower()
+    assert "ese dominio no esta permitido" in update["messages"][0].content.lower()
     assert update["student_profile"]["institutional_email"] is None
 
 
-def test_collect_profile_accepts_outlook_email_in_development_mode(monkeypatch) -> None:
-    monkeypatch.setenv("ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE", "disabled")
-    monkeypatch.delenv("ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS", raising=False)
-
+def test_collect_profile_accepts_microsoft_personal_email_and_continues_to_next_field() -> None:
+    """Un correo personal de Microsoft se acepta y el flujo continua pidiendo campos restantes."""
     state = AgentState(
         phase="profile",
         student_profile={
@@ -217,8 +213,7 @@ def test_collect_profile_accepts_outlook_email_in_development_mode(monkeypatch) 
 
     assert update["student_profile"]["institutional_email"] == "prueba@outlook.com"
     assert update["student_profile"]["email_verified"] is False
-    assert update["awaiting_user_input"] is False
-    assert _route_collect_profile(next_state) == "send_email_verification"
+    assert update["awaiting_user_input"] is True  # aun faltan semestre y promedio
 
 
 def test_collect_profile_prompts_scope_confirmation_for_wrong_prefix_code() -> None:
@@ -284,7 +279,8 @@ def test_persist_profile_success_moves_to_schedule_capture() -> None:
     set_onboarding_service(service)
     try:
         state = AgentState(
-            phase="profile_persist",
+            phase="profile",
+            onboarding={"profile_stage": "persisting"},
             student_profile={
                 "full_name": "Ana Maria Perez",
                 "student_code": "67000912",

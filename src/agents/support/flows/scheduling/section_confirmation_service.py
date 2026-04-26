@@ -11,7 +11,9 @@ from agents.support.nodes.utils import (
     parse_yes_no,
 )
 from agents.support.runtime_state_helpers import update_conversation_state
+from agents.support.scheduling import normalize_schedule_section
 from agents.support.scheduling.conflicts import detect_schedule_conflicts
+from agents.support.scheduling.pipeline import parse_extracurricular_section
 from agents.support.scheduling.render import build_rendered_schedule_message_content
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
@@ -38,6 +40,8 @@ _SECTION_REVIEW_STAGES = {
     "section_awaiting_field_selection",
     "section_awaiting_field_value",
     "section_awaiting_item_confirmation",
+    "section_awaiting_add_payload",
+    "section_awaiting_replace_all_payload",
 }
 _SECTION_LABELS = {
     "academic": "horario académico",
@@ -62,6 +66,11 @@ _TYPE_LABELS = {
 _OPTION_HINT = "(Escribe el número de la opción que quieres elegir)"
 _ITEM_HINT = "(Escribe el número del registro que quieres editar)"
 _FIELD_HINT = "(Escribe el número del cambio que quieres hacer)"
+_ADD_TYPE_LABELS = {
+    "academic": "académicas",
+    "work": "laborales",
+    "extracurricular": "extracurriculares",
+}
 _DAY_OPTIONS: dict[int, str] = {
     1: "monday",
     2: "tuesday",
@@ -199,6 +208,22 @@ def handle_section_review_turn(
         )
 
     if schedule_state.review_stage == "section_awaiting_item_selection":
+        if has_new_input and _is_add_command(last_text):
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(
+                    schedule_state,
+                    review_stage="section_awaiting_add_payload",
+                    editing_block_id=None,
+                    editing_field=None,
+                    pending_correction_text=None,
+                ),
+                phase=state.get("phase", "schedules"),
+                current_count=current_count,
+                last_text=last_text,
+                awaiting_user_input=True,
+                prompt=_build_add_payload_prompt(target),  # type: ignore[arg-type]
+            )
         selected_block = (
             _parse_selected_block(schedule_state.blocks, target, last_text)  # type: ignore[arg-type]
             if has_new_input
@@ -306,6 +331,36 @@ def handle_section_review_turn(
                 last_text=last_text if has_new_input else state.get("last_user_text"),
                 awaiting_user_input=True,
                 prompt=_build_section_confirmation_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+            )
+        if choice == "replace_all":
+            selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
+            if selected_block is None:
+                return _build_section_review_update(
+                    state,
+                    schedule=update_schedule_flow_state(
+                        schedule_state,
+                        review_stage="section_awaiting_item_selection",
+                        editing_block_id=None,
+                        editing_field=None,
+                    ),
+                    phase=state.get("phase", "schedules"),
+                    current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                    last_text=last_text if has_new_input else state.get("last_user_text"),
+                    awaiting_user_input=True,
+                    prompt=_build_item_selection_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                )
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(
+                    schedule_state,
+                    review_stage="section_awaiting_replace_all_payload",
+                    editing_field=None,
+                ),
+                phase=state.get("phase", "schedules"),
+                current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                last_text=last_text if has_new_input else state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=_build_replace_all_payload_prompt(target, selected_block),  # type: ignore[arg-type]
             )
         if choice in {"title", "day_of_week", "time_range"}:
             selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
@@ -469,6 +524,137 @@ def handle_section_review_turn(
             prompt=_build_invalid_item_confirmation_prompt(target, selected_block),  # type: ignore[arg-type]
         )
 
+    if schedule_state.review_stage == "section_awaiting_replace_all_payload":
+        selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
+        if not has_new_input or not str(last_text or "").strip():
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(schedule_state),
+                phase=state.get("phase", "schedules"),
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=_build_replace_all_payload_prompt(target, selected_block),  # type: ignore[arg-type]
+            )
+        replace_result = _apply_block_replace_all(
+            state,
+            target=target,  # type: ignore[arg-type]
+            block_id=str(schedule_state.editing_block_id or ""),
+            text=str(last_text or ""),
+            timezone=str(state.get("timezone", "America/Bogota")),
+        )
+        if replace_result.error_prompt is not None:
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(schedule_state),
+                phase=state.get("phase", "schedules"),
+                current_count=current_count,
+                last_text=last_text,
+                awaiting_user_input=True,
+                prompt=replace_result.error_prompt,
+            )
+        if completion.after_change_phase is not None:
+            return _complete_after_section_change(
+                state,
+                schedule=update_schedule_flow_state(
+                    schedule_state,
+                    blocks=replace_result.blocks,
+                    conflicts=replace_result.conflicts,
+                    conflicts_accepted=False,
+                    summary_text=None,
+                    review_stage="idle",
+                    correction_target=None,
+                    editing_block_id=None,
+                    editing_field=None,
+                    pending_correction_text=None,
+                ),
+                completion=completion,
+                current_count=current_count,
+                last_text=last_text,
+                **replace_result.scheduling_changes,
+            )
+        return _build_section_review_update(
+            state,
+            schedule=update_schedule_flow_state(
+                schedule_state,
+                blocks=replace_result.blocks,
+                conflicts=replace_result.conflicts,
+                conflicts_accepted=False,
+                summary_text=None,
+                review_stage="section_awaiting_item_confirmation",
+                correction_target=target,
+                editing_block_id=replace_result.updated_block.block_id if replace_result.updated_block else None,
+                editing_field=None,
+                pending_correction_text=None,
+            ),
+            phase=state.get("phase", "schedules"),
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=True,
+            prompt=_build_item_confirmation_prompt(
+                target,  # type: ignore[arg-type]
+                replace_result.updated_block,
+                replace_result.conflicts,
+            ),
+            render_preview_blocks=replace_result.blocks,
+            **replace_result.scheduling_changes,
+        )
+
+    if schedule_state.review_stage == "section_awaiting_add_payload":
+        if not has_new_input or not str(last_text or "").strip():
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(schedule_state),
+                phase=state.get("phase", "schedules"),
+                current_count=state.get("user_message_count", 0),
+                last_text=state.get("last_user_text"),
+                awaiting_user_input=True,
+                prompt=_build_add_payload_prompt(target),  # type: ignore[arg-type]
+            )
+        add_result = _apply_block_add(
+            state,
+            target=target,  # type: ignore[arg-type]
+            text=str(last_text or ""),
+            timezone=str(state.get("timezone", "America/Bogota")),
+        )
+        if add_result.error_prompt is not None:
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(schedule_state),
+                phase=state.get("phase", "schedules"),
+                current_count=current_count,
+                last_text=last_text,
+                awaiting_user_input=True,
+                prompt=add_result.error_prompt,
+            )
+        added_label = "registro" if add_result.added_count == 1 else "registros"
+        updated_schedule = update_schedule_flow_state(
+            schedule_state,
+            blocks=add_result.blocks,
+            conflicts=add_result.conflicts,
+            conflicts_accepted=False,
+            summary_text=None,
+            review_stage="section_awaiting_confirmation",
+            correction_target=target,
+            editing_block_id=None,
+            editing_field=None,
+            pending_correction_text=None,
+        )
+        return _build_section_review_update(
+            state,
+            schedule=updated_schedule,
+            phase=state.get("phase", "schedules"),
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=True,
+            prompt=(
+                f"✅ Listo, agregué {add_result.added_count} {added_label} nuevo(s).\n\n"
+                f"{_build_section_confirmation_prompt(add_result.blocks, target)}"  # type: ignore[arg-type]
+            ),
+            render_preview_blocks=add_result.blocks,
+            **add_result.scheduling_changes,
+        )
+
     return start_section_review(
         state,
         target=target,  # type: ignore[arg-type]
@@ -491,6 +677,15 @@ class _BlockEditResult:
 class _BlockDeleteResult:
     blocks: list[WeeklyScheduleBlock]
     conflicts: list
+    scheduling_changes: dict[str, object]
+    error_prompt: str | None = None
+
+
+@dataclass(frozen=True)
+class _BlockAddResult:
+    blocks: list[WeeklyScheduleBlock]
+    conflicts: list
+    added_count: int
     scheduling_changes: dict[str, object]
     error_prompt: str | None = None
 
@@ -568,7 +763,6 @@ def _apply_block_edit(
         )
         extracurricular_items = build_extracurricular_items_from_blocks(extracurricular_blocks)
         scheduling_changes["extracurricular"] = extracurricular_items
-        scheduling_changes["extras_has_any"] = bool(extracurricular_items)
 
     return _BlockEditResult(
         blocks=updated_schedule_blocks,
@@ -613,7 +807,6 @@ def _apply_block_delete(
     else:
         extracurricular_items = build_extracurricular_items_from_blocks(updated_target_blocks)
         scheduling_changes["extracurricular"] = extracurricular_items
-        scheduling_changes["extras_has_any"] = bool(extracurricular_items)
 
     return _BlockDeleteResult(
         blocks=updated_schedule_blocks,
@@ -878,6 +1071,7 @@ def _build_item_selection_prompt(
         [
             "",
             f"Elige el número de la {item_label if item_label != 'bloque' else 'actividad o bloque'} que quieres editar.",
+            f"Escribe 'Añadir' si deseas agregar más actividades {_ADD_TYPE_LABELS[target]}.",
         ]
     )
     return "\n".join(lines)
@@ -912,6 +1106,7 @@ def _build_field_selection_prompt(
             "3. Horario",
             f"4. Eliminar {item_label if item_label != 'bloque' else 'registro'}",
             "5. Cancelar edición",
+            "6. Reemplazar todos los datos",
         ]
     )
     return "\n".join(lines)
@@ -1111,6 +1306,8 @@ def _parse_field_choice(text: str | None) -> str | None:
         return "delete"
     if option == 5:
         return "cancel"
+    if option == 6:
+        return "replace_all"
 
     normalized = normalize_text(text or "")
     if any(token in normalized for token in ("nombre",)):
@@ -1123,6 +1320,8 @@ def _parse_field_choice(text: str | None) -> str | None:
         return "delete"
     if any(token in normalized for token in ("cancelar", "volver")):
         return "cancel"
+    if any(token in normalized for token in ("reemplazar", "todos", "cambiar todo")):
+        return "replace_all"
     return None
 
 
@@ -1137,6 +1336,207 @@ def _find_selected_block(
         if block.block_id == block_id:
             return block
     return None
+
+
+def _is_add_command(text: str | None) -> bool:
+    normalized = normalize_text(text or "")
+    return any(token in normalized for token in ("anadir", "añadir", "agregar", "nuevo", "nueva", "add"))
+
+
+def _build_add_payload_prompt(target: ScheduleBlockType) -> str:
+    if target == "work":
+        return (
+            "💼 Escríbeme el nuevo bloque laboral que quieres agregar.\n"
+            "Incluye días y horas exactas.\n"
+            "Ejemplo: miércoles de 7:00 a 18:00"
+        )
+    if target == "extracurricular":
+        return (
+            "🎯 Escríbeme la nueva actividad extracurricular que quieres agregar.\n"
+            "Incluye el nombre, día y horario.\n"
+            "Ejemplo: Gym — lunes de 7:00 a 8:00"
+        )
+    return (
+        "📚 Escríbeme la nueva materia o clase que quieres agregar.\n"
+        "Incluye el nombre, día y horario.\n"
+        "Ejemplo: Cálculo — martes de 8:00 a 10:00"
+    )
+
+
+def _apply_block_add(
+    state: AgentState,
+    *,
+    target: ScheduleBlockType,
+    text: str,
+    timezone: str,
+) -> _BlockAddResult:
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    all_blocks = [ensure_weekly_block(block) for block in schedule_state.blocks]
+    existing_section = current_section_blocks(all_blocks, target)
+
+    if target == "extracurricular":
+        section_result = parse_extracurricular_section(
+            text,
+            timezone=timezone,
+            expected_is_variable=False,
+        )
+        if not section_result.blocks:
+            return _BlockAddResult(
+                blocks=all_blocks,
+                conflicts=list(schedule_state.conflicts),
+                added_count=0,
+                scheduling_changes={},
+                error_prompt=(
+                    "⚠️ No pude interpretar la actividad. Intenta de nuevo.\n\n"
+                    f"{_build_add_payload_prompt(target)}"
+                ),
+            )
+        new_section = existing_section + list(section_result.blocks)
+        updated_all = replace_section_blocks(all_blocks, target, new_section)
+        updated_all, conflicts = detect_schedule_conflicts(updated_all)
+        items = build_extracurricular_items_from_blocks(current_section_blocks(updated_all, target))
+        return _BlockAddResult(
+            blocks=updated_all,
+            conflicts=conflicts,
+            added_count=len(section_result.blocks),
+            scheduling_changes={"extracurricular": items},
+        )
+
+    result = normalize_schedule_section(text, target, timezone=timezone)
+    if not result.blocks:
+        return _BlockAddResult(
+            blocks=all_blocks,
+            conflicts=list(schedule_state.conflicts),
+            added_count=0,
+            scheduling_changes={},
+            error_prompt=(
+                "⚠️ No pude interpretar el horario. Intenta de nuevo.\n\n"
+                f"{_build_add_payload_prompt(target)}"
+            ),
+        )
+    new_section = existing_section + list(result.blocks)
+    updated_all = replace_section_blocks(all_blocks, target, new_section)
+    updated_all, conflicts = detect_schedule_conflicts(updated_all)
+    raw_inputs = sync_schedule_blocks_to_raw_inputs(
+        state.get("raw_inputs", {}),
+        target,
+        current_section_blocks(updated_all, target),
+    )
+    return _BlockAddResult(
+        blocks=updated_all,
+        conflicts=conflicts,
+        added_count=len(result.blocks),
+        scheduling_changes={"raw_inputs": raw_inputs.model_dump(mode="python")},
+    )
+
+
+def _build_replace_all_payload_prompt(
+    target: ScheduleBlockType,
+    block: WeeklyScheduleBlock | None,
+) -> str:
+    current_line = f"\nActual: {_format_block_line(1, block)}" if block is not None else ""
+    if target == "work":
+        return (
+            f"✏️ Escríbeme los nuevos datos completos de este bloque laboral.\n"
+            "Incluye días y horas en un solo mensaje."
+            f"{current_line}\n"
+            "Ejemplo: miércoles de 8:00 a 17:00"
+        )
+    if target == "extracurricular":
+        return (
+            f"✏️ Escríbeme los nuevos datos completos de esta actividad.\n"
+            "Incluye nombre, día y horario en un solo mensaje."
+            f"{current_line}\n"
+            "Ejemplo: Fútbol — sábado de 9:00 a 11:00"
+        )
+    return (
+        f"✏️ Escríbeme los nuevos datos completos de esta materia.\n"
+        "Incluye nombre, día y horario en un solo mensaje."
+        f"{current_line}\n"
+        "Ejemplo: Cálculo — jueves de 2:00 a 4:00"
+    )
+
+
+def _apply_block_replace_all(
+    state: AgentState,
+    *,
+    target: ScheduleBlockType,
+    block_id: str,
+    text: str,
+    timezone: str,
+) -> _BlockEditResult:
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    all_blocks = [ensure_weekly_block(block) for block in schedule_state.blocks]
+    target_blocks = current_section_blocks(all_blocks, target)
+    selected_block = _find_selected_block(target_blocks, block_id)
+
+    if selected_block is None:
+        return _BlockEditResult(
+            blocks=all_blocks,
+            conflicts=list(schedule_state.conflicts),
+            updated_block=target_blocks[0] if target_blocks else None,
+            scheduling_changes={},
+            error_prompt=_build_item_selection_prompt(all_blocks, target),
+        )
+
+    if target == "extracurricular":
+        section_result = parse_extracurricular_section(text, timezone=timezone, expected_is_variable=False)
+        new_blocks = list(section_result.blocks)
+    else:
+        result = normalize_schedule_section(text, target, timezone=timezone)
+        new_blocks = list(result.blocks)
+
+    if not new_blocks:
+        return _BlockEditResult(
+            blocks=all_blocks,
+            conflicts=list(schedule_state.conflicts),
+            updated_block=selected_block,
+            scheduling_changes={},
+            error_prompt=(
+                "⚠️ No pude interpretar los nuevos datos. Intenta de nuevo.\n\n"
+                f"{_build_replace_all_payload_prompt(target, selected_block)}"
+            ),
+        )
+
+    src = new_blocks[0]
+    replacement = selected_block.model_copy(
+        update={
+            "title": src.title,
+            "day_of_week": src.day_of_week,
+            "start_time": src.start_time,
+            "end_time": src.end_time,
+            "source_text": _build_source_text(target, src),
+            "has_conflict": False,
+            "conflict_accepted": False,
+            "user_confirmed": False,
+        }
+    )
+    updated_target_blocks = [
+        replacement if block.block_id == selected_block.block_id else block
+        for block in target_blocks
+    ]
+    updated_all = replace_section_blocks(all_blocks, target, updated_target_blocks)
+    updated_all, conflicts = detect_schedule_conflicts(updated_all)
+    refreshed = _find_selected_block(updated_all, replacement.block_id)
+    scheduling_changes: dict[str, object] = {}
+
+    if target in {"academic", "work"}:
+        raw_inputs = sync_schedule_blocks_to_raw_inputs(
+            state.get("raw_inputs", {}),
+            target,
+            current_section_blocks(updated_all, target),
+        )
+        scheduling_changes["raw_inputs"] = raw_inputs.model_dump(mode="python")
+    else:
+        items = build_extracurricular_items_from_blocks(current_section_blocks(updated_all, target))
+        scheduling_changes["extracurricular"] = items
+
+    return _BlockEditResult(
+        blocks=updated_all,
+        conflicts=conflicts,
+        updated_block=refreshed or replacement,
+        scheduling_changes=scheduling_changes,
+    )
 
 
 def _build_day_prompt_error() -> str:

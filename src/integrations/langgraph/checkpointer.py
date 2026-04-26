@@ -23,6 +23,7 @@ from langgraph.checkpoint.base import (
 from psycopg import connect
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
+from psycopg_pool import ConnectionPool
 
 from bootstrap.settings import checkpoint_database_url_from_env as _checkpoint_database_url_from_env
 from utils.message_sanitizer import sanitize_persisted_payload
@@ -41,12 +42,36 @@ def checkpoint_database_url_from_env() -> str:
 class PostgresLangGraphCheckpointer(BaseCheckpointSaver[str]):
     """Implementación mínima y persistente de checkpoints sobre PostgreSQL."""
 
-    def __init__(self, database_url: str) -> None:
+    def __init__(
+        self,
+        database_url: str,
+        *,
+        min_size: int = 1,
+        max_size: int = 4,
+    ) -> None:
         super().__init__()
         self.database_url = database_url
+        self._pool: ConnectionPool = ConnectionPool(
+            database_url,
+            min_size=min_size,
+            max_size=max_size,
+            kwargs={"row_factory": dict_row},
+            open=True,
+        )
 
     def _connect(self):
-        return connect(self.database_url, row_factory=dict_row)
+        """Retorna un context manager que presta una conexión del pool."""
+        return self._pool.connection()
+
+    def close(self) -> None:
+        """Cierra el pool y libera todas las conexiones."""
+        self._pool.close()
+
+    def __del__(self) -> None:
+        try:
+            self._pool.close()
+        except Exception:
+            pass
 
     def _config_parts(self, config: RunnableConfig) -> tuple[str, str, str | None]:
         configurable = config.get("configurable", {})

@@ -38,7 +38,6 @@ def test_build_schedule_draft_turn_detects_conflicts_and_prepares_validate() -> 
     update = build_schedule_draft_turn(state)
 
     assert update["phase"] == "validate"
-    assert update["events_validated"] is False
     assert update["schedule"]["review_stage"] == "idle"
     assert len(update["schedule"]["conflicts"]) == 1
     assert any(block.has_conflict for block in update["schedule"]["blocks"])

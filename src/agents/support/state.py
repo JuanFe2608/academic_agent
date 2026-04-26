@@ -48,11 +48,7 @@ from services.scheduling.models import ScheduleFlowState as _ScheduleFlowState
 Phase = Literal[
     "consent",
     "profile",
-    "email_verification_send",
-    "email_verification",
     "microsoft_oauth",
-    "profile_confirm",
-    "profile_persist",
     "schedules",
     "extras",
     "draft",
@@ -63,18 +59,9 @@ Phase = Literal[
     "schedule_renewal",
     "schedule_repair",
     "fixed_schedule_management",
-    "academic_activity_management",
-    "calendar_sync",
-    "todo_sync",
-    "guided_academic_support",
-    "sync",
     "study_profile",
-    "study_profile_tiebreaker",
-    "study_profile_persist",
     "priorities",
-    "study_plan",
     "running",
-    "replan",
     "end",
 ]
 
@@ -120,7 +107,6 @@ class _SchedulingDomainState(_BaseSchemaModel):
     """Vista tipada del dominio de captura y revisión de horarios."""
 
     raw_inputs: _RawInputs = Field(default_factory=_RawInputs)
-    extras_has_any: bool | None = None
     extras_collect_stage: _ExtrasCollectStage | None = None
     extras_pending_is_variable: bool | None = None
     extras_pending_items: list[_PendingExtracurricularItem] = Field(default_factory=list)
@@ -128,7 +114,6 @@ class _SchedulingDomainState(_BaseSchemaModel):
     work_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     extracurricular: list[_ExtracurricularItem] = Field(default_factory=list)
     events: list[_Event] = Field(default_factory=list)
-    events_validated: bool = False
     schedule_preview: _SchedulePreview = Field(default_factory=_SchedulePreview)
     schedule: _ScheduleFlowState = Field(default_factory=_ScheduleFlowState)
 
@@ -193,7 +178,6 @@ class AgentState(_BaseSchemaModel):
         ),
         "scheduling": (
             "raw_inputs",
-            "extras_has_any",
             "extras_collect_stage",
             "extras_pending_is_variable",
             "extras_pending_items",
@@ -201,7 +185,6 @@ class AgentState(_BaseSchemaModel):
             "work_pending_items",
             "extracurricular",
             "events",
-            "events_validated",
             "schedule_preview",
             "schedule",
         ),
@@ -218,9 +201,7 @@ class AgentState(_BaseSchemaModel):
         "integrations": ("calendar",),
     }
     _DERIVATION_CANDIDATES: ClassVar[dict[str, str]] = {
-        "events": "Se mantiene por compatibilidad con replanning y pruebas, pero converge con `schedule.blocks`.",
-        "events_validated": "Flag operativo del flujo de revisión; candidato a derivarse desde la fase/review_stage.",
-        "extras_has_any": "Hoy resume una decisión conversacional; a futuro puede derivarse de `extracurricular` y del subflujo de extras.",
+        "events": "Copia de trabajo para replanning; schedule.blocks es la fuente de verdad. Migración pendiente Fase 1.",
     }
 
     messages: Annotated[list[BaseMessage], add_sanitized_messages] = Field(default_factory=list)
@@ -239,7 +220,6 @@ class AgentState(_BaseSchemaModel):
     student_profile: _StudentProfile = Field(default_factory=_StudentProfile)
     onboarding: _OnboardingState = Field(default_factory=_OnboardingState)
     raw_inputs: _RawInputs = Field(default_factory=_RawInputs)
-    extras_has_any: bool | None = None
     extras_collect_stage: _ExtrasCollectStage | None = None
     extras_pending_is_variable: bool | None = None
     extras_pending_items: list[_PendingExtracurricularItem] = Field(default_factory=list)
@@ -247,7 +227,6 @@ class AgentState(_BaseSchemaModel):
     work_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     extracurricular: list[_ExtracurricularItem] = Field(default_factory=list)
     events: list[_Event] = Field(default_factory=list)
-    events_validated: bool = False
     schedule_preview: _SchedulePreview = Field(default_factory=_SchedulePreview)
     schedule: _ScheduleFlowState = Field(default_factory=_ScheduleFlowState)
     calendar: _CalendarState = Field(default_factory=_CalendarState)

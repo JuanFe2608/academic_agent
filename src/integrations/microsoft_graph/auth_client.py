@@ -242,7 +242,13 @@ class UrllibMicrosoftOAuthTransport:
 
         if not payload.strip():
             return {}
-        data = json.loads(payload)
+        try:
+            data = json.loads(payload)
+        except json.JSONDecodeError as exc:
+            raise MicrosoftOAuthTransportError(
+                error_code="microsoft_oauth_invalid_json",
+                detail=f"Respuesta no es JSON válido: {payload[:200]}",
+            ) from exc
         if not isinstance(data, dict):
             raise MicrosoftOAuthTransportError(
                 error_code="microsoft_oauth_invalid_payload",

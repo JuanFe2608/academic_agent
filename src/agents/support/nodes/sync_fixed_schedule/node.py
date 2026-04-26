@@ -32,7 +32,7 @@ def sync_fixed_schedule(state: AgentState) -> dict:
                 "authorized": True,
                 "synced_event_map": dict(result.synced_event_map),
             },
-            "phase": "sync",
+            "phase": "study_profile",
             "awaiting_user_input": False,
             "messages": append_message(
                 state.get("messages", []),
@@ -54,7 +54,7 @@ def sync_fixed_schedule(state: AgentState) -> dict:
             "provider": calendar_state.get("provider") or "outlook",
             "synced_event_map": dict(result.synced_event_map),
         },
-        "phase": "sync",
+        "phase": "study_profile",
         "awaiting_user_input": False,
         "messages": append_message(
             state.get("messages", []),

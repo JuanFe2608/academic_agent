@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py tests/test_schedule_persistence.py -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py -v --tb=short)",
+      "Bash(PYTHONPATH=src python -c \"from agents.support.agent import build_graph; print\\('OK'\\)\")",
+      "Bash(PYTHONPATH=src python -c \"from agents.support.agent import build_agent; print\\('import OK'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(PYTHONPATH=src python -m pytest tests/ -v --ignore=tests/test_onboarding_services.py -x -q)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py tests/test_confirm_profile_prompts.py tests/test_schedule_persistence.py tests/test_personalization_flow.py tests/test_onboarding_oauth_flow.py -v -q)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py::test_collect_profile_stores_email_unverified_and_continues_to_next_field -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_confirm_profile_prompts.py::test_confirm_profile_summary_includes_program_and_verified_email -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_personalization_flow.py -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_personalization_flow.py::test_personalization_feature_flag_on_routes_after_persist_schedule -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py::test_collect_profile_accepts_student_code_and_prompts_age -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py::test_collect_profile_accepts_microsoft_personal_email_and_continues_to_next_field -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py::test_collect_profile_rejects_invalid_institutional_email -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py tests/test_confirm_profile_prompts.py -v -q)",
+      "Bash(PYTHONPATH=src python -m pytest tests/ -v -q --ignore=tests/test_onboarding_services.py)",
+      "Bash(PYTHONPATH=src python -m pytest tests/ -q --ignore=tests/test_onboarding_services.py)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_study_planning_persistence.py::test_build_study_plan_persists_recalculated_snapshot -v)",
+      "Bash(PYTHONPATH=src python -m pytest tests/test_collect_profile_validation.py tests/test_confirm_profile_prompts.py -q)",
+      "Bash(PYTHONPATH=src python -c \"from agents.support.nodes.handle_academic_update.node import handle_academic_update; print\\('import OK'\\)\")",
+      "Bash(PYTHONPATH=src python3 -c \"from agents.support.nodes.handle_academic_update.node import handle_academic_update; print\\('import OK'\\)\")",
+      "Bash(PYTHONPATH=src uv run python3 -c \"from agents.support.nodes.handle_academic_update.node import handle_academic_update; print\\('import OK'\\)\")",
+      "Bash(PYTHONPATH=src uv run python3 -m pytest tests/test_academic_update_orchestrator.py -v)"
+    ]
+  }
+}

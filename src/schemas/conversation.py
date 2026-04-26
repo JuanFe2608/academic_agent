@@ -54,6 +54,7 @@ class InteractionState(BaseSchemaModel):
     """Estado conversacional operativo minimo del MVP Lara."""
 
     active_intent: str | None = None
+    active_subflow: str | None = None
     current_domain: str | None = None
     interaction_mode: str = "guided"
     pending_action: str | None = None
@@ -74,6 +75,7 @@ class InteractionState(BaseSchemaModel):
 
     @field_validator(
         "active_intent",
+        "active_subflow",
         "current_domain",
         "pending_action",
         "pending_entity_type",

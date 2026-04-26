@@ -95,7 +95,7 @@ ROUTER_EVAL_DATASET = [
     ConversationScenario(
         name="dato_faltante",
         text="viernes",
-        phase="academic_activity_management",
+        phase="running",
         interaction={
             "active_intent": "register_academic_activity",
             "current_domain": "activity_management",
@@ -109,7 +109,7 @@ ROUTER_EVAL_DATASET = [
     ConversationScenario(
         name="confirmacion",
         text="si",
-        phase="calendar_sync",
+        phase="running",
         interaction={
             "active_intent": "sync_study_calendar",
             "current_domain": "calendar_action",
@@ -123,7 +123,7 @@ ROUTER_EVAL_DATASET = [
     ConversationScenario(
         name="bloque_activo_preserva_calendario",
         text="Modo socratico para taller de Calculo sobre derivadas",
-        phase="calendar_sync",
+        phase="running",
         interaction={
             "active_intent": "sync_study_calendar",
             "current_domain": "calendar_action",

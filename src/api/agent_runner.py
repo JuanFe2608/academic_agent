@@ -80,7 +80,7 @@ class AgentRunner:
         """Invoca el agente sincrono y envia las respuestas generadas."""
         thread_id = message.from_number
 
-        human_message = _build_human_message(message)
+        human_message = self._build_human_message(message)
         if human_message is None:
             return
 
@@ -112,6 +112,37 @@ class AgentRunner:
         except Exception:
             logger.exception("Error al enviar respuestas a %s", thread_id)
 
+    def _build_human_message(self, message: WhatsAppInboundMessage) -> HumanMessage | None:
+        """Construye el HumanMessage adecuado segun el tipo de contenido recibido."""
+        text = (message.text or "").strip()
+
+        if message.media is None:
+            if not text:
+                return None
+            return HumanMessage(content=text)
+
+        if message.media.media_type in {"image", "sticker"}:
+            content: list[dict] = []
+            if text:
+                content.append({"type": "text", "text": text})
+            try:
+                channel_msg = self._whatsapp_service.download_inbound(message)
+                if channel_msg.media:
+                    image_ref = channel_msg.media[0].reference
+                    from utils.media_artifacts import is_inline_preview_enabled, path_to_data_url
+                    url = path_to_data_url(image_ref) if is_inline_preview_enabled() else image_ref
+                    content.append({"type": "image_url", "image_url": {"url": url}})
+                else:
+                    content.append({"type": "text", "text": f"[imagen no disponible id={message.media.id}]"})
+            except Exception:
+                logger.warning("No se pudo descargar la imagen %s", message.media.id, exc_info=True)
+                content.append({"type": "text", "text": f"[imagen no disponible id={message.media.id}]"})
+            return HumanMessage(content=content)
+
+        ref = message.media.caption or f"[{message.media.media_type} adjunto]"
+        combined = f"{text}\n{ref}".strip() if text else ref
+        return HumanMessage(content=combined)
+
     def _send_error_message(self, recipient_id: str) -> None:
         """Notifica al estudiante que ocurrio un error temporal."""
         try:
@@ -126,32 +157,6 @@ class AgentRunner:
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-
-def _build_human_message(message: WhatsAppInboundMessage) -> HumanMessage | None:
-    """Construye el HumanMessage adecuado segun el tipo de contenido recibido."""
-    text = (message.text or "").strip()
-
-    if message.media is None:
-        if not text:
-            return None
-        return HumanMessage(content=text)
-
-    # Mensaje con media: construir contenido multimodal si es imagen
-    if message.media.media_type in {"image", "sticker"}:
-        content: list[dict] = []
-        if text:
-            content.append({"type": "text", "text": text})
-        content.append({
-            "type": "text",
-            "text": f"[imagen adjunta: {message.media.media_type} id={message.media.id}]",
-        })
-        return HumanMessage(content=content)
-
-    # Otros tipos de media: incluir como texto de referencia
-    ref = message.media.caption or f"[{message.media.media_type} adjunto]"
-    combined = f"{text}\n{ref}".strip() if text else ref
-    return HumanMessage(content=combined)
 
 
 def _extract_new_ai_messages(messages: list) -> list[AIMessage]:

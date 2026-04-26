@@ -371,7 +371,7 @@ def _safe_json_value(text: str) -> Any:
     except (ValueError, SyntaxError):
         pass
 
-    match = re.search(r"(\{.*\}|\[.*\])", text, flags=re.DOTALL)
+    match = re.search(r"(\{.*?\}|\[.*?\])", text, flags=re.DOTALL)
     if not match:
         return None
     try:

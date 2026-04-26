@@ -27,19 +27,9 @@ class StudentProfile(BaseSchemaModel):
     academic_program: Optional[str] = None
     supported_program: Optional[bool] = None
     semester: Optional[int] = None
-    average_grade: Optional[float] = None
+    average_grade: Optional[int] = None
     occupation: Optional[Occupation] = None
     persisted_student_id: Optional[int] = None
-
-
-class EmailVerificationState(BaseSchemaModel):
-    """Estado transitorio de verificacion del correo institucional."""
-
-    status: Literal["idle", "sent", "verified"] = "idle"
-    attempts: int = 0
-    resend_count: int = 0
-    expires_at: Optional[str] = None
-    last_error: Optional[str] = None
 
 
 class MicrosoftOAuthOnboardingState(BaseSchemaModel):
@@ -58,19 +48,18 @@ class OnboardingState(BaseSchemaModel):
 
     current_field: Optional[str] = None
     pending_student_code_scope_confirmation: bool = False
+    pending_low_grade_confirmation: bool = False
+    pending_low_grade_value: Optional[int] = None
     slot_errors: dict[str, str] = Field(default_factory=dict)
-    email_verification: EmailVerificationState = Field(
-        default_factory=EmailVerificationState
-    )
     microsoft_oauth: MicrosoftOAuthOnboardingState = Field(
         default_factory=MicrosoftOAuthOnboardingState
     )
     persistence_error: Optional[str] = None
+    profile_stage: Literal["collecting", "confirming", "persisting"] = "collecting"
 
 
 __all__ = [
     "ConsentState",
-    "EmailVerificationState",
     "MicrosoftOAuthOnboardingState",
     "OnboardingState",
     "StudentProfile",

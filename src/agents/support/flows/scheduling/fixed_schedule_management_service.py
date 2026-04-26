@@ -840,7 +840,6 @@ def _schedule_side_effects(state: AgentState, blocks: list[WeeklyScheduleBlock])
     return {
         "raw_inputs": raw_inputs.model_dump(mode="python"),
         "extracurricular": extracurricular,
-        "extras_has_any": bool(extracurricular),
     }
 
 

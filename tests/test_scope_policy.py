@@ -58,12 +58,15 @@ def test_policy_rejects_direct_deliverable_for_copying() -> None:
 
 
 def test_policy_redirects_diffuse_academic_need() -> None:
+    # Expresiones de estrés académico ("estoy perdido", "voy muy mal") se enrutan
+    # a guided_academic_support para una respuesta interactiva, no a un mensaje estático.
     decision = decide_scope("Estoy muy perdido con todas mis materias")
 
-    assert decision.category == "redirectable_out_of_scope"
-    assert decision.action == "redirect"
-    assert decision.intent == "redirect_to_academic_planning"
-    assert "organizar esa carga academica" in render_scope_response(decision)
+    assert decision.category == "in_scope"
+    assert decision.action == "normal"
+    assert decision.allowed is True
+    assert decision.intent == "request_guided_academic_help"
+    assert decision.domain == "guided_academic_support"
 
 
 def test_policy_escalates_wellbeing_or_crisis_signal() -> None:

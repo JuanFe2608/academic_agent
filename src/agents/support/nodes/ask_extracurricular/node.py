@@ -28,7 +28,6 @@ def ask_extracurricular(state: AgentState) -> dict:
 
     if answer is True or numeric_choice == 1:
         return {
-            "extras_has_any": True,
             "extras_collect_stage": "awaiting_details",
             "extras_pending_is_variable": None,
             "extras_pending_items": [],
@@ -45,7 +44,6 @@ def ask_extracurricular(state: AgentState) -> dict:
 
     if answer is False or numeric_choice == 2:
         return {
-            "extras_has_any": False,
             "extras_collect_stage": "done",
             "extras_pending_is_variable": None,
             "extras_pending_items": [],
@@ -61,7 +59,6 @@ def ask_extracurricular(state: AgentState) -> dict:
         }
 
     return {
-        "extras_has_any": state.get("extras_has_any"),
         "phase": "extras",
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),

@@ -279,6 +279,9 @@ def _detect_possible_intent(normalized_text: str, signals: list[str]) -> str | N
     if contains_any(normalized_text, _VIEW_AGENDA_TERMS):
         signals.append("schedule_management")
         return "view_weekly_agenda"
+    if _is_concept_question(normalized_text):
+        signals.append("guided_academic_support")
+        return "answer_academic_concept_question"
     checks = [
         ("wellbeing_or_crisis_signal", _RISK_TERMS, "risk_or_wellbeing"),
         ("update_student_profile", _PROFILE_TERMS, "student_profile"),
@@ -304,6 +307,26 @@ def _media_intent(input_type: str) -> str:
     if input_type == "audio":
         return "audio_input"
     return "media_input"
+
+
+def _is_concept_question(normalized_text: str) -> bool:
+    """Detecta preguntas del tipo '¿qué es X?' sobre conceptos o temas académicos."""
+    starters = (
+        "que es ",
+        "que son ",
+        "para que sirve ",
+        "para que se usa ",
+        "como funciona ",
+        "como se usa ",
+        "cuando se usa ",
+        "en que consiste ",
+        "explicame ",
+        "que significa ",
+        "cual es la diferencia entre ",
+        "que diferencia hay entre ",
+        "que diferencia hay ",
+    )
+    return any(normalized_text.startswith(s) for s in starters)
 
 
 def _is_confirmation_text(normalized_text: str) -> bool:

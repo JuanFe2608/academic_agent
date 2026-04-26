@@ -9,10 +9,7 @@ from agents.support.dependencies import (
     set_personalization_service,
     set_schedule_service,
 )
-from agents.support.agent import (
-    _route_after_persist_schedule,
-    _route_after_schedule_sync,
-)
+from agents.support.agent import _route_collect_schedule
 from agents.support.nodes.collect_study_profile.node import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker.node import (
     collect_study_profile_tiebreaker,
@@ -89,7 +86,7 @@ def test_personalization_feature_flag_off_keeps_current_behavior(monkeypatch) ->
         next_state = _apply_update(state, update)
 
         assert update["phase"] == "schedule_sync"
-        assert _route_after_persist_schedule(next_state) == "sync_fixed_schedule"
+        assert _route_collect_schedule(next_state) == "collect_schedule"
     finally:
         set_schedule_service(None)
 
@@ -117,8 +114,8 @@ def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypat
         sync_update = sync_fixed_schedule(next_state)
         synced_state = _apply_update(next_state, sync_update)
 
-        assert _route_after_persist_schedule(next_state) == "sync_fixed_schedule"
-        assert _route_after_schedule_sync(synced_state) == "collect_study_profile"
+        assert _route_collect_schedule(next_state) == "collect_schedule"
+        assert _route_collect_schedule(synced_state) == "collect_study_profile"
 
         question_update = collect_study_profile(synced_state)
 
@@ -178,9 +175,9 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
         )
 
         state = _apply_update(state, persist_schedule(state))
-        assert _route_after_persist_schedule(state) == "sync_fixed_schedule"
+        assert _route_collect_schedule(state) == "collect_schedule"
         state = _apply_update(state, sync_fixed_schedule(state))
-        assert _route_after_schedule_sync(state) == "collect_study_profile"
+        assert _route_collect_schedule(state) == "collect_study_profile"
 
         state = _apply_update(state, collect_study_profile(state))
         assert state.phase == "study_profile"
@@ -190,7 +187,7 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
             state = _add_user_message(state, answer)
             state = _apply_update(state, collect_study_profile(state))
 
-        assert state.phase == "study_profile_persist"
+        assert state.phase == "study_profile" and state.study_profile.get("status") == "completed"
         assert state.study_profile.status == "completed"
         assert state.study_profile.completed_at is not None
         assert state.study_profile.top_techniques == [
@@ -256,7 +253,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
             state = _add_user_message(state, answer)
             state = _apply_update(state, collect_study_profile(state))
 
-        assert state.phase == "study_profile_tiebreaker"
+        assert state.phase == "study_profile" and state.study_profile.get("status") == "tiebreaker_collecting"
         assert state.study_profile.status == "tiebreaker_collecting"
         assert state.study_profile.tiebreaker["assessment"]["needs_tiebreaker"] is True
 
@@ -270,7 +267,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
             state = _add_user_message(state, answer)
             state = _apply_update(state, collect_study_profile_tiebreaker(state))
 
-        assert state.phase == "study_profile_persist"
+        assert state.phase == "study_profile" and state.study_profile.get("status") == "completed"
         assert state.study_profile.tiebreaker["status"] == "completed"
         assert state.study_profile.tiebreaker["confidence_before"] == "baja"
         assert state.study_profile.tiebreaker["confidence_after"] == "alta"

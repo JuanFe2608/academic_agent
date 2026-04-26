@@ -36,18 +36,19 @@ VALIDATION_ERROR_MESSAGES = {
     ),
     "age": "Necesito tu edad en numero 😊 Por ejemplo: 18 o 21",
     "institutional_email": (
-        "Ese correo no parece valido para este entorno 😕 Por favor ingresa "
-        "un correo permitido, por ejemplo: {email_examples}"
+        "Ese correo no tiene un formato valido 😕 Por favor ingresa tu correo "
+        "Microsoft personal, por ejemplo: usuario@outlook.com"
     ),
-    "verification_code": (
-        "Ese codigo no coincide o ya vencio 😕 Revisalo de nuevo o pide que "
-        "te envie uno nuevo."
+    "non_microsoft_personal_email": (
+        "Ese dominio no esta permitido 😕 Solo acepto cuentas personales de Microsoft "
+        "(@outlook.com, @hotmail.com, @live.com, etc.). "
+        "Los correos institucionales como @ucatolica.edu.co requieren permisos adicionales "
+        "que no estan disponibles en este momento."
     ),
     "supported_program": "Responde si o no, por favor 😊",
     "semester": "Necesito el semestre en numero 😊 Por ejemplo: 1, 5 u 8",
     "average_grade": (
-        "No pude entender ese promedio 😅 Escribelo en numero, por ejemplo: "
-        "76 o 76.5"
+        "No pude entender ese promedio 😅 Escribelo en numero entero, por ejemplo: 76"
     ),
 }
 
@@ -75,15 +76,15 @@ def build_field_prompt(
     if field == "age":
         name = first_name or "estudiante"
         return (
-            f"Perfecto, {name} 🙌 Ahora cuentame, ¿cuantos anos tienes? "
+            f"Perfecto, {name} 🙌 Ahora cuentame, ¿Que edad tienes? "
             "Escribelo solo en numero, por ejemplo: 20"
         )
 
     if field == "institutional_email":
         return (
-            "Ahora necesito tu correo institucional o de pruebas 📧 "
-            "Por favor escribelo completo. Ejemplo: "
-            f"{_email_examples(config)}"
+            "Para conectar tu cuenta Microsoft necesito tu correo personal 📧 "
+            "Puede ser @outlook.com, @hotmail.com, @live.com u otro dominio Microsoft. "
+            "Por ejemplo: usuario@outlook.com"
         )
 
     if field == "supported_program":
@@ -102,7 +103,7 @@ def build_field_prompt(
     if field == "average_grade":
         return (
             "Por ultimo, ¿cual es tu promedio academico acumulado? ⭐ "
-            "Escribelo en numero entre 0 y 100, por ejemplo: 76 o 76.5"
+            "Escribelo en numero entero entre 0 y 100, por ejemplo: 76"
         )
 
     return "Necesito un dato mas para continuar."
@@ -113,14 +114,16 @@ def build_prompt_with_error(
     config: OnboardingConfig,
     first_name: str | None = None,
     extra_note: str | None = None,
+    *,
+    error_key: str | None = None,
 ) -> str:
-    """Agrega el mensaje de error al prompt del campo."""
+    """Agrega el mensaje de error al prompt del campo.
 
-    parts = [VALIDATION_ERROR_MESSAGES[field], build_field_prompt(field, config, first_name)]
-    if field == "institutional_email":
-        parts[0] = VALIDATION_ERROR_MESSAGES[field].format(
-            email_examples=_email_examples(config)
-        )
+    error_key permite usar un mensaje especifico en lugar del mensaje generico del campo.
+    """
+
+    message = VALIDATION_ERROR_MESSAGES.get(error_key or field, VALIDATION_ERROR_MESSAGES.get(field, ""))
+    parts = [message, build_field_prompt(field, config, first_name)]
     if extra_note:
         parts.append(extra_note)
     return "\n".join(part for part in parts if part)
@@ -157,47 +160,27 @@ def build_student_code_scope_prompt(config: OnboardingConfig) -> str:
     )
 
 
-def build_verification_sent_prompt(config: OnboardingConfig) -> str:
-    """Mensaje al enviar el codigo de verificacion."""
+def build_low_grade_confirmation_prompt(grade: int) -> str:
+    """Pregunta de confirmacion cuando el promedio registrado es menor de 60."""
 
     return (
-        "¡Gracias! Ya casi terminamos esta parte ✨ Voy a enviarte un codigo "
-        "de verificacion a tu correo institucional. Cuando lo recibas, "
-        "escribemelo aqui para continuar.\n"
-        "Codigo enviado 📩\n"
-        f"El codigo vence en {config.verification_ttl_minutes} minutos."
+        f"Hmm, registre que tu promedio es *{grade}* 🤔\n"
+        "¿Seguro que ese es tu promedio?\n(Responde con el numero de tu opcion)\n"
+        "1. Si\n"
+        "2. No\n"   
     )
 
 
-def build_verification_prompt(config: OnboardingConfig) -> str:
-    """Prompt base para capturar el codigo."""
+def build_low_grade_motivation_message() -> str:
+    """Mensaje motivacional cuando el estudiante confirma un promedio bajo."""
 
     return (
-        "¿Me compartes el codigo que te llego al correo? 🔐 Escribelo tal "
-        "como aparece, por ejemplo: "
-        f"{'4' * config.verification_code_length}\n"
-        "Si no te llega, escribe: reenviar"
+        "¡Anotado! 📝 Un promedio bajo es un punto de partida, no un limite. 💪\n"
+        "Cada dia es una nueva oportunidad para mejorar y superarte. "
+        "Estoy aqui para ayudarte a organizar mejor tu tiempo, estudiar con "
+        "estrategias efectivas y subir ese promedio paso a paso. 🚀\n"
+        "¡Tu puedes lograrlo! Con constancia y las herramientas correctas, "
+        "los resultados van a llegar. Juntos vamos a trabajar en eso 🎯✨"
     )
 
 
-def build_verification_error_prompt(
-    config: OnboardingConfig,
-    detail: str | None = None,
-) -> str:
-    """Prompt de error para la verificacion del correo."""
-
-    parts = [VALIDATION_ERROR_MESSAGES["verification_code"]]
-    if detail:
-        parts.append(detail)
-    parts.append(build_verification_prompt(config))
-    return "\n".join(parts)
-
-
-def _email_examples(config: OnboardingConfig) -> str:
-    domains = tuple(config.allowed_email_domains or (config.institutional_email_domain,))
-    examples = [f"usuario@{domain}" for domain in domains if domain]
-    if not examples:
-        return f"usuario@{config.institutional_email_domain}"
-    if len(examples) == 1:
-        return examples[0]
-    return " o ".join(examples[:2])

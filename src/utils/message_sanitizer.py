@@ -7,7 +7,11 @@ from typing import Any
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from utils.media_artifacts import materialize_base64_image, materialize_image_reference
+from utils.media_artifacts import (
+    is_data_image_url,
+    materialize_base64_image,
+    materialize_image_reference,
+)
 
 
 def add_sanitized_messages(left: Any, right: Any) -> list[BaseMessage]:
@@ -52,7 +56,11 @@ def sanitize_persisted_payload(payload: Any) -> Any:
     if isinstance(payload, tuple):
         return tuple(sanitize_persisted_payload(item) for item in payload)
     if isinstance(payload, str):
-        return materialize_image_reference(payload)
+        # Solo materializar base64 crudo; las rutas locales se dejan intactas
+        # para evitar que el checkpointer infle el estado con imágenes inline.
+        if is_data_image_url(payload):
+            return materialize_image_reference(payload)
+        return payload
     return payload
 
 

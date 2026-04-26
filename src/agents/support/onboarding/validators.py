@@ -16,8 +16,8 @@ _EMAIL_PATTERN = re.compile(
 )
 _DECIMAL_PATTERN = re.compile(r"^\d+(?:\.\d{1,2})?$")
 
-_YES_TOKENS = {"si", "sip", "s", "claro", "ok", "vale", "yes"}
-_NO_TOKENS = {"no", "nop", "n", "negativo"}
+_YES_TOKENS = {"si", "sip", "s", "claro", "ok", "vale", "yes", "1"}
+_NO_TOKENS = {"no", "nop", "n", "negativo", "2"}
 _NAME_LOWER_PARTICLES = {"de", "del", "la", "las", "los", "y"}
 
 
@@ -90,11 +90,14 @@ def validate_age(raw: str, _config: OnboardingConfig) -> ValidationResult:
     return ValidationResult(value=age)
 
 
+_MICROSOFT_PERSONAL_DOMAIN_ROOTS = frozenset({"outlook", "hotmail", "live", "msn"})
+
+
 def validate_institutional_email(
     raw: str,
-    config: OnboardingConfig,
+    config: OnboardingConfig,  # noqa: ARG001 — mantenido por firma del Protocol
 ) -> ValidationResult:
-    """Valida correo permitido por onboarding y lo normaliza a minusculas."""
+    """Valida que el correo sea una cuenta personal de Microsoft (outlook/hotmail/live/msn)."""
 
     normalized = str(raw or "").strip().lower()
     if not normalized or " " in normalized:
@@ -102,21 +105,9 @@ def validate_institutional_email(
     if not _EMAIL_PATTERN.fullmatch(normalized):
         return ValidationResult(error="invalid_institutional_email")
     domain = normalized.rsplit("@", 1)[-1]
-    allowed_domains = tuple(
-        domain_name.lower() for domain_name in getattr(config, "allowed_email_domains", ())
-    ) or (config.institutional_email_domain,)
-    if domain not in allowed_domains:
-        return ValidationResult(error="invalid_institutional_email")
-    return ValidationResult(value=normalized)
-
-
-def validate_verification_code(raw: str, config: OnboardingConfig) -> ValidationResult:
-    """Valida el formato del codigo de verificacion."""
-
-    normalized = str(raw or "").strip()
-    pattern = rf"\d{{{config.verification_code_length}}}"
-    if not re.fullmatch(pattern, normalized):
-        return ValidationResult(error="invalid_verification_code")
+    domain_root = domain.split(".")[0]
+    if domain_root not in _MICROSOFT_PERSONAL_DOMAIN_ROOTS:
+        return ValidationResult(error="non_microsoft_personal_email")
     return ValidationResult(value=normalized)
 
 
@@ -142,15 +133,15 @@ def validate_semester(raw: str, _config: OnboardingConfig) -> ValidationResult:
 
 
 def validate_average_grade(raw: str, _config: OnboardingConfig) -> ValidationResult:
-    """Valida promedio academico entre 0 y 100 con punto decimal opcional."""
+    """Valida promedio academico entero entre 0 y 100."""
 
     normalized = str(raw or "").strip()
-    if "," in normalized or not _DECIMAL_PATTERN.fullmatch(normalized):
+    if not re.fullmatch(r"\d{1,3}", normalized):
         return ValidationResult(error="invalid_average_grade")
-    grade = float(normalized)
+    grade = int(normalized)
     if not 0 <= grade <= 100:
         return ValidationResult(error="invalid_average_grade")
-    return ValidationResult(value=round(grade, 2))
+    return ValidationResult(value=grade)
 
 
 def validate_profile_field(
@@ -184,15 +175,6 @@ def get_missing_profile_fields(profile: Any) -> list[str]:
         if value in (None, ""):
             missing.append(field)
     return missing
-
-
-def profile_requires_email_verification(profile: Any) -> bool:
-    """Indica si ya hay correo pero aun no esta verificado."""
-
-    return bool(
-        profile_value(profile, "institutional_email")
-        and not profile_value(profile, "email_verified", False)
-    )
 
 
 def get_first_name(profile: Any) -> str | None:

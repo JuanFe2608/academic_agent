@@ -10,6 +10,7 @@ from agents.support.nodes.utils import append_message
 from agents.support.personalization.formatter import build_personalization_summary
 from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
+from utils.avatar_assets import AVATAR_PERFIL_LISTO, with_avatar
 
 
 _OPERATIONAL_WELCOME = (
@@ -46,14 +47,18 @@ def persist_study_profile(state: AgentState) -> dict:
     if result.persisted:
         study_profile["persisted_profile_id"] = result.personalization_profile_id
         study_profile["persistence_error"] = None
+        next_phase = "running" if is_post_radar_flow_enabled() else "end"
         return {
             "study_profile": study_profile,
-            "phase": "priorities" if is_post_radar_flow_enabled() else "end",
-            "awaiting_user_input": False,
+            "phase": next_phase,
+            "awaiting_user_input": next_phase == "running",
             "messages": append_message(
                 messages,
                 "assistant",
-                _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
+                with_avatar(
+                    _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
+                    AVATAR_PERFIL_LISTO,
+                ),
             ),
         }
 

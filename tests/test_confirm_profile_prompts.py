@@ -10,7 +10,8 @@ from agents.support.state import AgentState
 
 def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
     state = AgentState(
-        phase="profile_confirm",
+        phase="profile",
+        onboarding={"profile_stage": "confirming"},
         awaiting_user_input=True,
         profile_edit_target="awaiting_field",
         user_message_count=0,
@@ -35,14 +36,15 @@ def test_confirm_profile_edit_name_prompt_has_no_intro_phrase() -> None:
     assert "como te llamas" in prompt.lower()
 
 
-def test_confirm_profile_summary_includes_program_and_verified_email() -> None:
+def test_confirm_profile_summary_includes_program() -> None:
     state = AgentState(
-        phase="profile_confirm",
+        phase="profile",
+        onboarding={"profile_stage": "confirming"},
         student_profile={
             "full_name": "Ana Maria Perez",
             "student_code": "67000912",
             "age": 20,
-            "institutional_email": "ana@ucatolica.edu.co",
+            "institutional_email": "ana@outlook.com",
             "email_verified": True,
             "supported_program": True,
             "academic_program": "Ingenieria de Sistemas y Computacion",
@@ -55,4 +57,5 @@ def test_confirm_profile_summary_includes_program_and_verified_email() -> None:
     prompt = update["messages"][0].content.lower()
 
     assert "programa" in prompt
-    assert "correo verificado: si" in prompt
+    assert "ana maria perez" in prompt
+    assert "correo" not in prompt

@@ -86,6 +86,20 @@ def set_academic_activity_persistence_service(
     get_app_container().set_academic_activity_persistence_service(service)
 
 
+def get_academic_update_orchestrator() -> AcademicUpdateOrchestrator:
+    """Retorna una instancia reusable del orquestador de actualizaciones académicas."""
+
+    return get_app_container().get_academic_update_orchestrator()
+
+
+def set_academic_update_orchestrator(
+    service: AcademicUpdateOrchestrator | None,
+) -> None:
+    """Permite inyectar el orquestador durante pruebas."""
+
+    get_app_container().set_academic_update_orchestrator(service)
+
+
 def get_study_plan_materialization_service() -> StudyPlanMaterializationService:
     """Retorna una instancia reusable del servicio de materialización."""
 
@@ -136,6 +150,20 @@ def set_study_recommendation_service(
     """Permite inyectar recomendaciones de estudio durante pruebas."""
 
     get_app_container().set_study_recommendation_service(service)
+
+
+def get_study_plan_enrichment_service() -> StudyPlanEnrichmentService:
+    """Retorna el servicio de enriquecimiento del plan de estudio."""
+
+    return get_app_container().get_study_plan_enrichment_service()
+
+
+def set_study_plan_enrichment_service(
+    service: StudyPlanEnrichmentService | None,
+) -> None:
+    """Permite inyectar el servicio de enriquecimiento durante pruebas."""
+
+    get_app_container().set_study_plan_enrichment_service(service)
 
 
 def get_microsoft_graph_state_repository() -> MicrosoftGraphStateRepository:
@@ -267,6 +295,8 @@ __all__ = [
     "set_study_plan_materialization_service",
     "set_study_planning_persistence_service",
     "set_study_replanning_service",
+    "get_study_plan_enrichment_service",
+    "set_study_plan_enrichment_service",
     "set_study_recommendation_service",
     "set_tracking_service",
 ]

@@ -201,7 +201,7 @@ def test_persist_study_profile_does_not_materialize_instances_after_radar(
     set_study_plan_materialization_service(materialization_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,

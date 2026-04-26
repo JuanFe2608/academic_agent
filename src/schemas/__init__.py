@@ -16,7 +16,6 @@ from .conversation import (
 from .microsoft_graph import CalendarProvider, CalendarState
 from .onboarding import (
     ConsentState,
-    EmailVerificationState,
     MicrosoftOAuthOnboardingState,
     OnboardingState,
     StudentProfile,
@@ -57,7 +56,6 @@ __all__ = [
     "ConversationInputType",
     "ConversationRouteAction",
     "ConversationRouteDecision",
-    "EmailVerificationState",
     "Event",
     "EventCategory",
     "EventType",

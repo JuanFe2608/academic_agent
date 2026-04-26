@@ -59,15 +59,18 @@ def build_study_plan_summary(
     subjects: list[SubjectItem],
     study_plan: StudyPlanState,
     *,
+    academic_activities: list | None = None,
     reminders: RemindersState | dict | None = None,
 ) -> str:
     """Construye el resumen conversacional del plan semanal de estudio.
 
     Formato objetivo:
       📚 Plan semanal sugerido
-      Enfoques principales → Bloques recomendados → Recomendaciones
-      Guía pedagógica RAG (si aplica) → Método aplicado (si aplica)
-      Estado operativo → Oferta de sincronización con Outlook
+      Enfoques principales
+      📅 Sesiones de estudio (Calendario / Outlook)
+      📝 Pendientes registrados (Microsoft To Do) — solo si hay actividades
+      Recomendaciones → Guía RAG → Método aplicado → Estado operativo
+      Oferta de sincronización con destino según contenido
     """
     rules = dict(study_plan.rules or {})
     events = list(study_plan.plan_events)
@@ -94,10 +97,10 @@ def build_study_plan_summary(
         lines += ["", "*Enfoques principales de la semana*"]
         lines += focus
 
-    # §2 — Bloques recomendados
+    # §2 — Sesiones de estudio (van al Calendario / Outlook)
     blocks = _format_plan_blocks(events, subjects)
     if blocks:
-        lines += ["", "*Bloques recomendados*"]
+        lines += ["", "📅 *Sesiones de estudio* (Calendario)"]
         lines += blocks
     else:
         unscheduled = list(rules.get("unscheduled_requests") or [])
@@ -110,29 +113,41 @@ def build_study_plan_summary(
         else:
             lines += ["", "Todavía no hay bloques ubicados. Puedes pedirme un replanning para generarlos."]
 
-    # §3 — Recomendaciones dinámicas
+    # §3 — Pendientes registrados (van a Microsoft To Do)
+    pending = _format_pending_activities(list(academic_activities or []))
+    if pending:
+        lines += ["", "📝 *Pendientes registrados* (Microsoft To Do)"]
+        lines += pending
+
+    # §4 — Recomendaciones dinámicas
     recs = _smart_recommendations(subjects, events, rules)
     if recs:
         lines += ["", "*Recomendaciones*"]
         lines += recs
 
-    # §4 — Consejo pedagógico RAG (primera oración, no el bloque completo)
+    # §5 — Consejo pedagógico RAG (primera oración, no el bloque completo)
     rag_tip = _format_rag_tip(rules)
     if rag_tip:
         lines += ["", rag_tip]
 
-    # §5 — Método aplicado a actividad prioritaria (resumen breve)
+    # §6 — Método aplicado a actividad prioritaria (resumen breve)
     method_tip = _format_applied_method_tip(rules)
     if method_tip:
         lines += ["", method_tip]
 
-    # §6 — Estado operativo (sesiones materializadas, recordatorios)
+    # §7 — Estado operativo (sesiones materializadas, recordatorios)
     status = _format_operational_status(study_plan, reminders)
     if status:
         lines += [""] + status
 
-    # Cierre — oferta de sincronización
-    lines += ["", "¿Quieres que sincronice este plan con tu Outlook Calendar? 📅"]
+    # Cierre — oferta de sincronización adaptada según contenido disponible
+    if pending:
+        lines += [
+            "",
+            "¿Quieres que registre las sesiones en tu Outlook Calendar y los pendientes en Microsoft To Do? 📅✅",
+        ]
+    else:
+        lines += ["", "¿Quieres que sincronice este plan con tu Outlook Calendar? 📅"]
 
     return "\n".join(lines)
 
@@ -185,6 +200,45 @@ def _format_plan_blocks(events: list, subjects: list[SubjectItem]) -> list[str]:
         urgency_type = subject_urgency.get(subject.lower(), "")
         action = _block_action_label(urgency_type, subject)
         lines.append(f"- {day} {start} a {end} → {action}")
+    return lines
+
+
+def _format_pending_activities(activities: list) -> list[str]:
+    """Formatea actividades académicas pendientes para la sección Microsoft To Do."""
+    if not activities:
+        return []
+
+    from datetime import date as _date
+
+    pending = [
+        a for a in activities
+        if str(getattr(a, "status", "pending")) not in ("deleted", "completed")
+    ]
+    if not pending:
+        return []
+
+    lines: list[str] = []
+    for activity in pending[:6]:
+        activity_type = str(getattr(activity, "activity_type", "") or "")
+        subject = str(getattr(activity, "subject_name", "") or "")
+        due_date = getattr(activity, "due_date", None)
+        priority = str(getattr(activity, "priority_level", "") or "")
+
+        label = _ACTIVITY_LABEL.get(activity_type, activity_type or "actividad")
+        line = f"- {label.capitalize()} de {subject}"
+
+        if due_date:
+            try:
+                d = _date.fromisoformat(str(due_date)[:10])
+                day_name = _DAYS_ES[d.weekday()]
+                line += f" — {day_name} {d.day}/{d.month}"
+            except (ValueError, IndexError):
+                pass
+
+        if priority == "alta":
+            line += " ⚠️"
+
+        lines.append(line)
     return lines
 
 

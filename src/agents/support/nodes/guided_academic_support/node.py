@@ -10,6 +10,29 @@ from services.conversation import (
     ensure_interaction_state,
     update_interaction_state,
 )
+from services.conversation.text_normalization import normalize_text
+
+
+_GREETING_TOKENS = frozenset({
+    "hola", "buenas", "buenos dias", "buenas tardes", "buenas noches",
+    "hey", "saludos", "que tal", "como estas", "como estan",
+})
+
+_GREETING_RESPONSE = (
+    "¡Hola! ¿En qué puedo apoyarte hoy? 😊\n\n"
+    "Puedo ayudarte a:\n"
+    "- Registrar o revisar tus actividades pendientes (parciales, tareas, entregas)\n"
+    "- Organizar tu semana de estudio\n"
+    "- Recomendarte cómo preparar una evaluación según tu técnica"
+)
+
+_UNDETECTED_FALLBACK = (
+    "Para ayudarte bien, cuéntame qué tienes pendiente esta semana. 📋\n\n"
+    "Por ejemplo:\n"
+    "- \"Tengo parcial de Cálculo el viernes\"\n"
+    "- \"Quiero organizar mis horas de estudio\"\n"
+    "- \"¿Cómo aplico pomodoro para un parcial?\""
+)
 
 
 def guided_academic_support(state: AgentState) -> dict:
@@ -25,6 +48,18 @@ def guided_academic_support(state: AgentState) -> dict:
     if not has_new_input:
         return {"phase": "end", "awaiting_user_input": False}
 
+    # Saludos antes de llamar al servicio — evita enviar el fallback de "sin contexto"
+    # para mensajes que son simplemente una apertura de conversación.
+    normalized = normalize_text(last_text or "")
+    if _is_pure_greeting(normalized):
+        return {
+            "phase": "running",
+            "awaiting_user_input": True,
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "messages": append_message(messages, "assistant", _GREETING_RESPONSE),
+        }
+
     interaction = ensure_interaction_state(state)
     pending_payload = (
         dict(interaction.pending_entity_payload or {})
@@ -38,15 +73,20 @@ def guided_academic_support(state: AgentState) -> dict:
     )
     if not result.detected:
         return {
-            "phase": "end",
-            "awaiting_user_input": False,
+            "phase": "running",
+            "awaiting_user_input": True,
             "user_message_count": current_count,
             "last_user_text": last_text,
+            "messages": append_message(
+                messages,
+                "assistant",
+                _UNDETECTED_FALLBACK,
+            ),
         }
 
     if result.requires_clarification:
         return {
-            "phase": "guided_academic_support",
+            "phase": "running",
             "awaiting_user_input": True,
             "user_message_count": current_count,
             "last_user_text": last_text,
@@ -56,7 +96,7 @@ def guided_academic_support(state: AgentState) -> dict:
 
     if result.requires_follow_up:
         return {
-            "phase": "guided_academic_support",
+            "phase": "running",
             "awaiting_user_input": True,
             "user_message_count": current_count,
             "last_user_text": last_text,
@@ -78,6 +118,7 @@ def _pending_guided_interaction(state: AgentState, result) -> dict[str, object]:
     return update_interaction_state(
         state,
         active_intent=result.intent,
+        active_subflow="guided_academic_support",
         current_domain=GUIDED_SUPPORT_DOMAIN,
         interaction_mode=result.interaction_mode,
         pending_action="complete_guided_academic_context",
@@ -96,6 +137,7 @@ def _follow_up_guided_interaction(state: AgentState, result) -> dict[str, object
     return update_interaction_state(
         state,
         active_intent=result.intent,
+        active_subflow="guided_academic_support",
         current_domain=GUIDED_SUPPORT_DOMAIN,
         interaction_mode=result.interaction_mode,
         pending_action="continue_socratic_mode",
@@ -114,6 +156,7 @@ def _completed_guided_interaction(state: AgentState, result) -> dict[str, object
     return update_interaction_state(
         state,
         active_intent=result.intent,
+        active_subflow=None,
         current_domain=GUIDED_SUPPORT_DOMAIN,
         interaction_mode=result.interaction_mode,
         pending_action=None,
@@ -130,6 +173,12 @@ def _completed_guided_interaction(state: AgentState, result) -> dict[str, object
         current_step=None,
         current_section="guided_academic_support",
     )
+
+
+def _is_pure_greeting(normalized: str) -> bool:
+    """Detecta saludos simples sin contenido académico adicional (máx 3 palabras)."""
+    words = normalized.split()
+    return len(words) <= 3 and any(token in normalized for token in _GREETING_TOKENS)
 
 
 __all__ = ["guided_academic_support"]

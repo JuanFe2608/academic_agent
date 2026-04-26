@@ -256,9 +256,6 @@ def copy_onboarding_state(state: Any) -> dict[str, Any]:
 
     onboarding_state = state.get("onboarding", {}) if hasattr(state, "get") else {}
     onboarding = dict(onboarding_state)
-    onboarding["email_verification"] = dict(
-        onboarding_state.get("email_verification", {})
-    )
     onboarding["microsoft_oauth"] = dict(
         onboarding_state.get("microsoft_oauth", {})
     )

@@ -23,6 +23,14 @@ from services.planning.academic_activity_persistence_service import (
     AcademicActivityPersistenceService,
     build_academic_activity_persistence_service,
 )
+from services.planning.academic_update_orchestrator import (
+    AcademicUpdateOrchestrator,
+    build_academic_update_orchestrator,
+)
+from services.planning.study_plan_enrichment_service import (
+    StudyPlanEnrichmentService,
+    build_study_plan_enrichment_service,
+)
 from services.planning.persistence_service import (
     StudyPlanningPersistenceService,
     build_study_planning_persistence_service,
@@ -146,6 +154,18 @@ class AppContainer:
     ) -> None:
         self._set_override("academic_activity_persistence_service", service)
 
+    def get_academic_update_orchestrator(self) -> AcademicUpdateOrchestrator:
+        return self._get_or_build(
+            "academic_update_orchestrator",
+            self._build_academic_update_orchestrator,
+        )
+
+    def set_academic_update_orchestrator(
+        self,
+        service: AcademicUpdateOrchestrator | None,
+    ) -> None:
+        self._set_override("academic_update_orchestrator", service)
+
     def get_study_plan_materialization_service(self) -> StudyPlanMaterializationService:
         return self._get_or_build(
             "study_plan_materialization_service",
@@ -181,6 +201,18 @@ class AppContainer:
         service: StudyRecommendationService | None,
     ) -> None:
         self._set_override("study_recommendation_service", service)
+
+    def get_study_plan_enrichment_service(self) -> StudyPlanEnrichmentService:
+        return self._get_or_build(
+            "study_plan_enrichment_service",
+            self._build_study_plan_enrichment_service,
+        )
+
+    def set_study_plan_enrichment_service(
+        self,
+        service: StudyPlanEnrichmentService | None,
+    ) -> None:
+        self._set_override("study_plan_enrichment_service", service)
 
     def get_microsoft_graph_state_repository(self) -> MicrosoftGraphStateRepository:
         return self._get_or_build(
@@ -259,6 +291,16 @@ class AppContainer:
         service: MicrosoftTodoSyncService | None,
     ) -> None:
         self._set_override("microsoft_todo_sync_service", service)
+
+    def _build_study_plan_enrichment_service(self) -> StudyPlanEnrichmentService:
+        return build_study_plan_enrichment_service(
+            recommendation_service=self.get_study_recommendation_service()
+        )
+
+    def _build_academic_update_orchestrator(self) -> AcademicUpdateOrchestrator:
+        return build_academic_update_orchestrator(
+            persistence_service=self.get_academic_activity_persistence_service()
+        )
 
     def _build_reminders_service(self) -> StudyPlanRemindersService:
         materialization_service = self.get_study_plan_materialization_service()

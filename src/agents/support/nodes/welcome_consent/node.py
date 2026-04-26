@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
-from pathlib import Path
 
 from langchain_core.messages import AIMessage, BaseMessage
 
@@ -14,6 +13,7 @@ from agents.support.nodes.utils import (
     parse_yes_no,
 )
 from agents.support.state import AgentState
+from utils.avatar_assets import AVATAR_HOLA_SALUDO
 
 from .prompt import CONSENT_PROMPT, WELCOME_MESSAGE
 
@@ -25,11 +25,6 @@ _GREETING_KEYWORDS = (
     "buenas noches",
     "hey",
     "hello",
-)
-
-_PROJECT_ROOT = Path(__file__).resolve().parents[5]
-_WELCOME_IMAGE_PATH = (
-    _PROJECT_ROOT / "assets" / "whatsapp" / "saludando con un brazo cruzado.png"
 )
 
 def welcome_consent(state: AgentState) -> dict:
@@ -134,7 +129,7 @@ def _welcome_sequence() -> list[BaseMessage]:
 
 
 def _welcome_image_block() -> dict[str, object]:
-    return {"type": "image_url", "image_url": {"url": str(_WELCOME_IMAGE_PATH)}}
+    return {"type": "image_url", "image_url": {"url": str(AVATAR_HOLA_SALUDO)}}
 
 
 def _restart_after_out_of_scope(

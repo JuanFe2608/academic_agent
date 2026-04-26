@@ -5,7 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 
-from agents.support.scheduling.schedule_renderer import render_week_schedule
+from agents.support.scheduling.schedule_renderer import (
+    _DEFAULT_RENDER_DIR,
+    render_week_schedule,
+)
 from schemas.scheduling import Event
 from services.scheduling.event_projection import blocks_to_schedule_events
 from services.scheduling.models import WeeklyScheduleBlock
@@ -25,7 +28,7 @@ def blocks_to_events(blocks: list[WeeklyScheduleBlock]) -> list[Event]:
 
 def render_recurring_schedule(
     blocks: list[WeeklyScheduleBlock],
-    out_dir: str = "tmp",
+    out_dir: str = _DEFAULT_RENDER_DIR,
     filename: str = "schedule.png",
     timezone_name: str = "America/Bogota",
     reference: datetime | None = None,

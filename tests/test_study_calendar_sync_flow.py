@@ -7,7 +7,7 @@ from datetime import datetime as real_datetime
 from langchain_core.messages import HumanMessage
 
 import services.planning.materialization_service as materialization_module
-from agents.support.agent import _route_welcome
+from agents.support.agent import _route_entry
 from agents.support.dependencies import (
     set_outlook_calendar_sync_service,
     set_study_plan_materialization_service,
@@ -161,7 +161,7 @@ def test_study_calendar_sync_requires_confirmation_before_outlook_calls(monkeypa
     state = _state()
 
     try:
-        assert _route_welcome(state) == "sync_study_calendar"
+        assert _route_entry(state) == "sync_study_calendar"
         preview_update = sync_study_calendar(state)
         assert fake_client.upserts == []
 
@@ -172,7 +172,7 @@ def test_study_calendar_sync_requires_confirmation_before_outlook_calls(monkeypa
         set_outlook_calendar_sync_service(None)
 
     links = state_repository.list_calendar_event_links(student_id=7, calendar_id="calendar-1")
-    assert preview_update["phase"] == "calendar_sync"
+    assert preview_update["phase"] == "running"
     assert preview_update["awaiting_user_input"] is True
     assert preview_update["interaction"]["confirmation_pending"] is True
     assert preview_update["interaction"]["last_confirmation_payload"]["preview"]["create_count"] == 1

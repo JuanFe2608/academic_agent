@@ -31,8 +31,30 @@ def is_data_image_url(value: object) -> bool:
     return isinstance(value, str) and bool(_DATA_IMAGE_RE.match(value.strip()))
 
 
+def is_inline_preview_enabled() -> bool:
+    """Retorna True si MEDIA_INLINE_PREVIEW=true (para debuggear en LangSmith)."""
+    return os.getenv("MEDIA_INLINE_PREVIEW", "").lower() in {"1", "true", "yes"}
+
+
+def path_to_data_url(path: str) -> str:
+    """Convierte una ruta local de imagen a data: URL (base64). Util para debugging."""
+    raw = str(path or "").strip()
+    if not raw or not os.path.exists(raw):
+        return raw
+    mime_type = mimetypes.guess_type(raw)[0] or "image/png"
+    with open(raw, "rb") as f:
+        encoded = base64.b64encode(f.read()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
+
+
 def materialize_image_reference(value: str | None) -> str:
-    """Convierte data URLs de imagen en rutas locales; deja URLs/rutas intactas."""
+    """Convierte data URLs de imagen en rutas locales; deja URLs/rutas intactas.
+
+    Con MEDIA_INLINE_PREVIEW=true:
+    - Las data: URLs se conservan inline (no se escriben a disco).
+    - Las rutas locales de archivo se convierten a data: URLs.
+    Esto permite que LangSmith renderice todas las imagenes en modo debug.
+    """
 
     raw = str(value or "").strip()
     if not raw:
@@ -40,6 +62,11 @@ def materialize_image_reference(value: str | None) -> str:
 
     match = _DATA_IMAGE_RE.match(raw)
     if match is None:
+        if is_inline_preview_enabled() and os.path.isfile(raw):
+            return path_to_data_url(raw)
+        return raw
+
+    if is_inline_preview_enabled():
         return raw
 
     return materialize_base64_image(

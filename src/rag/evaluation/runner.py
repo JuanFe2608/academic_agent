@@ -96,7 +96,10 @@ def load_eval_cases(path: str | Path = DEFAULT_EVAL_DATASET_PATH) -> list[RagEva
     if not raw:
         return []
     if raw.startswith("["):
-        payload = json.loads(raw)
+        try:
+            payload = json.loads(raw)
+        except json.JSONDecodeError as exc:
+            raise ValueError(f"Invalid JSON array in {dataset_path}: {exc}") from exc
         return [RagEvalCase.model_validate(item) for item in payload]
     cases: list[RagEvalCase] = []
     for line_number, line in enumerate(raw.splitlines(), start=1):

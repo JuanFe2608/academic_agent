@@ -100,7 +100,7 @@ def test_sync_fixed_schedule_node_marks_outlook_sync_success() -> None:
 
         update = sync_fixed_schedule(state)
 
-        assert update["phase"] == "sync"
+        assert update["phase"] == "study_profile"
         assert update["calendar"]["provider"] == "outlook"
         assert update["calendar"]["authorized"] is True
         assert update["calendar"]["synced_event_map"] == {"block-1": "outlook:block-1"}

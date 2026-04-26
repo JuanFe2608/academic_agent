@@ -30,7 +30,7 @@ def handle_replan_turn(state: AgentState) -> dict:
     if _is_awaiting_replan_confirmation(interaction, replan):
         if not has_new_input:
             return {
-                "phase": "replan",
+                "phase": "running",
                 "awaiting_user_input": True,
                 "replan": replan,
             }
@@ -116,7 +116,7 @@ def _build_proposal_update(
         }
     )
     return {
-        "phase": "replan",
+        "phase": "running",
         "awaiting_user_input": True,
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -138,7 +138,7 @@ def _handle_confirmation(
     if decision is None:
         prompt = str(replan.get("pending_prompt") or "Responde si o no para aplicar la replanificacion.")
         return {
-            "phase": "replan",
+            "phase": "running",
             "awaiting_user_input": True,
             "user_message_count": current_count,
             "last_user_text": last_text,
@@ -290,6 +290,7 @@ def _confirmation_interaction(state: AgentState, replan: dict[str, object]) -> d
     return update_interaction_state(
         state,
         active_intent="request_replan",
+        active_subflow="replan",
         current_domain=_REPLAN_DOMAIN,
         interaction_mode="confirmation",
         pending_action="confirm_replan",
@@ -308,6 +309,7 @@ def _clear_interaction(state: AgentState) -> dict[str, object]:
     return update_interaction_state(
         state,
         active_intent=None,
+        active_subflow=None,
         current_domain=_REPLAN_DOMAIN,
         interaction_mode="guided",
         pending_action=None,

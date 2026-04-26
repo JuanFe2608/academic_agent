@@ -20,9 +20,6 @@ _FIELD_ALIASES = {
     "codigo": "student_code",
     "codigo estudiantil": "student_code",
     "edad": "age",
-    "correo": "institutional_email",
-    "correo institucional": "institutional_email",
-    "email": "institutional_email",
     "semestre": "semester",
     "promedio": "average_grade",
 }
@@ -45,8 +42,10 @@ def confirm_profile(state: AgentState) -> dict:
 
     if not has_new_input:
         prompt = PROMPT_FIELD if edit_target else _build_confirm_prompt(profile)
+        onboarding["profile_stage"] = "confirming"
         return {
-            "phase": "profile_confirm",
+            "onboarding": onboarding,
+            "phase": "profile",
             "awaiting_user_input": True,
             "messages": append_message(messages, "assistant", prompt),
         }
@@ -58,14 +57,17 @@ def confirm_profile(state: AgentState) -> dict:
     if edit_target:
         field = _extract_field(normalized)
         if not field:
+            onboarding["profile_stage"] = "confirming"
             return {
-                "phase": "profile_confirm",
+                "onboarding": onboarding,
+                "phase": "profile",
                 "user_message_count": current_count,
                 "last_user_text": last_text,
                 "awaiting_user_input": True,
                 "messages": append_message(messages, "assistant", PROMPT_FIELD),
             }
         _reset_profile_field(profile, onboarding, field)
+        onboarding["profile_stage"] = "collecting"
         return {
             "student_profile": profile,
             "onboarding": onboarding,
@@ -82,8 +84,10 @@ def confirm_profile(state: AgentState) -> dict:
         }
 
     if answer is True:
+        onboarding["profile_stage"] = "persisting"
         return {
-            "phase": "profile_persist",
+            "onboarding": onboarding,
+            "phase": "profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": False,
@@ -93,6 +97,7 @@ def confirm_profile(state: AgentState) -> dict:
         field = _extract_field(normalized)
         if field:
             _reset_profile_field(profile, onboarding, field)
+            onboarding["profile_stage"] = "collecting"
             return {
                 "student_profile": profile,
                 "onboarding": onboarding,
@@ -107,17 +112,21 @@ def confirm_profile(state: AgentState) -> dict:
                     _prompt_for_field(field, config),
                 ),
             }
+        onboarding["profile_stage"] = "confirming"
         return {
             "profile_edit_target": "awaiting_field",
-            "phase": "profile_confirm",
+            "onboarding": onboarding,
+            "phase": "profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
             "messages": append_message(messages, "assistant", PROMPT_FIELD),
         }
 
+    onboarding["profile_stage"] = "confirming"
     return {
-        "phase": "profile_confirm",
+        "onboarding": onboarding,
+        "phase": "profile",
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": True,
@@ -136,8 +145,6 @@ def _build_confirm_prompt(profile: dict) -> str:
         f"Nombre: {_display_value(profile.get('full_name'))}",
         f"Codigo estudiantil: {_display_value(profile.get('student_code'))}",
         f"Edad: {_display_value(profile.get('age'))}",
-        f"Correo institucional: {_display_value(profile.get('institutional_email'))}",
-        f"Correo verificado: {'Si' if profile.get('email_verified') else 'No'}",
         f"Programa: {program}",
         f"Semestre: {_display_value(profile.get('semester'))}",
         f"Promedio acumulado: {_display_value(profile.get('average_grade'))}",
@@ -173,13 +180,6 @@ def _reset_profile_field(profile: dict, onboarding: dict, field: str) -> None:
     profile[field] = None
     if field == "institutional_email":
         profile["email_verified"] = False
-        onboarding["email_verification"] = {
-            "status": "idle",
-            "attempts": 0,
-            "resend_count": 0,
-            "expires_at": None,
-            "last_error": None,
-        }
 
 
 def _prompt_for_field(field: str, config) -> str:

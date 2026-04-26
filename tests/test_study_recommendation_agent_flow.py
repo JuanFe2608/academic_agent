@@ -6,7 +6,7 @@ from types import SimpleNamespace
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.agent import _route_welcome
+from agents.support.agent import _route_entry
 from agents.support.dependencies import set_study_recommendation_service
 from agents.support.nodes.answer_scope_boundary import answer_scope_boundary
 from agents.support.nodes.answer_study_recommendation import answer_study_recommendation
@@ -39,7 +39,7 @@ def test_end_phase_routes_direct_study_question_to_rag_service_node() -> None:
         messages=[HumanMessage(content="Que es Pomodoro y cuando conviene?")],
     )
 
-    assert _route_welcome(state) == "answer_study_recommendation"
+    assert _route_entry(state) == "answer_study_recommendation"
 
 
 def test_end_phase_routes_applied_method_question_to_recommendation_node() -> None:
@@ -50,7 +50,7 @@ def test_end_phase_routes_applied_method_question_to_recommendation_node() -> No
         messages=[HumanMessage(content="Como estudio para parcial de Calculo en 60 minutos?")],
     )
 
-    assert _route_welcome(state) == "answer_study_recommendation"
+    assert _route_entry(state) == "answer_study_recommendation"
 
 
 def test_end_phase_routes_direct_study_question_when_counter_is_already_current() -> None:
@@ -62,7 +62,7 @@ def test_end_phase_routes_direct_study_question_when_counter_is_already_current(
         messages=[HumanMessage(content="Que es Pomodoro?")],
     )
 
-    assert _route_welcome(state) == "answer_study_recommendation"
+    assert _route_entry(state) == "answer_study_recommendation"
 
 
 def test_answer_study_recommendation_uses_service_and_preserves_state_boundary() -> None:
@@ -132,7 +132,7 @@ def test_academic_update_keeps_precedence_over_study_recommendation_route() -> N
         messages=[HumanMessage(content="Tengo parcial de calculo mañana")],
     )
 
-    assert _route_welcome(state) == "handle_academic_update"
+    assert _route_entry(state) == "handle_academic_update"
 
 
 def test_end_phase_routes_out_of_scope_question_to_scope_boundary() -> None:
@@ -147,7 +147,7 @@ def test_end_phase_routes_out_of_scope_question_to_scope_boundary() -> None:
         ],
     )
 
-    assert _route_welcome(state) == "answer_scope_boundary"
+    assert _route_entry(state) == "answer_scope_boundary"
 
 
 def test_end_phase_routes_forbidden_evaluation_solution_to_scope_boundary() -> None:
@@ -158,7 +158,7 @@ def test_end_phase_routes_forbidden_evaluation_solution_to_scope_boundary() -> N
         messages=[HumanMessage(content="Resuelveme este quiz y dame la respuesta exacta")],
     )
 
-    assert _route_welcome(state) == "answer_scope_boundary"
+    assert _route_entry(state) == "answer_scope_boundary"
 
 
 def test_scope_boundary_answers_and_updates_last_user_text() -> None:

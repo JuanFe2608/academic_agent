@@ -27,6 +27,8 @@ ScheduleReviewStage = Literal[
     "section_awaiting_field_selection",
     "section_awaiting_field_value",
     "section_awaiting_item_confirmation",
+    "section_awaiting_add_payload",
+    "section_awaiting_replace_all_payload",
 ]
 ScheduleRenewalStage = Literal[
     "idle",

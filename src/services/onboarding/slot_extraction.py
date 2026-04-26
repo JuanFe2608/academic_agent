@@ -43,7 +43,7 @@ _SEMESTER_PATTERNS = (
 )
 _AVERAGE_PATTERN = re.compile(
     r"\bpromedio(?:\s+(?:academico|acumulado))?(?:\s+(?:es|de))?\D{0,10}"
-    r"(\d{1,3}(?:[\.,]\d{1,2})?)\b",
+    r"(\d{1,3})\b",
     re.IGNORECASE,
 )
 _NAME_MARKER_PATTERN = re.compile(

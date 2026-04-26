@@ -15,6 +15,24 @@ from .scope_policy import decide_scope, render_scope_response, should_answer_sco
 from .state_helpers import ensure_interaction_state
 from .text_normalization import normalize_text
 
+_SCOPE_INTENT_TO_ROUTE: dict[str, str] = {
+    "prioritize_academic_work": "collect_priorities",
+    "manage_academic_activity": "handle_academic_update",
+    "track_study_session": "handle_academic_update",
+    "view_weekly_agenda": "view_weekly_agenda",
+    "view_tasks": "view_tasks",
+    "request_replan": "request_replan",
+    "sync_study_calendar": "sync_study_calendar",
+    "sync_study_todo": "sync_study_todo",
+    "manage_fixed_schedule": "manage_fixed_schedule",
+    "study_method_recommendation": "answer_study_recommendation",
+    "request_guided_academic_help": "guided_academic_support",
+    "enter_socratic_mode": "guided_academic_support",
+    "followup_in_context": "guided_academic_support",
+    "academic_request": "guided_academic_support",
+    "limited_academic_guidance": "guided_academic_support",
+}
+
 _YES_CONFIRMATIONS = {
     "si",
     "sip",
@@ -31,8 +49,7 @@ _SMALLTALK_TOKENS = {"gracias", "ok", "jaja", "jeje", "hola", "buenas", "listo"}
 _ACTIVE_PHASE_ROUTES = {
     "consent": "welcome_consent",
     "profile": "collect_profile",
-    "email_verification_send": "send_email_verification",
-    "email_verification": "verify_email_code",
+    "microsoft_oauth": "request_microsoft_oauth",
     "profile_confirm": "confirm_profile",
     "profile_persist": "persist_profile",
     "schedules": "request_schedules",
@@ -50,7 +67,6 @@ _ACTIVE_PHASE_ROUTES = {
     "calendar_sync": "sync_study_calendar",
     "todo_sync": "sync_study_todo",
     "guided_academic_support": "guided_academic_support",
-    "sync": "collect_study_profile",
     "study_profile": "collect_study_profile",
     "study_profile_tiebreaker": "collect_study_profile_tiebreaker",
     "study_profile_persist": "persist_study_profile",
@@ -61,8 +77,7 @@ _ACTIVE_PHASE_ROUTES = {
 _PHASE_DOMAINS = {
     "consent": "student_profile",
     "profile": "student_profile",
-    "email_verification_send": "student_profile",
-    "email_verification": "student_profile",
+    "microsoft_oauth": "student_profile",
     "profile_confirm": "student_profile",
     "profile_persist": "student_profile",
     "schedules": "schedule_management",
@@ -80,7 +95,6 @@ _PHASE_DOMAINS = {
     "calendar_sync": "calendar_action",
     "todo_sync": "todo_action",
     "guided_academic_support": "guided_academic_support",
-    "sync": "study_method_recommendation",
     "study_profile": "study_method_recommendation",
     "study_profile_tiebreaker": "study_method_recommendation",
     "study_profile_persist": "study_method_recommendation",
@@ -105,6 +119,9 @@ def route_conversation_input(
     normalized_interaction = ensure_interaction_state(interaction)
     input_classification = classification or classify_input(text, media_types=media_types)
     active_phase = str(phase or "").strip() or None
+    active_subflow = str(normalized_interaction.active_subflow or "").strip() or None
+    if active_subflow and active_phase in {None, "end", "running"}:
+        active_phase = active_subflow
     current_domain = _PHASE_DOMAINS.get(active_phase or "", "")
     has_prior_context = bool(
         active_phase
@@ -181,6 +198,9 @@ def route_conversation_input(
                 missing_fields=normalized_interaction.missing_fields_json,
             )
 
+    if _has_active_block(active_phase) and _is_interruptible_question(input_classification, policy):
+        return _interrupt_and_return_decision(policy, input_classification)
+
     if _has_active_block(active_phase):
         if _is_contextual_smalltalk(input_classification):
             return _active_block_decision(
@@ -206,6 +226,21 @@ def route_conversation_input(
 
     if should_answer_scope_boundary(policy):
         return _policy_boundary_decision(policy, input_classification)
+
+    # Intents ya resueltos por scope_policy o input_classifier: rutar directamente
+    # sin re-clasificar con el LLM para evitar fallbacks incorrectos.
+    if policy.intent == "answer_academic_concept_question" or input_classification.possible_intent == "answer_academic_concept_question":
+        return _decision(
+            intent="answer_academic_concept_question",
+            domain="guided_academic_support",
+            action="route",
+            route_name="answer_study_recommendation",
+            priority=7,
+            reason="academic_concept_question_direct_route",
+            classification=input_classification,
+            scope_decision=policy,
+            confidence=max(input_classification.confidence, 0.80),
+        )
 
     return _route_new_intent(
         text,
@@ -305,6 +340,39 @@ def _route_new_intent(
         active_domain=active_domain,
         active_intent=active_intent,
     )
+
+    # Cuando el LLM falla o devuelve out_of_scope pero la scope policy ya validó
+    # que el mensaje es académico, no rechazar al estudiante. Estrategia en dos pasos:
+    # 1. Si el scope detectó un intent específico con ruta conocida, usarlo directamente.
+    # 2. Si el intent es ambiguo, caer a guided_academic_support como fallback seguro.
+    # Crítico en WhatsApp donde mensajes informales o con errores de tipeo son la norma.
+    if llm_result.route_name == "answer_scope_boundary" and scope_decision.allowed:
+        scope_route = _SCOPE_INTENT_TO_ROUTE.get(scope_decision.intent or "")
+        if scope_route:
+            return _decision(
+                intent=scope_decision.intent,
+                domain=scope_decision.domain,
+                action="route",
+                route_name=scope_route,
+                priority=9,
+                reason=f"scope_intent_fallback:{llm_result.source}",
+                classification=classification,
+                scope_decision=scope_decision,
+                confidence=0.62,
+                interrupts_active_block=interrupts_active_block,
+            )
+        return _decision(
+            intent="followup_in_context",
+            domain="guided_academic_support",
+            action="route",
+            route_name="guided_academic_support",
+            priority=9,
+            reason=f"llm_out_of_scope_overridden_by_scope_policy:{llm_result.source}",
+            classification=classification,
+            scope_decision=scope_decision,
+            confidence=0.55,
+            interrupts_active_block=interrupts_active_block,
+        )
 
     action = "answer_policy" if llm_result.route_name == "answer_scope_boundary" else "route"
     return _decision(
@@ -418,6 +486,41 @@ def _is_blocking_policy(policy: ScopeDecision) -> bool:
 
 def _has_active_block(phase: str | None) -> bool:
     return bool(phase and phase not in {"end", "running"})
+
+
+def _is_interruptible_question(
+    classification: InputClassification,
+    policy: ScopeDecision,
+) -> bool:
+    """Detecta preguntas conceptuales académicas que pueden interrumpir un flujo activo."""
+    interruptible_intents = {
+        "answer_academic_concept_question",
+        "study_method_recommendation",
+        "request_study_method_recommendation",
+    }
+    return (
+        classification.possible_intent in interruptible_intents
+        or policy.intent in interruptible_intents
+    )
+
+
+def _interrupt_and_return_decision(
+    policy: ScopeDecision,
+    classification: InputClassification,
+) -> ConversationRouteDecision:
+    """Ruta a answer_study_recommendation preservando el flujo activo para reanudar después."""
+    return _decision(
+        intent="answer_academic_concept_question",
+        domain="guided_academic_support",
+        action="route",
+        route_name="answer_study_recommendation",
+        priority=6,
+        reason="academic_question_interrupts_active_block",
+        classification=classification,
+        scope_decision=policy,
+        confidence=max(classification.confidence, 0.80),
+        preserves_active_block=True,
+    )
 
 
 

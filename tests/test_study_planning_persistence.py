@@ -298,7 +298,7 @@ def test_persist_study_profile_does_not_persist_initial_priorities_or_plan(monke
     set_study_planning_persistence_service(planning_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -363,7 +363,7 @@ def test_build_study_plan_persists_recalculated_snapshot() -> None:
     set_study_planning_persistence_service(planning_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             student_profile={"persisted_student_id": 15},
             study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
             priorities={"status": "completed", "source": "manual"},
@@ -432,7 +432,7 @@ def test_phase_11_persists_only_generated_plan_after_priorities_completion(
 
         priorities_update = collect_priorities(state)
 
-        assert priorities_update["phase"] == "study_plan"
+        assert priorities_update["phase"] == "running"
         assert planning_repository._priority_profiles == {}
         assert planning_repository._study_plan_profiles == {}
 
@@ -464,7 +464,7 @@ def test_phase_11_does_not_materialize_plan_without_phase_12_flag(
     set_study_plan_materialization_service(materialization_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             student_profile={"persisted_student_id": 15},
             study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
             priorities={"status": "completed", "source": "manual"},
@@ -518,7 +518,7 @@ def test_phase_12_materializes_and_syncs_reminders_from_generated_plan(
     set_reminders_service(reminders_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             student_profile={"persisted_student_id": 15},
             study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
             priorities={"status": "completed", "source": "manual"},
@@ -584,7 +584,7 @@ def test_phase_12_repository_failures_do_not_break_conversation(
     set_study_planning_persistence_service(planning_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             student_profile={"persisted_student_id": 15},
             study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
             priorities={"status": "completed", "source": "manual"},
@@ -639,7 +639,7 @@ def test_phase_12_reminder_failure_keeps_materialized_plan(
     set_study_plan_materialization_service(materialization_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             student_profile={"persisted_student_id": 15},
             study_profile={"persisted_profile_id": 7, "top_techniques": ["pomodoro"]},
             priorities={"status": "completed", "source": "manual"},

@@ -7,7 +7,7 @@ from datetime import date, datetime as real_datetime
 from langchain_core.messages import HumanMessage
 
 import services.planning.materialization_service as materialization_module
-from agents.support.agent import _route_handle_academic_update, _route_welcome
+from agents.support.agent import _route_handle_academic_update, _route_entry
 from agents.support.dependencies import (
     set_academic_activity_persistence_service,
     set_tracking_service,
@@ -111,11 +111,11 @@ def test_end_phase_routes_academic_deadline_to_event_update() -> None:
         messages=[HumanMessage(content="Tengo parcial de calculo mañana")],
     )
 
-    assert _route_welcome(state) == "handle_academic_update"
+    assert _route_entry(state) == "handle_academic_update"
 
     try:
         update = handle_academic_update(state)
-        assert update["phase"] == "academic_activity_management"
+        assert update["phase"] == "running"
         assert update["interaction"]["confirmation_pending"] is True
 
         confirmation_state = _next_state(state, update, "si")
@@ -156,9 +156,9 @@ def test_academic_activity_missing_subject_uses_incremental_capture(monkeypatch)
     second_state = _next_state(state, first_update, "Calculo")
     second_update = handle_academic_update(second_state)
 
-    assert first_update["phase"] == "academic_activity_management"
+    assert first_update["phase"] == "running"
     assert first_update["interaction"]["missing_fields_json"] == ["subject_name"]
-    assert second_update["phase"] == "academic_activity_management"
+    assert second_update["phase"] == "running"
     assert second_update["interaction"]["confirmation_pending"] is True
     assert second_update["interaction"]["last_confirmation_payload"]["activity"]["due_date"] == "2026-04-24"
 
@@ -228,7 +228,7 @@ def test_end_phase_routes_and_tracks_completed_study_session(monkeypatch) -> Non
     )
 
     try:
-        assert _route_welcome(state) == "handle_academic_update"
+        assert _route_entry(state) == "handle_academic_update"
         update = handle_academic_update(state)
     finally:
         set_tracking_service(None)

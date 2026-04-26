@@ -167,7 +167,7 @@ def test_router_interprets_confirmation_pending_before_new_intent() -> None:
 def test_router_treats_pending_missing_field_as_missing_data_not_new_intent() -> None:
     decision = route_conversation_input(
         "viernes",
-        phase="study_plan",
+        phase="running",
         interaction={
             "active_intent": "register_academic_activity",
             "current_domain": "activity_management",
@@ -185,9 +185,10 @@ def test_router_treats_pending_missing_field_as_missing_data_not_new_intent() ->
 def test_router_does_not_mix_critical_command_with_pending_capture() -> None:
     decision = route_conversation_input(
         "borra esa actividad",
-        phase="study_plan",
+        phase="running",
         interaction={
             "active_intent": "register_academic_activity",
+            "active_subflow": "academic_activity_management",
             "current_domain": "activity_management",
             "missing_fields_json": ["fecha"],
         },

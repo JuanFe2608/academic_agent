@@ -58,9 +58,9 @@ def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp
     assert "Esto fue lo que entendí" in text
     assert "- Lunes: Calculo" in text
     assert "- Martes: Trabajo" in text
-    assert "¿Entendí bien tu horario?" in text
-    assert "escribe el número de la opción" in text.lower()
-    assert "1. Sí, está correcto" in text
+    # La pregunta de confirmación ya no va en el mensaje de imagen; la emite validate_schedule
+    assert "¿Entendí bien tu horario?" not in text
+    assert "1. Sí, está correcto" not in text
     rendered_image = update["messages"][0].content[1]["image_url"]["url"]
     assert not rendered_image.startswith("data:image")
     assert Path(rendered_image).exists()
@@ -124,7 +124,11 @@ def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_p
     update = render_schedule_preview(state)
 
     text = update["messages"][0].content[0]["text"]
-    assert "Encontré cruces" in text
+    # El mensaje de imagen solo lleva el resumen; los conflictos los emite validate_schedule
+    assert "Encontré cruces" not in text
     assert "Miércoles" in text
     assert "Programacion" in text
     assert "Trabajo" in text
+    # El review_stage queda correctamente seteado para que validate_schedule emita el conflicto
+    schedule_state_dict = update["schedule"]
+    assert schedule_state_dict.get("review_stage") == "awaiting_conflict_decision"

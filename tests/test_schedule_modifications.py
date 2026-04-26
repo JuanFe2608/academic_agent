@@ -13,6 +13,18 @@ from schemas.onboarding import StudentProfile
 from services.scheduling import ScheduleConflict, WeeklyScheduleBlock
 
 
+def _message_text(update: dict, idx: int = 0) -> str:
+    """Extrae el texto plano del mensaje del agente (soporta string y lista multimodal)."""
+    content = update["messages"][idx].content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return str(block.get("text", ""))
+    return ""
+
+
 def _academic_block(title: str = "Calculo") -> WeeklyScheduleBlock:
     return WeeklyScheduleBlock(
         block_type="academic",
@@ -87,7 +99,7 @@ def test_validate_schedule_confirmation_yes_requests_schedule_end_date() -> None
     assert update["awaiting_user_input"] is True
     assert update["schedule"]["review_stage"] == "awaiting_schedule_end_date"
     assert update["schedule"]["blocks"][0].user_confirmed is True
-    assert "fecha límite" in update["messages"][0].content.lower()
+    assert "fecha límite" in _message_text(update).lower()
 
 
 def test_validate_schedule_schedule_end_date_moves_to_persist(monkeypatch) -> None:
@@ -110,7 +122,6 @@ def test_validate_schedule_schedule_end_date_moves_to_persist(monkeypatch) -> No
     update = validate_schedule(state)
 
     assert update["phase"] == "schedule_persist"
-    assert update["events_validated"] is True
     assert update["schedule"]["schedule_end_date"] == "2026-06-30"
 
 
@@ -126,7 +137,7 @@ def test_validate_schedule_correction_menu_for_solo_estudio_hides_work() -> None
 
     update = validate_schedule(state)
 
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario académico" in prompt
     assert "actividades extracurriculares" in prompt
     assert "horario laboral" not in prompt
@@ -144,7 +155,7 @@ def test_validate_schedule_correction_menu_for_ambos_shows_work() -> None:
 
     update = validate_schedule(state)
 
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario académico" in prompt
     assert "horario laboral" in prompt
     assert "actividades extracurriculares" in prompt
@@ -168,7 +179,7 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_work()
     assert update["phase"] == "validate"
     assert update["schedule"]["review_stage"] == "section_awaiting_item_selection"
     assert update["schedule"]["correction_target"] == "work"
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario laboral actual" in prompt
     assert "trabajo" in prompt
     assert "elige el número" in prompt
@@ -213,14 +224,16 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_extrac
     assert update["phase"] == "validate"
     assert update["schedule"]["review_stage"] == "section_awaiting_item_selection"
     assert update["schedule"]["correction_target"] == "extracurricular"
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario extracurricular actual" in prompt
     assert "gimnasio" in prompt
     assert "elige el número" in prompt
     assert "envíame de nuevo solo las actividades" not in prompt
 
 
-def test_validate_schedule_no_input_does_not_duplicate_conflict_prompt() -> None:
+def test_validate_schedule_no_input_emits_conflict_prompt_with_avatar() -> None:
+    """Cuando no hay input nuevo y hay conflictos, validate_schedule emite el mensaje
+    de conflicto con avatar. La imagen del horario ya fue emitida por render_schedule_preview."""
     academic = _academic_block()
     work = _work_block()
     conflict = ScheduleConflict(
@@ -251,7 +264,9 @@ def test_validate_schedule_no_input_does_not_duplicate_conflict_prompt() -> None
     update = validate_schedule(state)
 
     assert update["awaiting_user_input"] is True
-    assert "messages" not in update
+    assert "messages" in update
+    prompt = _message_text(update).lower()
+    assert "encontré cruces" in prompt
 
 
 def test_validate_schedule_shared_item_edit_routes_to_draft_for_rerender() -> None:
@@ -313,7 +328,6 @@ def test_apply_schedule_correction_can_clear_extracurricular_section() -> None:
     )
     state = AgentState(
         phase="schedule_edit",
-        extras_has_any=True,
         extracurricular=[],
         schedule={
             "blocks": [_academic_block(), extracurricular],
@@ -325,7 +339,6 @@ def test_apply_schedule_correction_can_clear_extracurricular_section() -> None:
     update = apply_schedule_correction(state)
 
     assert update["phase"] == "draft"
-    assert update["extras_has_any"] is False
     assert all(block.block_type != "extracurricular" for block in update["schedule"]["blocks"])
 
 

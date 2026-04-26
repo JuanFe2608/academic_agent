@@ -31,7 +31,7 @@ def sync_study_todo_turn(state: AgentState) -> dict:
     if interaction.confirmation_pending and confirmation_payload.get("domain") == _TODO_SYNC_DOMAIN:
         if not has_new_input:
             return {
-                "phase": "todo_sync",
+                "phase": "running",
                 "awaiting_user_input": True,
             }
         return _handle_confirmation(
@@ -116,7 +116,7 @@ def _preview_and_prompt(
         "study_plan_profile_id": None,
     }
     return {
-        "phase": "todo_sync",
+        "phase": "running",
         "awaiting_user_input": True,
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),
@@ -141,7 +141,7 @@ def _handle_confirmation(
     decision = parse_yes_no(last_text)
     if decision is None:
         return {
-            "phase": "todo_sync",
+            "phase": "running",
             "awaiting_user_input": True,
             "user_message_count": current_count,
             "last_user_text": last_text,
@@ -361,6 +361,7 @@ def _confirmation_interaction(state: AgentState, payload: dict[str, object]) -> 
     return update_interaction_state(
         state,
         active_intent="sync_study_todo",
+        active_subflow="todo_sync",
         current_domain=_TODO_SYNC_DOMAIN,
         interaction_mode="confirmation",
         pending_action="confirm_study_todo_sync",
@@ -379,6 +380,7 @@ def _clear_interaction(state: AgentState) -> dict[str, object]:
     return update_interaction_state(
         state,
         active_intent=None,
+        active_subflow=None,
         current_domain=_TODO_SYNC_DOMAIN,
         interaction_mode="guided",
         pending_action=None,

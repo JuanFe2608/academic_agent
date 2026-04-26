@@ -7,22 +7,22 @@ from pathlib import Path
 from langchain_core.messages import HumanMessage
 
 import agents.support.nodes.parse_schedules_to_events.node as parse_node
-from agents.support.agent import _route_request_schedules
+from agents.support.agent import _route_collect_schedule
 from agents.support.nodes.request_schedules.node import request_schedules
 from agents.support.state import AgentState
 
 
-def test_route_request_schedules_requires_academic_first_for_ambos() -> None:
+def test_route_collect_schedule_requires_academic_first_for_ambos() -> None:
     state = AgentState(
         phase="schedules",
         student_profile={"occupation": "ambos"},
         raw_inputs={"horario_laboral_text": "Lunes a viernes de 7 am a 6 pm"},
     )
 
-    assert _route_request_schedules(state) == "request_schedules"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
-def test_route_request_schedules_when_all_text_ready_goes_parse() -> None:
+def test_route_collect_schedule_continues_when_all_text_ready() -> None:
     state = AgentState(
         phase="schedules",
         student_profile={"occupation": "ambos"},
@@ -32,7 +32,7 @@ def test_route_request_schedules_when_all_text_ready_goes_parse() -> None:
         },
     )
 
-    assert _route_request_schedules(state) == "parse_schedules_to_events"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
 def test_request_schedules_prompts_for_three_options_when_missing() -> None:

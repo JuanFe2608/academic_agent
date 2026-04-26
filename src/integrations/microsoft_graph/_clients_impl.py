@@ -321,7 +321,13 @@ class UrllibMicrosoftGraphTransport:
 
         if not body.strip():
             return {}
-        decoded = json.loads(body)
+        try:
+            decoded = json.loads(body)
+        except json.JSONDecodeError as exc:
+            raise MicrosoftGraphClientError(
+                error_code="microsoft_graph_invalid_json",
+                detail=f"Respuesta no es JSON válido: {body[:200]}",
+            ) from exc
         if not isinstance(decoded, dict):
             raise MicrosoftGraphClientError(
                 error_code="microsoft_graph_invalid_payload",

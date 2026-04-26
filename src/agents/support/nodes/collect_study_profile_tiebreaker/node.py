@@ -55,7 +55,7 @@ def collect_study_profile_tiebreaker(state: AgentState) -> dict:
         study_profile["tiebreaker"] = tiebreaker
         return {
             "study_profile": study_profile,
-            "phase": "study_profile_tiebreaker",
+            "phase": "study_profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
@@ -90,7 +90,7 @@ def collect_study_profile_tiebreaker(state: AgentState) -> dict:
         study_profile["tiebreaker"] = tiebreaker
         return {
             "study_profile": study_profile,
-            "phase": "study_profile_tiebreaker",
+            "phase": "study_profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
@@ -125,7 +125,7 @@ def collect_study_profile_tiebreaker(state: AgentState) -> dict:
         study_profile["tiebreaker"] = tiebreaker
         return {
             "study_profile": study_profile,
-            "phase": "study_profile_tiebreaker",
+            "phase": "study_profile",
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
@@ -186,7 +186,7 @@ def _finalize_tiebreaker(
     study_profile["completed_at"] = completed_at
     update = {
         "study_profile": study_profile,
-        "phase": "study_profile_persist",
+        "phase": "study_profile",
         "awaiting_user_input": False,
         "messages": append_message(
             messages,

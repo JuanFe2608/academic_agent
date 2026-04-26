@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.agent import _route_welcome
+from agents.support.agent import _route_entry
 from agents.support.nodes.guided_academic_support import guided_academic_support
 from agents.support.state import AgentState
 from services.conversation.guided_academic_support import (
@@ -95,7 +95,7 @@ def test_guided_academic_support_node_stores_pending_context() -> None:
 
     update = guided_academic_support(state)
 
-    assert update["phase"] == "guided_academic_support"
+    assert update["phase"] == "running"
     assert update["awaiting_user_input"] is True
     assert update["interaction"]["active_intent"] == "request_guided_academic_help"
     assert update["interaction"]["current_domain"] == "guided_academic_support"
@@ -141,9 +141,10 @@ def test_router_sends_guided_help_to_node_but_preserves_calendar_active_block() 
     )
     calendar_active = route_conversation_input(
         "modo socratico para taller de calculo sobre derivadas",
-        phase="calendar_sync",
+        phase="running",
         interaction={
             "active_intent": "sync_study_calendar",
+            "active_subflow": "calendar_sync",
             "current_domain": "calendar_action",
         },
     )
@@ -162,4 +163,4 @@ def test_graph_welcome_routes_guided_help_to_guided_node() -> None:
         messages=[HumanMessage(content="Ayudame con este taller pero no me lo resuelvas")],
     )
 
-    assert _route_welcome(state) == "guided_academic_support"
+    assert _route_entry(state) == "guided_academic_support"

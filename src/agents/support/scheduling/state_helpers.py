@@ -16,7 +16,7 @@ from services.scheduling.models import (
     ensure_schedule_conflict,
     ensure_weekly_block,
 )
-from services.scheduling.event_projection import sync_schedule_block_events
+from services.scheduling.event_projection import blocks_to_schedule_events
 from services.scheduling.raw_input_sync import (
     sync_schedule_blocks_to_raw_inputs,
 )
@@ -93,15 +93,12 @@ def scheduling_state_to_update(
     normalized = ensure_scheduling_state(raw_state)
     return {
         "raw_inputs": raw_inputs_to_update(normalized.raw_inputs),
-        "extras_has_any": normalized.extras_has_any,
         "extras_collect_stage": normalized.extras_collect_stage,
         "extras_pending_is_variable": normalized.extras_pending_is_variable,
         "extras_pending_items": list(normalized.extras_pending_items),
         "academic_pending_items": list(normalized.academic_pending_items),
         "work_pending_items": list(normalized.work_pending_items),
         "extracurricular": list(normalized.extracurricular),
-        "events": list(normalized.events),
-        "events_validated": normalized.events_validated,
         "schedule_preview": normalized.schedule_preview.model_dump(mode="python"),
         "schedule": schedule_flow_state_to_update(normalized.schedule),
     }
@@ -126,19 +123,10 @@ def update_scheduling_state(
     data = normalized.model_dump(mode="python")
     data.update(normalized_changes)
     updated = normalized.__class__(**data)
-    should_sync_schedule_events = (
-        "schedule" in normalized_changes
-        and "events" not in normalized_changes
-        and updated.schedule.blocks != normalized.schedule.blocks
-    )
 
     payload: dict[str, object] = {}
     for field_name in normalized_changes:
         payload[field_name] = _serialize_scheduling_field(updated, field_name)
-    if should_sync_schedule_events:
-        payload["events"] = list(
-            sync_schedule_block_events(normalized.events, updated.schedule.blocks)
-        )
     return payload
 
 
@@ -309,10 +297,6 @@ def _normalize_scheduling_changes(changes: dict[str, object]) -> dict[str, objec
         normalized["schedule_preview"] = ensure_schedule_preview(normalized["schedule_preview"])
     if "schedule" in normalized and normalized["schedule"] is not None:
         normalized["schedule"] = ensure_schedule_flow_state(normalized["schedule"])
-    if "events" in normalized and normalized["events"] is not None:
-        normalized["events"] = [
-            ensure_event(item) for item in list(normalized["events"])
-        ]
     if "extracurricular" in normalized and normalized["extracurricular"] is not None:
         normalized["extracurricular"] = [
             ensure_extracurricular_item(item)

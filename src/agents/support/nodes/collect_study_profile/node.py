@@ -3,6 +3,12 @@
 from __future__ import annotations
 
 from agents.support.dependencies import get_personalization_service
+from agents.support.nodes.collect_study_profile_tiebreaker.node import (
+    collect_study_profile_tiebreaker as _collect_tiebreaker,
+)
+from agents.support.nodes.persist_study_profile.node import (
+    persist_study_profile as _persist_study_profile,
+)
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
 from services.personalization import (
@@ -12,11 +18,24 @@ from services.personalization import (
     parse_likert_answer,
 )
 from services.personalization.runtime import coerce_int_answer_map, current_timestamp
+from utils.avatar_assets import AVATAR_TE_ESCUCHO, with_avatar
 
 from .prompt import build_question_prompt
 
 
 def collect_study_profile(state: AgentState) -> dict:
+    """Despacha al paso correcto del Radar según study_profile.status."""
+
+    study_profile = state.planning_state.study_profile
+    status = study_profile.status or "collecting"
+    if status == "tiebreaker_collecting":
+        return _collect_tiebreaker(state)
+    if status == "completed" and not study_profile.persisted_profile_id:
+        return _persist_study_profile(state)
+    return _do_collect_study_profile(state)
+
+
+def _do_collect_study_profile(state: AgentState) -> dict:
     """Pregunta una afirmacion a la vez y deriva a desempate si hace falta."""
 
     messages = state.get("messages", [])
@@ -47,6 +66,14 @@ def collect_study_profile(state: AgentState) -> dict:
         study_profile["scoring_version"] = config.scoring_version
         study_profile["current_question_index"] = current_index
         study_profile["answers"] = answers
+        is_intro = current_index == 0 and not answers
+        question_content = build_question_prompt(
+            question,
+            question_number=current_index + 1,
+            total_questions=total_questions,
+            include_intro=is_intro,
+            answered_count=len(answers),
+        )
         return {
             "study_profile": study_profile,
             "phase": "study_profile",
@@ -54,13 +81,7 @@ def collect_study_profile(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                build_question_prompt(
-                    question,
-                    question_number=current_index + 1,
-                    total_questions=total_questions,
-                    include_intro=current_index == 0 and not answers,
-                    answered_count=len(answers),
-                ),
+                with_avatar(question_content, AVATAR_TE_ESCUCHO) if is_intro else question_content,
             ),
         }
 
@@ -159,7 +180,7 @@ def _apply_main_result(
         study_profile["completed_at"] = None
         update = {
             "study_profile": study_profile,
-            "phase": "study_profile_tiebreaker",
+            "phase": "study_profile",
             "awaiting_user_input": False,
         }
     else:
@@ -167,7 +188,7 @@ def _apply_main_result(
         study_profile["completed_at"] = current_timestamp(state.get("timezone"))
         update = {
             "study_profile": study_profile,
-            "phase": "study_profile_persist",
+            "phase": "study_profile",
             "awaiting_user_input": False,
             "messages": append_message(
                 messages,

@@ -257,7 +257,7 @@ def test_persist_study_profile_closes_without_generating_study_plan(
     try:
         study_profile = _completed_profile_payload()
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -300,7 +300,7 @@ def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
     try:
         study_profile = _completed_profile_payload()
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -352,7 +352,7 @@ def test_persist_study_profile_keeps_rag_guidance_complete_without_ellipsis(
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -387,7 +387,7 @@ def test_persist_study_profile_keeps_base_summary_when_rag_service_is_not_ready(
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -414,7 +414,7 @@ def test_build_study_plan_adds_rag_session_guidance_when_service_is_ready() -> N
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             study_profile={
                 "top_techniques": ["pomodoro", "feynman"],
                 "weakness_tags": ["procrastination", "distraction"],
@@ -459,7 +459,7 @@ def test_build_study_plan_adds_applied_method_guidance_for_pending_activity() ->
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             study_profile={
                 "top_techniques": ["pomodoro"],
                 "weakness_tags": ["procrastination"],
@@ -513,7 +513,7 @@ def test_build_study_plan_skips_rag_session_guidance_when_sources_do_not_match_p
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             study_profile={
                 "top_techniques": ["feynman", "active_recall"],
                 "weakness_tags": ["explanation_gap", "passive_review_dependence"],
@@ -565,7 +565,7 @@ def test_build_study_plan_keeps_full_rag_session_guidance_without_extra_truncati
     set_study_recommendation_service(recommendation_service)
     try:
         state = AgentState(
-            phase="study_plan",
+            phase="running",
             study_profile={
                 "top_techniques": ["pomodoro"],
                 "weakness_tags": ["procrastination"],

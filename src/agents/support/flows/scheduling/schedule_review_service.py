@@ -15,6 +15,7 @@ from agents.support.nodes.utils import (
 )
 from agents.support.runtime_state_helpers import update_conversation_state
 from agents.support.scheduling import (
+    build_conflict_message,
     build_section_summary,
     normalize_schedule_section,
     replace_section_blocks,
@@ -58,6 +59,13 @@ from .section_confirmation_service import (
     handle_section_review_turn,
     has_active_section_review,
     start_section_review,
+)
+
+_CONFIRMATION_QUESTION = (
+    "✅ ¿Entendí bien tu horario?\n"
+    "(Escribe el número de la opción que quieres elegir)\n"
+    "1. Sí, está correcto\n"
+    "2. No, quiero corregir algo"
 )
 
 
@@ -111,6 +119,11 @@ def handle_schedule_review_turn(
         "awaiting_correction_target",
         "awaiting_correction_payload",
     }:
+        prompt: str | None = None
+        if stage == "awaiting_conflict_decision":
+            prompt = build_conflict_message(conflicts) or _CONFIRMATION_QUESTION
+        elif stage == "awaiting_confirmation":
+            prompt = _CONFIRMATION_QUESTION
         return _build_schedule_review_update(
             state,
             schedule=update_schedule_flow_state(schedule_state),
@@ -118,6 +131,7 @@ def handle_schedule_review_turn(
             current_count=state.get("user_message_count", 0),
             last_text=state.get("last_user_text"),
             awaiting_user_input=True,
+            prompt=prompt,
         )
 
     if has_active_section_review(state) and str(correction_target or "") in {
@@ -252,7 +266,6 @@ def handle_schedule_review_turn(
                 schedule_end_date=parsed_end_date.isoformat(),
                 review_stage="idle",
             ),
-            events_validated=True,
             phase="schedule_persist",
             current_count=current_count,
             last_text=last_text,
@@ -333,7 +346,6 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
             state,
             schedule=_reset_schedule_review_state(schedule_state, updated_blocks),
             extracurricular=[],
-            extras_has_any=False,
             extras_pending_items=[],
             phase="draft",
             current_count=state.get("user_message_count", 0),
@@ -370,7 +382,6 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
                     updated_schedule_blocks,
                 ),
                 extracurricular=merged_items,
-                extras_has_any=bool(merged_items),
                 extras_pending_items=[],
                 phase="draft",
                 current_count=state.get("user_message_count", 0),
@@ -508,7 +519,6 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
                     review_stage="awaiting_correction_payload",
                 ),
                 extracurricular=section_result.extracurricular_items,
-                extras_has_any=bool(section_result.extracurricular_items),
                 extras_pending_items=section_result.pending_extracurricular_items,
                 phase="validate",
                 current_count=state.get("user_message_count", 0),
@@ -631,7 +641,6 @@ def apply_schedule_correction_turn(state: AgentState) -> dict:
     elif target == "extracurricular":
         items, _ = parse_extracurricular_items(text, expected_is_variable=False)
         update["extracurricular"] = items
-        update["extras_has_any"] = bool(items)
     return update
 
 

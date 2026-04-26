@@ -35,7 +35,6 @@ def test_agent_state_partitions_expose_typed_domain_views() -> None:
                 "due_date": "2026-04-24",
             }
         ],
-        extras_has_any=True,
     )
 
     partitions = state.partitions
@@ -45,7 +44,6 @@ def test_agent_state_partitions_expose_typed_domain_views() -> None:
     assert partitions.interaction.current_domain == "agenda"
     assert partitions.onboarding.student_profile.full_name == "Ana Perez"
     assert partitions.scheduling.raw_inputs.horario_academico_text == "Lunes 08:00-10:00 Algebra"
-    assert partitions.scheduling.extras_has_any is True
     assert partitions.scheduling.schedule.capture_target == "academic"
     assert partitions.planning.academic_activities[0].subject_name == "Algebra"
     assert partitions.planning.study_profile.status == "collecting"
@@ -62,7 +60,6 @@ def test_restart_payload_for_new_attempt_resets_domain_state_without_breaking_ru
         student_profile={"full_name": "Ana Perez"},
         raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
         study_profile={"status": "completed", "top_techniques": ["pomodoro"]},
-        extras_has_any=True,
         profile_edit_target="awaiting_field",
     )
 
@@ -100,7 +97,7 @@ def test_make_initial_state_accepts_timezone_override() -> None:
 def test_agent_state_exposes_derivation_candidates_for_legacy_fields() -> None:
     candidates = AgentState.derivation_candidates()
 
-    assert set(candidates) == {"events", "events_validated", "extras_has_any"}
+    assert set(candidates) == {"events"}
     assert "schedule.blocks" in candidates["events"]
 
 
@@ -147,7 +144,6 @@ def test_update_scheduling_state_validates_and_serializes_only_changed_fields() 
         state,
         raw_inputs={"horario_academico_text": "Martes 10:00-12:00 Fisica"},
         schedule={"capture_target": "work", "capture_stage": "awaiting_more"},
-        extras_has_any=False,
         events=[
             {
                 "id": "evt-1",
@@ -173,13 +169,11 @@ def test_update_scheduling_state_validates_and_serializes_only_changed_fields() 
     assert set(update) == {
         "raw_inputs",
         "schedule",
-        "extras_has_any",
         "events",
         "extras_pending_items",
     }
     assert update["raw_inputs"]["horario_academico_text"] == "Martes 10:00-12:00 Fisica"
     assert update["schedule"]["capture_target"] == "work"
     assert update["schedule"]["capture_stage"] == "awaiting_more"
-    assert update["extras_has_any"] is False
     assert update["events"][0].titulo == "Fisica"
     assert update["extras_pending_items"][0].nombre == "Gimnasio"

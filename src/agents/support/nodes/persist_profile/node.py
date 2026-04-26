@@ -30,6 +30,7 @@ def persist_profile(state: AgentState) -> dict:
     if result.persisted:
         profile["persisted_student_id"] = result.student_id
         onboarding["persistence_error"] = None
+        onboarding["profile_stage"] = "collecting"
         return {
             "student_profile": profile,
             "onboarding": onboarding,
@@ -42,15 +43,9 @@ def persist_profile(state: AgentState) -> dict:
     if result.error_code == "duplicate_email":
         profile["institutional_email"] = None
         profile["email_verified"] = False
-        onboarding["email_verification"] = {
-            "status": "idle",
-            "attempts": 0,
-            "resend_count": 0,
-            "expires_at": None,
-            "last_error": "duplicate_email",
-        }
+        onboarding["profile_stage"] = "collecting"
         prompt = (
-            "Ese correo institucional ya esta registrado, asi que necesito uno distinto.\n"
+            "Ese correo Microsoft ya esta registrado, necesito uno distinto.\n"
             f"{build_field_prompt('institutional_email', config)}"
         )
         return {
@@ -63,6 +58,7 @@ def persist_profile(state: AgentState) -> dict:
 
     if result.error_code == "duplicate_student_code":
         profile["student_code"] = None
+        onboarding["profile_stage"] = "collecting"
         prompt = (
             "Ese codigo estudiantil ya esta registrado en el sistema.\n"
             f"{build_field_prompt('student_code', config)}"
@@ -75,23 +71,11 @@ def persist_profile(state: AgentState) -> dict:
             "messages": append_message(messages, "assistant", prompt),
         }
 
-    if result.error_code == "email_not_verified":
-        return {
-            "student_profile": profile,
-            "onboarding": onboarding,
-            "phase": "email_verification",
-            "awaiting_user_input": True,
-            "messages": append_message(
-                messages,
-                "assistant",
-                result.detail or "Aun necesito verificar tu correo institucional.",
-            ),
-        }
-
+    onboarding["profile_stage"] = "confirming"
     return {
         "student_profile": profile,
         "onboarding": onboarding,
-        "phase": "profile_confirm",
+        "phase": "profile",
         "awaiting_user_input": True,
         "messages": append_message(
             messages,

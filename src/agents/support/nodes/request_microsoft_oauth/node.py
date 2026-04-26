@@ -148,6 +148,7 @@ def request_microsoft_oauth(state: AgentState) -> dict:
         )
         interaction["is_waiting_for_oauth"] = False
         interaction["current_step"] = None
+        profile["email_verified"] = True
         calendar = dict(state.get("calendar", {}))
         calendar.update({"provider": "outlook", "authorized": True})
         return {
@@ -230,6 +231,7 @@ def request_microsoft_oauth(state: AgentState) -> dict:
         )
         interaction["is_waiting_for_oauth"] = False
         interaction["current_step"] = None
+        profile["email_verified"] = True
         return {
             "student_profile": profile,
             "onboarding": onboarding,
@@ -291,12 +293,12 @@ def request_microsoft_oauth(state: AgentState) -> dict:
 
 
 def _profile_ready_for_oauth(profile: dict[str, Any]) -> bool:
+    """Verifica que el email este ingresado (aun no verificado — la verificacion la hace OAuth)."""
     return bool(
         profile.get("full_name")
         and profile.get("student_code")
         and profile.get("age")
         and profile.get("institutional_email")
-        and profile.get("email_verified")
     )
 
 
@@ -336,9 +338,17 @@ def _oauth_state(
 
 def _authorization_message(authorization_url: str) -> str:
     return (
-        "Para sincronizar tu calendario y recordatorios necesito que autorices "
-        "el acceso con Microsoft.\n"
-        f"Abre este enlace seguro y completa el inicio de sesion:\n{authorization_url}\n"
+        "📅 Necesito conectar tu cuenta Microsoft conmigo.\n\n"
+        "Para ayudarte a organizar tu tiempo y planificar tus actividades academicas, "
+        "necesito acceso a tu calendario y tareas (To Do).\n\n"
+        "Esto me permitira:\n"
+        "🗓️ Crear eventos en tu calendario academico\n"
+        "✅ Registrar tareas y recordatorios de estudio\n"
+        "⏰ Ayudarte a gestionar mejor tus tiempos y entregas\n\n"
+        "🔒 Tu informacion es segura:\n"
+        "Solo usare estos permisos para apoyarte en tu planificacion academica.\n\n"
+        "Toca el link para iniciar sesion en Microsoft y autorizar el acceso:\n"
+        f"🔗 {authorization_url}\n\n"
         "Cuando termines, vuelve aqui y escribe listo. Si el enlace vence, escribe reintentar."
     )
 
@@ -346,14 +356,15 @@ def _authorization_message(authorization_url: str) -> str:
 def _pending_message(authorization_url: str, *, user_claims_done: bool) -> str:
     if user_claims_done:
         return (
-            "Aun no veo la conexion Microsoft confirmada. Revisa si terminaste "
-            "la autorizacion en el navegador.\n"
-            f"Puedes usar este enlace:\n{authorization_url}\n"
-            "Si vencio o fallo, escribe reintentar."
+            "Aun no veo la conexion Microsoft confirmada. "
+            "Revisa que hayas completado el inicio de sesion en el navegador.\n\n"
+            f"🔗 {authorization_url}\n\n"
+            "Si el enlace vencio o fallo, escribe reintentar."
         )
     return (
-        "Sigo esperando la autorizacion de Microsoft.\n"
-        f"Usa este enlace:\n{authorization_url}\n"
+        "Sigo esperando la autorizacion de Microsoft. "
+        "Usa este enlace para completar el acceso:\n\n"
+        f"🔗 {authorization_url}\n\n"
         "Cuando termines, escribe listo. Si vencio o fallo, escribe reintentar."
     )
 

@@ -6,6 +6,7 @@ from agents.support.dependencies import get_study_recommendation_service
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
 from schemas.rag import StudyRecommendationQuery
+from utils.avatar_assets import AVATAR_HORA_DE_ESTUDIAR, with_avatar
 from services.study_recommendations import (
     AppliedStudyMethodService,
     build_applied_method_request_from_text,
@@ -46,20 +47,52 @@ def answer_study_recommendation(state: AgentState) -> dict:
                     max_chunks=4,
                 )
             )
-            answer = result.answer.strip()
+            if result.confidence == "baja":
+                answer = _answer_academic_concept_with_llm(last_text) or result.answer.strip()
+            else:
+                answer = result.answer.strip()
     except Exception:
         answer = (
             "No pude preparar una respuesta confiable sobre esa tecnica en este momento. "
             "Puedes intentar de nuevo con una tecnica o metodo de estudio mas especifico."
         )
 
+    # Si el nodo fue llamado durante un flujo activo (interrupción), reanudar esa fase.
+    # Si vino desde "running" o sin fase, cerrar normalmente.
+    current_phase = str(state.get("phase") or "end")
+    return_phase = current_phase if current_phase not in {"running", "end", ""} else "end"
+
     return {
-        "phase": "end",
+        "phase": return_phase,
         "user_message_count": current_count,
         "last_user_text": last_text,
-        "awaiting_user_input": False,
-        "messages": append_message(messages, "assistant", answer),
+        "awaiting_user_input": return_phase != "end",
+        "messages": append_message(messages, "assistant", with_avatar(answer, AVATAR_HORA_DE_ESTUDIAR)),
     }
+
+
+def _answer_academic_concept_with_llm(text: str) -> str | None:
+    """Responde una pregunta conceptual académica directamente con LLM cuando el RAG no tiene fuentes."""
+    from integrations.ai._llm_impl import maybe_get_llm
+    from langchain_core.messages import HumanMessage, SystemMessage
+
+    llm = maybe_get_llm(temperature=0.3)
+    if not llm:
+        return None
+    try:
+        response = llm.bind(max_tokens=400).invoke([
+            SystemMessage(content=(
+                "Eres Lara, asistente académica universitaria. "
+                "Explica el concepto académico de forma clara y concisa en 3 a 5 oraciones. "
+                "NO resuelvas ejercicios, tareas ni evaluaciones. "
+                "Si la pregunta pide resolver algo concreto, indica al estudiante que consulte a su docente."
+            )),
+            HumanMessage(content=str(text or "").strip()),
+        ])
+        content = getattr(response, "content", "") or ""
+        return str(content).strip() or None
+    except Exception:
+        return None
 
 
 def _answer_applied_method_if_possible(

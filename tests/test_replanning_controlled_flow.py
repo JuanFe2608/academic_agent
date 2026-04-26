@@ -136,7 +136,7 @@ def test_replan_node_requires_confirmation_before_applying_and_then_persists() -
     try:
         assert _route_handle_academic_update(state) == "request_replan"
         proposal_update = handle_replan_turn(state)
-        assert proposal_update["phase"] == "replan"
+        assert proposal_update["phase"] == "running"
         assert proposal_update["awaiting_user_input"] is True
         assert proposal_update["interaction"]["confirmation_pending"] is True
         assert proposal_update["replan"]["status"] == "proposed"

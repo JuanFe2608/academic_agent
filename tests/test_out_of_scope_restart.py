@@ -6,7 +6,7 @@ from pathlib import Path
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.agent import _route_welcome
+from agents.support.agent import _route_entry
 from agents.support.nodes.welcome_consent.node import welcome_consent
 from agents.support.state import AgentState
 
@@ -20,7 +20,7 @@ def test_out_of_scope_message_routes_back_to_welcome_on_new_input() -> None:
         messages=[HumanMessage(content="hola")],
     )
 
-    assert _route_welcome(state) == "welcome_consent"
+    assert _route_entry(state) == "welcome_consent"
 
 
 def test_welcome_consent_resets_state_after_out_of_scope() -> None:

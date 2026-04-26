@@ -17,7 +17,11 @@ from .prompt import PROMPT
 
 
 def render_schedule_preview(state: AgentState) -> dict:
-    """Genera un resumen liviano y una imagen a partir de bloques semanales."""
+    """Genera un resumen liviano y una imagen a partir de bloques semanales.
+
+    Solo emite la imagen del horario con el resumen. La pregunta de confirmación
+    la emite validate_schedule en el turno siguiente, separando ambos mensajes.
+    """
 
     schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
     blocks = list(schedule_state.blocks)
@@ -35,19 +39,10 @@ def render_schedule_preview(state: AgentState) -> dict:
         if conflict_text and not schedule_state.conflicts_accepted
         else "awaiting_confirmation"
     )
-    question = (
-        conflict_text
-        if conflict_text and not schedule_state.conflicts_accepted
-        else (
-            "✅ ¿Entendí bien tu horario?\n"
-            "(Escribe el número de la opción que quieres elegir)\n"
-            "1. Sí, está correcto\n"
-            "2. No, quiero corregir algo"
-        )
-    )
-    text = f"{PROMPT}\n{summary_text}\n\n{question}".strip()
+
+    header = f"{PROMPT}\n{summary_text}".strip()
     message_content, image_path = build_rendered_schedule_message_content(
-        text,
+        header,
         blocks,
         timezone_name=timezone_name,
     )

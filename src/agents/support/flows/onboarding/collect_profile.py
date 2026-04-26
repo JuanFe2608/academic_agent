@@ -10,6 +10,8 @@ from agents.support.nodes.utils import (
 from agents.support.onboarding.messages import (
     PROFILE_FIELD_ORDER,
     build_field_prompt,
+    build_low_grade_confirmation_prompt,
+    build_low_grade_motivation_message,
     build_out_of_scope_program_message,
     build_student_code_scope_prompt,
     build_prompt_with_error,
@@ -92,8 +94,75 @@ def collect_profile(state: AgentState) -> dict:
             ),
         }
 
+    if onboarding.get("pending_low_grade_confirmation"):
+        decision = parse_yes_no(last_text or "") if has_new_input else None
+        low_grade_value = onboarding.get("pending_low_grade_value")
+        base_counts = {
+            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+        }
+        if decision is True:
+            profile["average_grade"] = low_grade_value
+            onboarding["pending_low_grade_confirmation"] = False
+            onboarding["pending_low_grade_value"] = None
+            slot_errors.pop("average_grade", None)
+            onboarding["slot_errors"] = slot_errors
+            missing_after = get_missing_profile_fields(profile)
+            next_field = missing_after[0] if missing_after else None
+            onboarding["current_field"] = next_field
+            motivation = build_low_grade_motivation_message()
+            if next_field:
+                msgs = append_message(messages, "assistant", motivation)
+                msgs = append_message(msgs, "assistant", build_field_prompt(next_field, config, get_first_name(profile)))
+                return {
+                    "student_profile": profile,
+                    "onboarding": onboarding,
+                    "user_status": "valid",
+                    "phase": "profile",
+                    **base_counts,
+                    "awaiting_user_input": True,
+                    "messages": msgs,
+                }
+            onboarding["profile_stage"] = "confirming"
+            return {
+                "student_profile": profile,
+                "onboarding": onboarding,
+                "user_status": "valid",
+                "phase": "profile",
+                **base_counts,
+                "awaiting_user_input": False,
+                "messages": append_message(messages, "assistant", motivation),
+            }
+        if decision is False:
+            onboarding["pending_low_grade_confirmation"] = False
+            onboarding["pending_low_grade_value"] = None
+            onboarding["slot_errors"] = slot_errors
+            return {
+                "student_profile": profile,
+                "onboarding": onboarding,
+                "phase": "profile",
+                **base_counts,
+                "awaiting_user_input": True,
+                "messages": append_message(
+                    messages,
+                    "assistant",
+                    build_field_prompt("average_grade", config, get_first_name(profile)),
+                ),
+            }
+        return {
+            "student_profile": profile,
+            "onboarding": onboarding,
+            "phase": "profile",
+            **base_counts,
+            "awaiting_user_input": True,
+            "messages": append_message(
+                messages,
+                "assistant",
+                build_low_grade_confirmation_prompt(low_grade_value or 0),
+            ),
+        }
+
     validation_failed = False
-    should_send_verification = False
     processed_fields: set[str] = set()
     extracted_slots_count = 0
 
@@ -110,6 +179,23 @@ def collect_profile(state: AgentState) -> dict:
             processed_fields.add(field)
             result = validate_profile_field(field, extraction.raw_slots[field], config)
             if result.is_valid:
+                if field == "average_grade" and isinstance(result.value, (int, float)) and result.value < 60:
+                    onboarding["pending_low_grade_confirmation"] = True
+                    onboarding["pending_low_grade_value"] = int(result.value)
+                    onboarding["slot_errors"] = slot_errors
+                    return {
+                        "student_profile": profile,
+                        "onboarding": onboarding,
+                        "phase": "profile",
+                        "user_message_count": current_count,
+                        "last_user_text": last_text,
+                        "awaiting_user_input": True,
+                        "messages": append_message(
+                            messages,
+                            "assistant",
+                            build_low_grade_confirmation_prompt(int(result.value)),
+                        ),
+                    }
                 _apply_profile_field(
                     profile,
                     onboarding,
@@ -118,8 +204,6 @@ def collect_profile(state: AgentState) -> dict:
                     config,
                 )
                 slot_errors.pop(field, None)
-                if field == "institutional_email":
-                    should_send_verification = True
                 continue
             slot_errors[field] = result.error or "invalid_field"
             if field == "student_code" and result.error == "unsupported_student_code":
@@ -151,10 +235,25 @@ def collect_profile(state: AgentState) -> dict:
     ):
         result = validate_profile_field(target_field, last_text, config)
         if result.is_valid:
+            if target_field == "average_grade" and isinstance(result.value, (int, float)) and result.value < 60:
+                onboarding["pending_low_grade_confirmation"] = True
+                onboarding["pending_low_grade_value"] = int(result.value)
+                onboarding["slot_errors"] = slot_errors
+                return {
+                    "student_profile": profile,
+                    "onboarding": onboarding,
+                    "phase": "profile",
+                    "user_message_count": current_count,
+                    "last_user_text": last_text,
+                    "awaiting_user_input": True,
+                    "messages": append_message(
+                        messages,
+                        "assistant",
+                        build_low_grade_confirmation_prompt(int(result.value)),
+                    ),
+                }
             _apply_profile_field(profile, onboarding, target_field, result.value, config)
             slot_errors.pop(target_field, None)
-            if target_field == "institutional_email":
-                should_send_verification = True
         else:
             slot_errors[target_field] = result.error or "invalid_field"
             if target_field == "student_code" and result.error == "unsupported_student_code":
@@ -185,16 +284,6 @@ def collect_profile(state: AgentState) -> dict:
     onboarding["current_field"] = next_field
     onboarding["slot_errors"] = slot_errors
 
-    if should_send_verification:
-        return {
-            "student_profile": profile,
-            "onboarding": onboarding,
-            "phase": "profile",
-            "user_message_count": current_count,
-            "last_user_text": last_text,
-            "awaiting_user_input": False,
-        }
-
     if next_field or validation_failed:
         prompt_field = target_field if validation_failed and target_field else next_field or "full_name"
         if validation_failed or (not validation_failed and prompt_field in slot_errors):
@@ -202,6 +291,7 @@ def collect_profile(state: AgentState) -> dict:
                 prompt_field,
                 config,
                 get_first_name(profile),
+                error_key=slot_errors.get(prompt_field),
             )
         else:
             prompt = build_field_prompt(
@@ -222,11 +312,12 @@ def collect_profile(state: AgentState) -> dict:
             "messages": append_message(messages, "assistant", prompt),
         }
 
+    onboarding["profile_stage"] = "confirming"
     return {
         "student_profile": profile,
         "onboarding": onboarding,
         "user_status": "valid",
-        "phase": "profile_confirm",
+        "phase": "profile",
         "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
         "last_user_text": last_text if has_new_input else state.get("last_user_text"),
         "awaiting_user_input": False,
@@ -245,11 +336,5 @@ def _apply_profile_field(
         profile["supported_program"] = True
         profile["academic_program"] = config.supported_program_name
     if field == "institutional_email":
+        # La verificación real ocurre vía OAuth; aquí solo se registra el campo.
         profile["email_verified"] = False
-        onboarding["email_verification"] = {
-            "status": "idle",
-            "attempts": 0,
-            "resend_count": 0,
-            "expires_at": None,
-            "last_error": None,
-        }

@@ -6,6 +6,13 @@ from .academic_activity_persistence_service import (
     PersistAcademicActivityResult,
     build_academic_activity_persistence_service,
 )
+from .academic_update_orchestrator import (
+    AcademicUpdateOrchestrator,
+    PriorityComputeResult,
+    build_academic_update_orchestrator,
+    reference_date,
+    reference_datetime,
+)
 from .academic_activity_service import (
     AcademicActivityApplyResult,
     AcademicActivityParseResult,
@@ -56,6 +63,10 @@ from .state_helpers import (
     ensure_study_profile,
     study_plan_state_to_update,
     update_study_plan_state,
+)
+from .study_plan_enrichment_service import (
+    StudyPlanEnrichmentService,
+    build_study_plan_enrichment_service,
 )
 from .study_plan_sync_service import StudyPlanSyncResult, sync_subjects_and_study_plan
 from .study_planning_service import build_initial_study_plan
@@ -113,4 +124,11 @@ __all__ = [
     "priority_update_text_for_activity",
     "render_activity_list",
     "update_study_plan_state",
+    "AcademicUpdateOrchestrator",
+    "PriorityComputeResult",
+    "StudyPlanEnrichmentService",
+    "build_academic_update_orchestrator",
+    "build_study_plan_enrichment_service",
+    "reference_date",
+    "reference_datetime",
 ]

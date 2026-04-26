@@ -74,6 +74,7 @@ class PrioritiesState(BaseSchemaModel):
     persistence_error: Optional[str] = None
     capture_stage: Optional[
         Literal[
+            "ask_context",
             "ask_update",
             "ask_top3",
             "ask_urgent_subjects",

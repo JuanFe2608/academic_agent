@@ -37,6 +37,5 @@ def build_schedule_draft_turn(state: AgentState) -> dict:
         ),
         "events": blocks_to_events(updated_blocks),
         "schedule_preview": {"text": summary_text, "image_path": None},
-        "events_validated": False,
         "phase": "validate",
     }

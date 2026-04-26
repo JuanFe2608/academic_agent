@@ -20,59 +20,54 @@ SECONDARY_WEIGHT = 40
 TIEBREAKER_BOOST_WEIGHT = 100
 
 LIKERT_OPTIONS = {
-    0: "Casi nunca",
-    1: "A veces",
-    2: "Me pasa seguido",
-    3: "Me pasa casi siempre",
+    0: "Nunca",
+    1: "Pocas veces",
+    2: "Seguido",
+    3: "Siempre",
 }
 
 LIKERT_ALIASES = {
-    0: {"0", "casi nunca", "nunca", "nunca o casi nunca"},
-    1: {"1", "a veces"},
-    2: {"2", "me pasa seguido", "seguido", "frecuentemente"},
-    3: {"3", "me pasa casi siempre", "casi siempre"},
+    0: {"0", "nunca", "casi nunca", "jamas", "jamás", "nunca o casi nunca"},
+    1: {"1", "pocas veces", "a veces", "rara vez", "raramente"},
+    2: {"2", "seguido", "me pasa seguido", "frecuentemente", "con frecuencia"},
+    3: {"3", "siempre", "casi siempre", "me pasa casi siempre"},
 }
 
 RADAR_INTRO = (
     "Vamos a activar tu Radar de estudio 🧭\n"
-    "Te haré 10 mini retos para detectar qué obstáculos aparecen cuando estudias "
+    "Te haré 10 preguntas para detectar qué obstáculos aparecen cuando estudias "
     "y qué técnicas pueden ayudarte más.\n"
     "No hay respuestas buenas o malas: la idea es entender cómo estudias hoy "
     "para construir un método más personalizado para ti.\n\n"
-    "Responde pensando en cómo has estudiado en las últimas 2 o 3 semanas.\n"
-    "Usa un número:\n"
-    "0 = Casi nunca\n"
-    "1 = A veces\n"
-    "2 = Me pasa seguido\n"
-    "3 = Me pasa casi siempre"
+    "Responde pensando en cómo has estudiado en las últimas 2 o 3 semanas."
 )
 
 QUESTION_OPTIONS_PROMPT = (
     "Responde con un número:\n"
-    "0 = Casi nunca\n"
-    "1 = A veces\n"
-    "2 = Me pasa seguido\n"
-    "3 = Me pasa casi siempre"
+    "0 = Nunca\n"
+    "1 = Pocas veces\n"
+    "2 = Seguido\n"
+    "3 = Siempre"
 )
 
 INVALID_ANSWER_PROMPT = (
     "Necesito que me respondas solo con un número del 0 al 3 para seguir con tu Radar 🧭\n"
-    "0 = Casi nunca\n"
-    "1 = A veces\n"
-    "2 = Me pasa seguido\n"
-    "3 = Me pasa casi siempre"
+    "0 = Nunca\n"
+    "1 = Pocas veces\n"
+    "2 = Seguido\n"
+    "3 = Siempre"
 )
 
 MICROFEEDBACK_BY_ANSWERED_COUNT = {
     1: "Bien, ya voy entendiendo cómo estudias 👌",
-    3: "Perfecto, continuemos con el siguiente reto.",
+    3: "Perfecto, continuemos con la siguiente pregunta.",
     5: "Buen avance, esto me ayuda a personalizar mejor tus recomendaciones.",
     7: "Vamos muy bien, ya casi completamos tu radar.",
     9: "Último tramo, una respuesta más y cierro tu radar.",
 }
 
 TIEBREAKER_INTRO = (
-    "Tu Radar quedó con señales bastante parejas, así que voy a hacerte 3 retos extra "
+    "Tu Radar quedó con señales bastante parejas, así que voy a hacerte 3 preguntas adicionales "
     "para afinar mejor tu perfil de estudio 🎯\n"
     "Con esto podré priorizar con más precisión las técnicas que más te pueden ayudar.\n\n"
     "Responde con un número del 1 al 4."
@@ -85,7 +80,7 @@ TIEBREAKER_INVALID_ANSWER_PROMPT = (
 
 TIEBREAKER_MICROFEEDBACK_BY_ANSWERED_COUNT = {
     1: "Bien, esto ya me da una pista mucho más clara 👌",
-    2: "Perfecto, voy con el último reto extra.",
+    2: "Perfecto, voy con la última pregunta adicional.",
 }
 
 
@@ -188,8 +183,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Encender el modo estudio",
         challenge_emoji="🚀",
         prompt=(
-            "Cuando sé que tengo cosas pendientes, me cuesta dar el primer paso y "
-            "empezar a estudiar."
+            "Cuando tengo actividades académicas pendientes, me cuesta iniciar y dar "
+            "el primer paso para estudiar."
         ),
         technique_id="pomodoro",
         technique_weights=_weights("pomodoro"),
@@ -200,8 +195,9 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Mantener el foco",
         challenge_emoji="🎯",
         prompt=(
-            "Cuando estudio, pierdo la concentración con facilidad por el celular, "
-            "redes sociales o interrupciones."
+            "Cuando estudio, pierdo la concentración con facilidad, ya sea por "
+            "distracciones externas como el celular o redes sociales, o porque mi "
+            "mente se dispersa."
         ),
         technique_id="pomodoro",
         technique_weights=_weights("pomodoro"),
@@ -212,8 +208,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Explicar para entender",
         challenge_emoji="🗣️",
         prompt=(
-            "Después de estudiar un tema, me cuesta explicarlo con mis propias "
-            "palabras de forma clara."
+            "Después de estudiar un tema, suele pasarme que no logro explicarlo con "
+            "mis propias palabras de forma clara."
         ),
         technique_id="feynman",
         technique_weights=_weights("feynman", "active_recall"),
@@ -224,8 +220,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Recordar sin mirar",
         challenge_emoji="🧠",
         prompt=(
-            "Cuando repaso, dependo mucho de releer o subrayar, pero me cuesta "
-            "responder sin mirar los apuntes."
+            "Cuando repaso, suelo limitarme a releer o subrayar, y después se me "
+            "dificulta responder preguntas sin mirar los apuntes."
         ),
         technique_id="active_recall",
         technique_weights=_weights("active_recall"),
@@ -237,7 +233,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_emoji="📝",
         prompt=(
             "Mis apuntes no me ayudan mucho a repasar después, porque me cuesta "
-            "encontrar ideas clave, preguntas importantes o resúmenes claros."
+            "identificar ideas clave, conexiones entre temas, preguntas importantes "
+            "o resúmenes claros."
         ),
         technique_id="cornell",
         technique_weights=_weights("cornell", "active_recall"),
@@ -248,8 +245,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Ver el mapa completo",
         challenge_emoji="🗺️",
         prompt=(
-            "Cuando un tema es amplio o teórico, me cuesta organizar las ideas y "
-            "entender cómo se conectan entre sí."
+            "Cuando un tema es amplio o teórico, me cuesta organizar las ideas, "
+            "recordar sus significados principales y entender cómo se conectan entre sí."
         ),
         technique_id="mapas_conceptuales",
         technique_weights=_weights("mapas_conceptuales"),
@@ -272,7 +269,7 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="No olvidar tan rápido",
         challenge_emoji="⏳",
         prompt=(
-            "Si no repaso un tema después de varios días, olvido rápido gran parte "
+            "Cuando pasan varios días sin repasar un tema, suelo olvidar gran parte "
             "de lo que había estudiado."
         ),
         technique_id="repeticion_espaciada",
@@ -296,8 +293,8 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
         challenge_title="Cambiar de chip",
         challenge_emoji="🔄",
         prompt=(
-            "Cuando cambio entre materias o entre tipos de problemas, me cuesta "
-            "identificar qué enfoque o procedimiento usar en cada caso."
+            "Cuando cambio de una materia a otra, o de un tipo de ejercicio a otro, "
+            "me cuesta reconocer qué procedimiento, fórmula o estrategia debo usar."
         ),
         technique_id="interleaving",
         technique_weights=_weights("interleaving"),
@@ -308,7 +305,7 @@ QUESTIONS: tuple[QuestionDefinition, ...] = (
 TIEBREAKER_QUESTIONS: tuple[TiebreakerQuestionDefinition, ...] = (
     TiebreakerQuestionDefinition(
         question_id="TB01",
-        challenge_title="Reto extra 1 · ¿Qué te frena más?",
+        challenge_title="Pregunta adicional 1 · ¿Qué te frena más?",
         challenge_emoji="🚦",
         prompt="Cuando vas a estudiar, ¿qué sientes que más te frena en este momento?",
         options=[
@@ -336,7 +333,7 @@ TIEBREAKER_QUESTIONS: tuple[TiebreakerQuestionDefinition, ...] = (
     ),
     TiebreakerQuestionDefinition(
         question_id="TB02",
-        challenge_title="Reto extra 2 · ¿Dónde se enreda más el estudio?",
+        challenge_title="Pregunta adicional 2 · ¿Dónde se enreda más el estudio?",
         challenge_emoji="🧩",
         prompt="¿En cuál de estas situaciones sientes más dificultad?",
         options=[
@@ -364,7 +361,7 @@ TIEBREAKER_QUESTIONS: tuple[TiebreakerQuestionDefinition, ...] = (
     ),
     TiebreakerQuestionDefinition(
         question_id="TB03",
-        challenge_title="Reto extra 3 · Cambiar de estrategia",
+        challenge_title="Pregunta adicional 3 · Cambiar de estrategia",
         challenge_emoji="🔄",
         prompt="Cuando estudias varias materias o tipos de ejercicios, ¿qué te cuesta más?",
         options=[

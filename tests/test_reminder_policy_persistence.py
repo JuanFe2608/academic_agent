@@ -94,7 +94,7 @@ def test_persist_study_profile_does_not_sync_reminders_after_radar(monkeypatch) 
     set_reminders_service(reminders_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,

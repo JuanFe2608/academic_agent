@@ -8,11 +8,10 @@ import agents.support.agent as agent_module
 from agents.support.agent import (
     _route_after_fixed_schedule_management,
     _route_after_schedule_repair,
-    _route_after_schedule_edit,
-    _route_after_parse_schedules,
     _route_collect_profile,
-    _route_welcome,
-    _route_validate,
+    _route_collect_schedule,
+    _route_entry,
+    _route_running,
     _should_wait,
 )
 from agents.support.state import AgentState
@@ -35,43 +34,43 @@ def test_should_wait_in_extras_with_stale_image_message() -> None:
     assert _should_wait(state) is True
 
 
-def test_route_after_schedule_edit_returns_end_when_waiting() -> None:
+def test_route_collect_schedule_returns_end_when_waiting() -> None:
     state = AgentState(
         phase="validate",
         awaiting_user_input=True,
     )
 
-    assert _route_after_schedule_edit(state) == "end"
+    assert _route_collect_schedule(state) == "end"
 
 
-def test_route_after_schedule_edit_returns_to_validate_when_node_requests_it() -> None:
+def test_route_collect_schedule_continues_on_validate_phase() -> None:
     state = AgentState(
         phase="validate",
         awaiting_user_input=False,
     )
 
-    assert _route_after_schedule_edit(state) == "validate_schedule"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
-def test_route_after_schedule_edit_returns_draft_when_rebuild_is_needed() -> None:
+def test_route_collect_schedule_continues_on_draft_phase() -> None:
     state = AgentState(
         phase="draft",
         awaiting_user_input=False,
     )
 
-    assert _route_after_schedule_edit(state) == "build_draft_schedule"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
-def test_route_validate_goes_to_schedule_edit_when_requested() -> None:
+def test_route_collect_schedule_continues_on_schedule_edit_phase() -> None:
     state = AgentState(phase="schedule_edit", awaiting_user_input=False)
 
-    assert _route_validate(state) == "apply_schedule_correction"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
-def test_route_validate_goes_to_draft_rebuild_when_requested() -> None:
-    state = AgentState(phase="draft", awaiting_user_input=False)
+def test_route_collect_schedule_continues_on_schedules_phase() -> None:
+    state = AgentState(phase="schedules", awaiting_user_input=False)
 
-    assert _route_validate(state) == "build_draft_schedule"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
 def test_route_collect_profile_stops_when_user_is_out_of_scope() -> None:
@@ -85,7 +84,7 @@ def test_route_collect_profile_stops_when_user_is_out_of_scope() -> None:
     assert _route_collect_profile(state) == "end"
 
 
-def test_route_after_parse_schedules_stops_when_academic_needs_clarification() -> None:
+def test_route_collect_schedule_stops_when_waiting_for_clarification() -> None:
     state = AgentState(
         phase="schedules",
         awaiting_user_input=True,
@@ -100,19 +99,19 @@ def test_route_after_parse_schedules_stops_when_academic_needs_clarification() -
         ],
     )
 
-    assert _route_after_parse_schedules(state) == "end"
+    assert _route_collect_schedule(state) == "end"
 
 
-def test_route_after_parse_schedules_only_moves_to_extras_when_parse_completed() -> None:
+def test_route_collect_schedule_continues_on_extras_phase() -> None:
     state = AgentState(
         phase="extras",
         awaiting_user_input=False,
     )
 
-    assert _route_after_parse_schedules(state) == "ask_extracurricular"
+    assert _route_collect_schedule(state) == "collect_schedule"
 
 
-def test_route_welcome_reopens_with_schedule_renewal_when_expired_and_user_writes(
+def test_route_entry_reopens_with_schedule_renewal_when_expired_and_user_writes(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: True)
@@ -124,10 +123,11 @@ def test_route_welcome_reopens_with_schedule_renewal_when_expired_and_user_write
         student_profile={"persisted_student_id": 1},
     )
 
-    assert _route_welcome(state) == "renew_fixed_schedule"
+    assert _route_entry(state) == "running_handler"
+    assert _route_running(state) == "renew_fixed_schedule"
 
 
-def test_route_welcome_reopens_with_schedule_repair_when_drift_pending(
+def test_route_entry_reopens_with_schedule_repair_when_drift_pending(
     monkeypatch,
 ) -> None:
     monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
@@ -140,10 +140,11 @@ def test_route_welcome_reopens_with_schedule_repair_when_drift_pending(
         student_profile={"persisted_student_id": 1},
     )
 
-    assert _route_welcome(state) == "repair_fixed_schedule"
+    assert _route_entry(state) == "running_handler"
+    assert _route_running(state) == "repair_fixed_schedule"
 
 
-def test_route_welcome_routes_prioritization_request_when_post_radar_flag_enabled(
+def test_route_entry_routes_prioritization_request_when_post_radar_flag_enabled(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
@@ -156,10 +157,11 @@ def test_route_welcome_routes_prioritization_request_when_post_radar_flag_enable
         messages=[HumanMessage(content="quiero priorizar mis materias")],
     )
 
-    assert _route_welcome(state) == "collect_priorities"
+    assert _route_entry(state) == "running_handler"
+    assert _route_running(state) == "collect_priorities"
 
 
-def test_route_welcome_blocks_prioritization_request_without_post_radar_flag(
+def test_route_entry_blocks_prioritization_request_without_post_radar_flag(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
@@ -172,13 +174,14 @@ def test_route_welcome_blocks_prioritization_request_without_post_radar_flag(
         messages=[HumanMessage(content="quiero priorizar mis materias")],
     )
 
-    assert _route_welcome(state) == "answer_scope_boundary"
+    assert _route_entry(state) == "running_handler"
+    assert _route_running(state) == "answer_scope_boundary"
 
 
 def test_route_after_schedule_repair_can_restart_schedule_capture() -> None:
     state = AgentState(phase="schedules", awaiting_user_input=False)
 
-    assert _route_after_schedule_repair(state) == "request_schedules"
+    assert _route_after_schedule_repair(state) == "collect_schedule"
 
 
 def test_route_after_fixed_schedule_management_waits_for_confirmation() -> None:

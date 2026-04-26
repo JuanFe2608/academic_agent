@@ -245,7 +245,6 @@ def handle_fixed_schedule_renewal_turn(
                 **update_scheduling_state(
                     state,
                     raw_inputs={},
-                    extras_has_any=None,
                     extras_collect_stage=None,
                     extras_pending_is_variable=None,
                     extras_pending_items=[],
@@ -253,7 +252,6 @@ def handle_fixed_schedule_renewal_turn(
                     work_pending_items=[],
                     extracurricular=[],
                     events=[],
-                    events_validated=False,
                     schedule_preview={},
                     schedule=update_schedule_flow_state(
                         schedule_state,

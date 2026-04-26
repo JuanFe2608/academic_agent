@@ -7,9 +7,15 @@ visual. Aqui se crea una imagen PNG con una tabla de dias y bloques de hora.
 from __future__ import annotations
 
 import os
+import tempfile
 from datetime import datetime
 
 from PIL import Image, ImageDraw, ImageFont
+
+_DEFAULT_RENDER_DIR = os.getenv(
+    "ACADEMIC_AGENT_SCHEDULE_DIR",
+    os.path.join(tempfile.gettempdir(), "academic_agent_schedules"),
+)
 
 from agents.support.scheduling.calendar_logic import (
     ScheduledOccurrence,
@@ -40,7 +46,7 @@ HOUR_BAND = (238, 242, 247)
 
 def render_week_schedule(
     events: list[Event],
-    out_dir: str = "tmp",
+    out_dir: str = _DEFAULT_RENDER_DIR,
     filename: str = "schedule.png",
     start_hour: int = 0,
     end_hour: int = 24,

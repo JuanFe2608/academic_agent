@@ -7,8 +7,8 @@ from langchain_core.messages import HumanMessage
 from agents.support.dependencies import set_personalization_service
 from agents.support.agent import (
     _route_collect_priorities,
+    _route_collect_study_profile,
     _route_from_phase,
-    _route_persist_study_profile,
 )
 from agents.support.nodes.build_study_plan.node import build_study_plan
 from agents.support.nodes.collect_priorities.node import collect_priorities
@@ -82,7 +82,7 @@ def test_priorities_feature_flag_no_longer_routes_after_persist_study_profile(mo
     set_personalization_service(personalization_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -100,12 +100,16 @@ def test_priorities_feature_flag_no_longer_routes_after_persist_study_profile(mo
         assert "subjects" not in update
         assert "priorities" not in update
         assert "study_plan" not in update
-        assert _route_persist_study_profile(next_state) == "end"
+        assert _route_collect_study_profile(next_state) == "end"
     finally:
         set_personalization_service(None)
 
 
-def test_post_radar_flow_routes_to_weekly_priorities_when_flag_is_enabled(monkeypatch) -> None:
+def test_post_radar_flow_goes_to_running_when_flag_is_enabled(monkeypatch) -> None:
+    # El flujo post-Radar ya NO pasa por collect_priorities automáticamente.
+    # Después del Radar el agente queda en "running" esperando que el estudiante
+    # escriba de forma natural. collect_priorities se activa solo cuando el
+    # estudiante lo solicita explícitamente desde la fase running.
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
@@ -114,7 +118,7 @@ def test_post_radar_flow_routes_to_weekly_priorities_when_flag_is_enabled(monkey
     set_personalization_service(personalization_service)
     try:
         state = AgentState(
-            phase="study_profile_persist",
+            phase="study_profile",
             student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
             schedule={
                 "persisted_profile_id": 9,
@@ -127,13 +131,10 @@ def test_post_radar_flow_routes_to_weekly_priorities_when_flag_is_enabled(monkey
 
         update = persist_study_profile(state)
         next_state = _apply_update(state, update)
-        priority_update = collect_priorities(next_state)
 
-        assert update["phase"] == "priorities"
-        assert _route_persist_study_profile(next_state) == "collect_priorities"
-        assert priority_update["phase"] == "priorities"
-        assert priority_update["priorities"]["capture_stage"] == "ask_update"
-        assert "prioridades de esta semana" in priority_update["messages"][0].content
+        assert update["phase"] == "running"
+        assert update["awaiting_user_input"] is True
+        assert _route_collect_study_profile(next_state) == "end"
     finally:
         set_personalization_service(None)
 
@@ -165,7 +166,7 @@ def test_collect_priorities_accepts_manual_subjects_and_rebuilds_plan(monkeypatc
     update = collect_priorities(state)
     next_state = _apply_update(state, update)
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "running"
     assert update["subjects"][0].nombre == "Calculo"
     assert update["subjects"][0].urgencia == "alta"
     assert update["subjects"][0].carga_semanal_min == 240
@@ -250,7 +251,7 @@ def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
     update = collect_priorities(state)
     next_state = _apply_update(state, update)
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "running"
     assert len(update["subjects"]) == 2
     assert update["priorities"]["status"] == "completed"
 
@@ -282,9 +283,9 @@ def test_collect_priorities_routes_completed_snapshot_to_study_plan_when_post_ra
     update = collect_priorities(state)
     next_state = _apply_update(state, update)
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "running"
     assert _route_collect_priorities(next_state) == "build_study_plan"
-    assert _route_from_phase(next_state) == "build_study_plan"
+    assert _route_from_phase(next_state) == "end"
 
     plan_update = build_study_plan(next_state)
     assert plan_update["phase"] == "end"
@@ -312,7 +313,7 @@ def test_collect_priorities_supports_visible_later_option(monkeypatch) -> None:
     update = collect_priorities(state)
     next_state = _apply_update(state, update)
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "running"
     assert len(update["subjects"]) == 2
     assert update["priorities"]["status"] == "completed"
     assert _route_collect_priorities(next_state) == "end"
@@ -377,7 +378,7 @@ def test_collect_priorities_guides_weekly_snapshot_until_confirmation(monkeypatc
     update = collect_priorities(_with_user_message(state, "confirmar"))
     next_state = _apply_update(_with_user_message(state, "confirmar"), update)
 
-    assert update["phase"] == "study_plan"
+    assert update["phase"] == "running"
     assert update["priorities"]["status"] == "completed"
     assert update["priorities"]["capture_stage"] is None
     assert _route_collect_priorities(next_state) == "end"

@@ -48,7 +48,7 @@ def build_question_prompt(
     challenge_emoji = str(_value(question, "challenge_emoji", "🧭")).strip()
     question_prompt = str(_value(question, "prompt", "")).strip()
 
-    lines.append(f"Reto {question_number}/{total_questions} · {challenge_title} {challenge_emoji}")
+    lines.append(f"Pregunta {question_number}/{total_questions} · {challenge_title} {challenge_emoji}")
     lines.append(f"Progreso {question_number}/{total_questions}: {build_progress_bar(question_number, total_questions)}")
     lines.append("")
     lines.append(question_prompt)

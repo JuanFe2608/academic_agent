@@ -59,15 +59,40 @@ _FORBIDDEN_SOLUTION_TERMS = {
     "escribe",
     "escribeme",
     "dame la respuesta",
+    "dame el codigo",
+    "dame la formula",
+    "dame el resultado",
     "respuesta exacta",
     "respuesta final",
     "para copiar",
     "copiar y pegar",
     "solucion completa",
     "solucionalo",
+    "contenta por mi",
     "contesta por mi",
     "pasame la respuesta",
     "hagame",
+    "generame el codigo",
+    "hazme el codigo",
+}
+_STEP_BY_STEP_RESOLUTION_TERMS = {
+    "resolver",
+    "calcular",
+    "demostrar",
+    "desarrollar",
+    "derivar",
+    "integrar",
+    "encontrar",
+    "obtener",
+}
+_SPECIFIC_EXERCISE_INDICATORS = {
+    "este",
+    "esta",
+    "lo siguiente",
+    "el siguiente",
+    "la siguiente",
+    "siguiente ejercicio",
+    "siguiente problema",
 }
 _GUIDED_EVALUATION_TERMS = {
     "organizar",
@@ -198,6 +223,19 @@ _GENERAL_OUT_OF_SCOPE_TERMS = {
     "rutina de gym",
     "medico",
     "legal",
+    "pelicula",
+    "serie",
+    "musica",
+    "cancion",
+    "deporte",
+    "cocina",
+    "receta",
+    "viaje",
+    "turismo",
+    "maquillaje",
+    "moda",
+    "recomiendame una pelicula",
+    "recomiendame una serie",
 }
 
 _GREETING_RESPONSE = (
@@ -294,6 +332,18 @@ def decide_scope(
             confidence=0.88,
         )
 
+    if _is_step_by_step_specific_exercise(normalized):
+        return _decision(
+            input_classification,
+            category="in_scope",
+            action="normal",
+            allowed=True,
+            domain="guided_academic_support",
+            intent="request_guided_academic_help",
+            reason="step_by_step_specific_exercise_to_guided",
+            confidence=0.87,
+        )
+
     if (
         input_classification.possible_intent
         in {"request_guided_academic_help", "enter_socratic_mode"}
@@ -316,16 +366,34 @@ def decide_scope(
         )
 
     if contains_any(normalized, _REDIRECTABLE_TERMS):
+        # Expresiones de estrés o desbordamiento académico ("estoy perdida",
+        # "voy muy mal", "no sé por dónde empezar") son señales válidas de que
+        # el estudiante necesita apoyo de planificación. Enrutar a guided_academic_support
+        # para una respuesta interactiva en lugar de un mensaje estático de redirección.
         return _decision(
             input_classification,
-            category="redirectable_out_of_scope",
-            action="redirect",
-            allowed=False,
-            domain="out_of_scope",
-            intent="redirect_to_academic_planning",
-            reason="diffuse_academic_need",
-            response_text=_REDIRECT_RESPONSE,
+            category="in_scope",
+            action="normal",
+            allowed=True,
+            domain="guided_academic_support",
+            intent="request_guided_academic_help",
+            reason="academic_overwhelm_signal",
             confidence=0.82,
+        )
+
+    if (
+        input_classification.possible_intent == "answer_academic_concept_question"
+        or _is_concept_question_text(normalized)
+    ):
+        return _decision(
+            input_classification,
+            category="in_scope",
+            action="normal",
+            allowed=True,
+            domain="guided_academic_support",
+            intent="answer_academic_concept_question",
+            reason="academic_concept_question",
+            confidence=max(input_classification.confidence, 0.80),
         )
 
     if input_classification.possible_intent in {
@@ -509,7 +577,7 @@ def _classify_followup_with_llm(recent_messages: list[str], text: str) -> bool:
         "o es un tema completamente nuevo sin relación?"
     )
     try:
-        response = llm.bind(max_tokens=5).invoke([
+        response = llm.bind(max_tokens=15).invoke([
             SystemMessage(content="Eres un clasificador binario. Responde solo: FOLLOWUP o NEW."),
             HumanMessage(content=user_prompt),
         ])
@@ -530,6 +598,39 @@ def _is_forbidden_evaluation_solution(normalized_text: str) -> bool:
         normalized_text,
         _FORBIDDEN_SOLUTION_TERMS,
     )
+
+
+def _is_concept_question_text(normalized: str) -> bool:
+    """Detecta preguntas conceptuales académicas por su estructura inicial."""
+    starters = (
+        "que es ",
+        "que son ",
+        "para que sirve ",
+        "para que se usa ",
+        "como funciona ",
+        "como se usa ",
+        "cuando se usa ",
+        "en que consiste ",
+        "explicame ",
+        "que significa ",
+        "cual es la diferencia entre ",
+        "que diferencia hay entre ",
+        "que diferencia hay ",
+    )
+    return any(normalized.startswith(s) for s in starters)
+
+
+def _is_step_by_step_specific_exercise(normalized: str) -> bool:
+    """Detecta solicitudes de resolución paso a paso de un ejercicio concreto.
+
+    Distingue 'explicame como se resuelven integrales paso a paso' (general → OK)
+    de 'ayudame paso a paso a resolver este ejercicio' (específico → guided_support).
+    """
+    if "paso a paso" not in normalized:
+        return False
+    if not contains_any(normalized, _STEP_BY_STEP_RESOLUTION_TERMS):
+        return False
+    return contains_any(normalized, _SPECIFIC_EXERCISE_INDICATORS)
 
 
 def _domain_from_classification(classification: InputClassification) -> str:
