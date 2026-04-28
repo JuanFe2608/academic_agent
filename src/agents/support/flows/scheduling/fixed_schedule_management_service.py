@@ -24,6 +24,7 @@ from services.scheduling.constants import ScheduleBlockType
 from services.scheduling.extracurricular_state import build_extracurricular_items_from_blocks
 from services.scheduling.fixed_schedule_management import (
     FixedScheduleOperation,
+    build_fixed_schedule_add_preview,
     build_fixed_schedule_summary,
     build_fixed_schedule_update_preview,
     delete_fixed_schedule_blocks,
@@ -73,13 +74,39 @@ def handle_fixed_schedule_management_turn(state: AgentState) -> dict:
         state.get("last_user_text"),
     )
     if not has_new_input:
-        return {"phase": "fixed_schedule_management", "awaiting_user_input": True}
+        replan_raw = dict(state.get("replan", {}))
+        change_request = _current_change_request(replan_raw)
+        if str(change_request.get("stage") or "").strip():
+            return {"phase": "fixed_schedule_management", "awaiting_user_input": True}
+        # Initial entry (no active stage) — show the options menu
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=last_text,
+            awaiting_user_input=True,
+            prompt=(
+                "Puedo mostrarte, modificar o eliminar bloques de tu horario fijo. "
+                "¿Qué necesitas? Por ejemplo: 'ver mi horario', 'cambiar Cálculo al viernes 10:00-12:00' "
+                "o 'eliminar Trabajo del lunes'."
+            ),
+        )
 
     blocks, schedule_patch = _current_fixed_schedule_blocks(state)
     replan = dict(state.get("replan", {}))
     change_request = _current_change_request(replan)
     stage = str(change_request.get("stage") or "").strip()
 
+    if stage == "awaiting_fixed_schedule_add_details":
+        return _handle_add_details_turn(
+            state,
+            blocks,
+            schedule_patch,
+            replan,
+            change_request,
+            str(last_text or ""),
+            current_count,
+        )
     if stage == "awaiting_fixed_schedule_identifier":
         return _handle_identifier_turn(
             state,
@@ -132,6 +159,15 @@ def handle_fixed_schedule_management_turn(state: AgentState) -> dict:
         )
     if operation.intent == "delete_fixed_schedule_item":
         return _start_delete_operation(
+            state,
+            blocks,
+            schedule_patch,
+            operation,
+            str(last_text or ""),
+            current_count,
+        )
+    if operation.intent == "add_fixed_schedule_item":
+        return _start_add_operation(
             state,
             blocks,
             schedule_patch,
@@ -327,19 +363,26 @@ def _handle_confirmation_turn(
     selected_ids = [str(item) for item in change_request.get("selected_block_ids") or []]
     if operation == "delete":
         updated_blocks = delete_fixed_schedule_blocks(blocks, selected_ids)
+    elif operation == "add":
+        new_blocks = [
+            ensure_weekly_block(block)
+            for block in change_request.get("new_blocks") or []
+        ]
+        updated_blocks = list(blocks) + new_blocks
     else:
         replacement_blocks = [
             ensure_weekly_block(block)
             for block in change_request.get("replacement_blocks") or []
         ]
         updated_blocks = replace_fixed_schedule_blocks(blocks, selected_ids, replacement_blocks)
+    success_labels = {"delete": "eliminado", "add": "agregado"}
     return _persist_confirmed_schedule_change(
         state,
         updated_blocks,
         replan,
         text,
         current_count,
-        success_label="eliminado" if operation == "delete" else "actualizado",
+        success_label=success_labels.get(operation, "actualizado"),
     )
 
 
@@ -569,6 +612,144 @@ def _start_delete_operation(
         selected,
         text,
         current_count,
+    )
+
+
+def _start_add_operation(
+    state: AgentState,
+    blocks: list[WeeklyScheduleBlock],
+    schedule_patch: dict[str, object],
+    operation: FixedScheduleOperation,
+    text: str,
+    current_count: int,
+) -> dict:
+    block_type = operation.target or "academic"
+    timezone = str(state.get("timezone", "America/Bogota"))
+    add_text = operation.reference_text or text
+
+    preview = build_fixed_schedule_add_preview(add_text, block_type, timezone=timezone)
+    if preview.prompt:
+        change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_add_details")
+        change_request["add_text"] = add_text
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=text,
+            awaiting_user_input=True,
+            prompt=str(preview.prompt),
+            replan=_store_change_request(dict(state.get("replan", {})), change_request),
+            interaction=_pending_interaction(
+                state,
+                active_intent="add_fixed_schedule_item",
+                pending_action="provide_fixed_schedule_add_details",
+                current_step="awaiting_add_details",
+            ),
+            **schedule_patch,
+        )
+
+    return _queue_add_confirmation(
+        state,
+        blocks,
+        schedule_patch,
+        dict(state.get("replan", {})),
+        _base_change_request(operation, stage=""),
+        preview.replacement_blocks,
+        text,
+        current_count,
+    )
+
+
+def _handle_add_details_turn(
+    state: AgentState,
+    blocks: list[WeeklyScheduleBlock],
+    schedule_patch: dict[str, object],
+    replan: dict,
+    change_request: dict,
+    text: str,
+    current_count: int,
+) -> dict:
+    block_type = str(change_request.get("target") or "academic")
+    timezone = str(state.get("timezone", "America/Bogota"))
+
+    preview = build_fixed_schedule_add_preview(text, block_type, timezone=timezone)  # type: ignore[arg-type]
+    if preview.prompt:
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=text,
+            awaiting_user_input=True,
+            prompt=str(preview.prompt),
+            replan=_store_change_request(replan, change_request),
+            interaction=_pending_interaction(
+                state,
+                active_intent="add_fixed_schedule_item",
+                pending_action="provide_fixed_schedule_add_details",
+                current_step="awaiting_add_details",
+            ),
+            **schedule_patch,
+        )
+
+    return _queue_add_confirmation(
+        state,
+        blocks,
+        schedule_patch,
+        replan,
+        change_request,
+        preview.replacement_blocks,
+        text,
+        current_count,
+    )
+
+
+def _queue_add_confirmation(
+    state: AgentState,
+    blocks: list[WeeklyScheduleBlock],
+    schedule_patch: dict[str, object],
+    replan: dict,
+    change_request: dict,
+    new_blocks: list[WeeklyScheduleBlock],
+    last_text: str,
+    current_count: int,
+) -> dict:
+    payload = {
+        "intent": "add_fixed_schedule_item",
+        "operation": "add",
+        "new_blocks": [_dump_block(block) for block in new_blocks],
+        "requires_persistence": True,
+        "requires_outlook_sync": True,
+    }
+    prompt_text = (
+        "Voy a agregar este bloque a tu horario fijo:\n\n"
+        f"{format_fixed_schedule_blocks(new_blocks)}\n\n"
+        "Confirmas el cambio?"
+    )
+    prompt = _try_render_schedule_content(
+        blocks + new_blocks,
+        prompt_text,
+        str(state.get("timezone", "America/Bogota")),
+    )
+    change_request.update(
+        {
+            "stage": _CONFIRMATION_STAGE,
+            "operation": "add",
+            "new_blocks": [_dump_block(block) for block in new_blocks],
+            "confirmation_payload": payload,
+        }
+    )
+    replan = _store_change_request(replan, change_request)
+    replan["pending_prompt"] = prompt_text
+    return _prompt_update(
+        state,
+        phase="fixed_schedule_management",
+        current_count=current_count,
+        last_text=last_text,
+        awaiting_user_input=True,
+        prompt=prompt,
+        replan=replan,
+        interaction=_confirmation_interaction(state, payload),
+        **schedule_patch,
     )
 
 
@@ -956,10 +1137,14 @@ def _no_schedule_update(
 
 
 def _base_change_request(operation: FixedScheduleOperation, *, stage: str) -> dict[str, object]:
+    _OP_MAP = {
+        "delete_fixed_schedule_item": "delete",
+        "add_fixed_schedule_item": "add",
+    }
     return {
         "domain": _FLOW_DOMAIN,
         "intent": operation.intent,
-        "operation": "delete" if operation.intent == "delete_fixed_schedule_item" else "update",
+        "operation": _OP_MAP.get(str(operation.intent), "update"),
         "target": operation.target,
         "reference_text": operation.reference_text,
         "update_text": operation.update_text,

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections import OrderedDict
 from concurrent.futures import ThreadPoolExecutor
 
 from langchain_core.messages import AIMessage, HumanMessage
@@ -16,6 +17,59 @@ from integrations.whatsapp import WhatsAppCloudClient, WhatsAppInboundMessage
 from services.channels.whatsapp_service import WhatsAppChannelService
 
 logger = logging.getLogger(__name__)
+
+
+class _BoundedIdSet:
+    """Conjunto acotado con política FIFO para deduplicar message_ids.
+
+    Evita que el mismo webhook procesado dos veces (retry de WhatsApp)
+    ejecute el agente dos veces. maxsize limita el uso de memoria.
+    """
+
+    def __init__(self, maxsize: int = 500) -> None:
+        self._data: OrderedDict[str, None] = OrderedDict()
+        self._maxsize = maxsize
+
+    def contains_and_add(self, item: str) -> bool:
+        """Retorna True si el item ya existía (duplicado). Lo registra si es nuevo."""
+        if item in self._data:
+            return True
+        self._data[item] = None
+        if len(self._data) > self._maxsize:
+            self._data.popitem(last=False)  # Evicta el más antiguo
+        return False
+
+
+class _BoundedLockMap:
+    """Mapa acotado de asyncio.Lock con eviction LRU de locks inactivos.
+
+    Garantiza procesamiento secuencial por usuario y acota el uso de memoria
+    evitando que phone numbers inactivos acumulen locks indefinidamente.
+    Solo evicta locks que no están siendo sostenidos (lock.locked() == False)
+    para preservar la garantía de serialización del checkpointer de LangGraph.
+    """
+
+    def __init__(self, maxsize: int = 1000) -> None:
+        self._locks: OrderedDict[str, asyncio.Lock] = OrderedDict()
+        self._maxsize = maxsize
+
+    def get_or_create(self, key: str) -> asyncio.Lock:
+        """Devuelve el lock existente (promovido a MRU) o crea uno nuevo."""
+        if key in self._locks:
+            self._locks.move_to_end(key)
+            return self._locks[key]
+        lock = asyncio.Lock()
+        self._locks[key] = lock
+        if len(self._locks) > self._maxsize:
+            self._evict_oldest_idle()
+        return lock
+
+    def _evict_oldest_idle(self) -> None:
+        """Evicta el lock libre más antiguo. No-op si todos están activos."""
+        for key in list(self._locks.keys()):
+            if not self._locks[key].locked():
+                del self._locks[key]
+                return
 
 
 class AgentRunner:
@@ -34,6 +88,10 @@ class AgentRunner:
         self._checkpointer = checkpointer
         self._agent = build_agent(checkpointer=checkpointer)
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="lara-agent")
+        # Deduplicación: evita procesar el mismo message_id dos veces (retries de WhatsApp)
+        self._seen_ids: _BoundedIdSet = _BoundedIdSet(maxsize=500)
+        # Lock por thread_id: garantiza procesamiento secuencial por usuario (acotado a 1000 entradas)
+        self._thread_locks: _BoundedLockMap = _BoundedLockMap(maxsize=1000)
 
     # ------------------------------------------------------------------
     # Factory
@@ -63,14 +121,32 @@ class AgentRunner:
     # ------------------------------------------------------------------
 
     async def process_message(self, message: WhatsAppInboundMessage) -> None:
-        """Procesa un mensaje entrante de WhatsApp de forma asincrona."""
-        loop = asyncio.get_event_loop()
-        try:
-            await loop.run_in_executor(self._executor, self._run_agent_sync, message)
-        except Exception:
-            logger.exception(
-                "Error procesando mensaje de %s", message.from_number
-            )
+        """Procesa un mensaje entrante de WhatsApp de forma asincrona.
+
+        Garantías:
+        - Deduplicación por message_id: los reintentos de WhatsApp no ejecutan el agente dos veces.
+        - Procesamiento secuencial por usuario: nunca hay dos invocaciones paralelas del agente
+          para el mismo thread_id, evitando race conditions en el checkpointer.
+        - Feedback inmediato: marca el mensaje como leído antes de invocar el agente.
+        """
+        # 1. Dedup — silenciosamente ignorar si ya se procesó este message_id
+        if self._seen_ids.contains_and_add(message.message_id):
+            logger.info("Mensaje duplicado %s ignorado.", message.message_id)
+            return
+
+        # 2. Marcar como leído inmediatamente (checkmarks azules al usuario)
+        self._executor.submit(self._whatsapp_service.mark_message_read, message.message_id)
+
+        # 3. Lock por usuario — serializa mensajes del mismo thread_id
+        thread_id = message.from_number
+        lock = self._thread_locks.get_or_create(thread_id)
+
+        async with lock:
+            loop = asyncio.get_running_loop()
+            try:
+                await loop.run_in_executor(self._executor, self._run_agent_sync, message)
+            except Exception:
+                logger.exception("Error procesando mensaje de %s", thread_id)
 
     # ------------------------------------------------------------------
     # Sync agent invocation (runs in thread pool)
@@ -160,20 +236,22 @@ class AgentRunner:
 
 
 def _extract_new_ai_messages(messages: list) -> list[AIMessage]:
-    """Devuelve los AIMessages generados en el ultimo turno del agente.
+    """Devuelve los AIMessages con respuesta textual generados en el turno actual.
 
-    Busca desde el final de la lista hacia atras hasta encontrar el ultimo
-    HumanMessage, luego retorna los AIMessages que lo siguen.
+    Busca el ultimo HumanMessage y retorna los AIMessages que lo siguen,
+    filtrando mensajes intermedios del ciclo ReAct (tool_calls pendientes o
+    content vacio) que no deben enviarse al usuario de WhatsApp.
     """
     last_human_idx = -1
     for i, msg in enumerate(messages):
         if isinstance(msg, HumanMessage):
             last_human_idx = i
 
-    if last_human_idx == -1:
-        return [m for m in messages if isinstance(m, AIMessage)]
-
-    return [m for m in messages[last_human_idx + 1:] if isinstance(m, AIMessage)]
+    slice_start = last_human_idx + 1 if last_human_idx != -1 else len(messages)
+    return [
+        m for m in messages[slice_start:]
+        if isinstance(m, AIMessage) and not m.tool_calls and m.content
+    ]
 
 
 __all__ = ["AgentRunner"]

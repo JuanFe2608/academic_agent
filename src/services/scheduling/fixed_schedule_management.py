@@ -18,9 +18,20 @@ FixedScheduleIntent = Literal[
     "view_fixed_schedule",
     "update_fixed_schedule",
     "delete_fixed_schedule_item",
+    "add_fixed_schedule_item",
     "unknown",
 ]
 
+_ADD_VERBS = {
+    "agregar",
+    "agrega",
+    "anadir",   # normalize_text strips ñ → añadir
+    "anade",    # normalize_text strips ñ → añade
+    "incluir",
+    "incluye",
+    "insertar",
+    "inserta",
+}
 _DELETE_VERBS = {
     "elimina",
     "eliminar",
@@ -121,6 +132,15 @@ def parse_fixed_schedule_operation(text: str | None) -> FixedScheduleOperation:
 
     if not normalized:
         return FixedScheduleOperation(intent="unknown", target=target)
+
+    if _contains_any_token(normalized, _ADD_VERBS):
+        reference = _clean_reference_text(_strip_command(raw_text, _ADD_VERBS))
+        return FixedScheduleOperation(
+            intent="add_fixed_schedule_item",
+            target=target,
+            reference_text=reference,
+            apply_to_all=apply_to_all,
+        )
 
     if _contains_any_token(normalized, _DELETE_VERBS):
         reference = _clean_reference_text(_strip_command(raw_text, _DELETE_VERBS))
@@ -301,6 +321,90 @@ def build_fixed_schedule_update_preview(
         )
         replacements.append(preview)
     return FixedScheduleUpdatePreview(replacement_blocks=replacements)
+
+
+_ADD_TITLE_DAY_PATTERN = re.compile(
+    r"\b(?:lunes|martes|mi[eé]rcoles|jueves|viernes|s[aá]bados?|domingos?)\b",
+    re.IGNORECASE,
+)
+_ADD_TITLE_TIME_PATTERN = re.compile(
+    r"\b\d{1,2}(?::\d{2})?\s*(?:[ap]\.?\s*m\.?)?\s*(?:-|a|hasta)\s*\d{1,2}(?::\d{2})?\s*(?:[ap]\.?\s*m\.?)?\b",
+    re.IGNORECASE,
+)
+_ADD_TITLE_FILLER = re.compile(
+    r"\b(?:el|los|la|las|de|a|para|en|al|del|y|todas?|todos?|fijo|cada|clase|clases|"
+    r"materia|asignatura|actividad|extracurricular|acad[eé]mic[ao]|laboral)\b",
+    re.IGNORECASE,
+)
+
+
+def _extract_new_block_title(text: str, block_type: ScheduleBlockType) -> str:
+    if block_type == "work":
+        return "Trabajo"
+    stripped = _ADD_TITLE_DAY_PATTERN.sub("", text)
+    stripped = _ADD_TITLE_TIME_PATTERN.sub("", stripped)
+    stripped = _ADD_TITLE_FILLER.sub("", stripped)
+    title = re.sub(r"\s+", " ", stripped).strip(" ,.;:()")
+    return title
+
+
+def build_fixed_schedule_add_preview(
+    raw_text: str,
+    block_type: ScheduleBlockType,
+    *,
+    timezone: str = "America/Bogota",
+) -> FixedScheduleUpdatePreview:
+    """Convierte texto libre en bloques nuevos para confirmar antes de persistir."""
+    clean_text = str(raw_text or "").strip()
+    if not clean_text:
+        return FixedScheduleUpdatePreview(prompt="Indica el nombre, dia y horario del nuevo bloque.")
+
+    try:
+        parsed = extract_natural_schedule_components(clean_text)
+    except ValueError as exc:
+        error_text = str(exc).lower()
+        if "no day found" in error_text:
+            return FixedScheduleUpdatePreview(prompt="Indica el dia del nuevo bloque.")
+        if "no time range found" in error_text:
+            return FixedScheduleUpdatePreview(prompt="Indica hora de inicio y hora de fin.")
+        if "invalid time range" in error_text or "ambiguous time range" in error_text:
+            return FixedScheduleUpdatePreview(prompt="Aclara AM o PM en el horario del nuevo bloque.")
+        return FixedScheduleUpdatePreview(prompt="No pude interpretar el nuevo bloque.")
+
+    days = [str(day) for day in parsed.get("days") or []]
+    start_time = str(parsed.get("start") or "").strip()
+    end_time = str(parsed.get("end") or "").strip()
+    if not days or not start_time or not end_time:
+        return FixedScheduleUpdatePreview(prompt="Indica dia, hora de inicio y hora de fin del nuevo bloque.")
+
+    title = _extract_new_block_title(clean_text, block_type)
+    if not title:
+        return FixedScheduleUpdatePreview(prompt="Indica el nombre del nuevo bloque.")
+
+    new_blocks: list[WeeklyScheduleBlock] = []
+    for index, spanish_day in enumerate(days):
+        english_day = SPANISH_TO_ENGLISH.get(spanish_day, SPANISH_TO_ENGLISH.get(spanish_day.title()))
+        if english_day is None:
+            return FixedScheduleUpdatePreview(prompt="No pude interpretar el dia del nuevo bloque.")
+        new_block = WeeklyScheduleBlock(
+            block_id=new_block_id() if index > 0 else new_block_id(),
+            block_type=block_type,
+            title=title,
+            day_of_week=english_day,
+            start_time=start_time,
+            end_time=end_time,
+            timezone=timezone,
+            source_text=_build_source_text(
+                block_type,
+                title=title,
+                day_of_week=english_day,
+                start_time=start_time,
+                end_time=end_time,
+            ),
+            user_confirmed=False,
+        )
+        new_blocks.append(new_block)
+    return FixedScheduleUpdatePreview(replacement_blocks=new_blocks)
 
 
 def replace_fixed_schedule_blocks(
@@ -531,6 +635,7 @@ __all__ = [
     "FixedScheduleMatchResult",
     "FixedScheduleOperation",
     "FixedScheduleUpdatePreview",
+    "build_fixed_schedule_add_preview",
     "build_fixed_schedule_summary",
     "build_fixed_schedule_update_preview",
     "delete_fixed_schedule_blocks",

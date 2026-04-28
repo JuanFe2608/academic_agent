@@ -18,7 +18,7 @@ from agents.support.flows.scheduling.fixed_schedule_renewal_service import (
 from agents.support.flows.scheduling.fixed_schedule_repair_service import (
     requires_fixed_schedule_repair,
 )
-from agents.support.nodes.academic_agent.context import build_agent_context
+from agents.support.nodes.academic_agent.context import _STATIC_INSTRUCTIONS, build_dynamic_context
 from agents.support.nodes.academic_agent.tools import extract_tool_state_updates, make_tools
 from agents.support.nodes.manage_fixed_schedule.node import manage_fixed_schedule as _manage_fixed_schedule
 from agents.support.nodes.renew_fixed_schedule.node import renew_fixed_schedule as _renew_fixed_schedule
@@ -74,7 +74,7 @@ def academic_agent(state: AgentState) -> dict:
     #    - Rutas locales (WhatsApp) → sobreviven al reducer y se procesan aquí con visión.
     from utils.media_artifacts import IMAGE_RECEIVED_MARKER
     from integrations.ai._llm_impl import maybe_get_llm
-    from langchain_core.messages import HumanMessage
+    from langchain_core.messages import HumanMessage, SystemMessage
     from langgraph.prebuilt import create_react_agent
 
     last_images = get_last_user_images(list(state.messages or []))
@@ -111,13 +111,16 @@ def academic_agent(state: AgentState) -> dict:
         }
 
     tools = make_tools(state)
-    system_context = build_agent_context(state)
-    react_agent = create_react_agent(model=llm, tools=tools, prompt=system_context, checkpointer=False)
+    # _STATIC_INSTRUCTIONS es constante — Azure OpenAI lo cachea junto con las tool
+    # definitions (~1450 tokens estables). Solo build_dynamic_context se recalcula
+    # cada turno (~400 tokens), reduciendo el procesamiento por invocación al LLM.
+    react_agent = create_react_agent(model=llm, tools=tools, prompt=_STATIC_INSTRUCTIONS, checkpointer=False)
 
     # Construir mensaje para el agente: multimodal si hay imágenes reales (WhatsApp).
     human_msg = _build_human_message(last_text, last_images)
     recent_history = _build_recent_history(list(state.messages or []))
-    result = react_agent.invoke({"messages": [*recent_history, human_msg]})
+    dynamic_msg = SystemMessage(content=build_dynamic_context(state))
+    result = react_agent.invoke({"messages": [dynamic_msg, *recent_history, human_msg]})
 
     tool_updates = extract_tool_state_updates(result)
     final_message = result["messages"][-1].content
@@ -130,6 +133,10 @@ def academic_agent(state: AgentState) -> dict:
         "phase": "running",
         **tool_updates,
     }
+
+    if "subjects" in tool_updates:
+        from agents.support.flows.planning.persistence_support import persist_planning_snapshot_for_update
+        return_dict = persist_planning_snapshot_for_update(state, return_dict)
 
     return return_dict
 

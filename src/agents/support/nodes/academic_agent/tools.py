@@ -33,9 +33,11 @@ _DAYS_ES: dict[str, str] = {
 
 _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
+_VALID_PRIORIDAD: frozenset[str] = frozenset({"alta", "media", "baja"})
+
 
 def make_tools(state: AgentState) -> list:
-    """Crea las 11 herramientas del agente con el estado actual capturado en closure."""
+    """Crea las 13 herramientas del agente con el estado actual capturado en closure."""
     student_id = _get_student_id(state)
 
     # ------------------------------------------------------------------ RAG --
@@ -184,6 +186,112 @@ def make_tools(state: AgentState) -> list:
             return f"No pude registrar la actividad: {exc}"
 
     @tool
+    def edit_academic_activity(
+        activity_reference: str,
+        subject: str | None = None,
+        activity_type: str | None = None,
+        title: str | None = None,
+        due_date: str | None = None,
+        priority: str | None = None,
+        difficulty: int | None = None,
+    ) -> str:
+        """Edita una actividad académica ya registrada del estudiante.
+        activity_reference: descripción para identificar la actividad (materia, tipo o título).
+        subject: nuevo nombre de materia (opcional).
+        activity_type: nuevo tipo — parcial | quiz | tarea | taller | entrega | exposicion | proyecto (opcional).
+        title: nuevo título de la actividad (opcional).
+        due_date: nueva fecha límite YYYY-MM-DD (opcional).
+        priority: nueva prioridad — alta | media | baja (opcional).
+        difficulty: nueva dificultad 1-5 (opcional).
+        Úsala cuando el estudiante quiera corregir datos de una actividad ya registrada."""
+        from services.planning.academic_activity_service import (
+            apply_confirmed_academic_activity_operation,
+            coerce_academic_activities,
+            match_academic_activities,
+        )
+
+        activities = coerce_academic_activities(list(state.academic_activities))
+        matches = match_academic_activities(activities, text=activity_reference)
+        if not matches:
+            return f"No encontré ninguna actividad que coincida con '{activity_reference}'."
+        if len(matches) > 1:
+            lines = [f"Encontré {len(matches)} actividades que podrían ser esa. Especifica cuál:"]
+            for a in matches:
+                due_str = f" — vence {a.due_date}" if a.due_date else ""
+                lines.append(f"  • [{a.activity_type}] {a.subject_name}: {a.activity_title}{due_str}")
+            return "\n".join(lines)
+        target = matches[0]
+        changes: dict[str, Any] = {}
+        if subject is not None:
+            changes["subject_name"] = subject
+        if activity_type is not None:
+            changes["activity_type"] = activity_type
+        if title is not None:
+            changes["activity_title"] = title
+        if due_date is not None:
+            changes["due_date"] = due_date
+        if priority is not None:
+            changes["priority_level"] = priority
+        if difficulty is not None:
+            changes["difficulty_level"] = difficulty
+        if not changes:
+            return "No indicaste ningún campo a actualizar."
+        try:
+            result = apply_confirmed_academic_activity_operation(
+                activities,
+                {"operation": "update", "activity_id": target.activity_id, "changes": changes},
+                timezone=state.timezone,
+                reference_date=date.today(),
+            )
+            state_update: dict[str, Any] = {
+                "academic_activities": [a.model_dump() for a in result.activities],
+            }
+            if result.replan_required:
+                state_update["replan"] = {"trigger": "academic_activity"}
+            return json.dumps({"result": result.message or "Actividad actualizada.", "_state_update": state_update})
+        except Exception as exc:
+            return f"No pude actualizar la actividad: {exc}"
+
+    @tool
+    def delete_academic_activity(activity_reference: str) -> str:
+        """Elimina una actividad académica del estudiante.
+        activity_reference: descripción para identificar la actividad (materia, tipo o título).
+        Úsala cuando el estudiante diga que canceló una actividad, que fue un registro incorrecto,
+        o que ya no necesita hacer seguimiento de esa actividad."""
+        from services.planning.academic_activity_service import (
+            apply_confirmed_academic_activity_operation,
+            coerce_academic_activities,
+            match_academic_activities,
+        )
+
+        activities = coerce_academic_activities(list(state.academic_activities))
+        matches = match_academic_activities(activities, text=activity_reference)
+        if not matches:
+            return f"No encontré ninguna actividad que coincida con '{activity_reference}'."
+        if len(matches) > 1:
+            lines = [f"Encontré {len(matches)} actividades. Especifica cuál eliminar:"]
+            for a in matches:
+                due_str = f" — vence {a.due_date}" if a.due_date else ""
+                lines.append(f"  • [{a.activity_type}] {a.subject_name}: {a.activity_title}{due_str}")
+            return "\n".join(lines)
+        target = matches[0]
+        try:
+            result = apply_confirmed_academic_activity_operation(
+                activities,
+                {"operation": "delete", "activity_id": target.activity_id},
+                timezone=state.timezone,
+                reference_date=date.today(),
+            )
+            state_update: dict[str, Any] = {
+                "academic_activities": [a.model_dump() for a in result.activities],
+            }
+            if result.replan_required:
+                state_update["replan"] = {"trigger": "academic_activity"}
+            return json.dumps({"result": result.message or "Actividad eliminada.", "_state_update": state_update})
+        except Exception as exc:
+            return f"No pude eliminar la actividad: {exc}"
+
+    @tool
     def get_pending_activities(days_ahead: int = 7) -> str:
         """Lista actividades académicas pendientes del estudiante en los próximos N días.
         Úsala cuando el estudiante pregunte qué tiene pendiente, cuáles son sus próximas
@@ -302,9 +410,15 @@ def make_tools(state: AgentState) -> list:
             if match_data:
                 patch: dict[str, Any] = {}
                 if "prioridad" in match_data:
-                    patch["prioridad"] = match_data["prioridad"]
+                    val = match_data["prioridad"]
+                    if val not in _VALID_PRIORIDAD:
+                        return f"Prioridad inválida: '{val}'. Valores aceptados: alta, media, baja."
+                    patch["prioridad"] = val
                 if "urgencia" in match_data:
-                    patch["urgencia"] = match_data["urgencia"]
+                    val = match_data["urgencia"]
+                    if val is not None and val not in _VALID_PRIORIDAD:
+                        return f"Urgencia inválida: '{val}'. Valores aceptados: alta, media, baja."
+                    patch["urgencia"] = val
                 updated.append(s.model_copy(update=patch) if patch else s)
                 changed += 1
             else:
@@ -399,8 +513,12 @@ def make_tools(state: AgentState) -> list:
         from agents.support.dependencies import get_microsoft_todo_sync_service
 
         service = get_microsoft_todo_sync_service()
+        task_list_id = state.calendar.todo_task_list_id
         try:
-            result = service.sync_actionable_sessions(student_id=student_id)
+            result = service.sync_actionable_sessions(
+                student_id=student_id,
+                task_list_id=task_list_id,
+            )
             if result.synced:
                 return f"Tareas sincronizadas: {result.upserted_count} creadas/actualizadas."
             return f"No se pudo sincronizar las tareas: {result.detail or result.error_code or 'error desconocido'}"
@@ -411,6 +529,8 @@ def make_tools(state: AgentState) -> list:
         search_study_methods,
         get_technique_guide,
         add_academic_activity,
+        edit_academic_activity,
+        delete_academic_activity,
         get_pending_activities,
         get_weekly_plan,
         update_study_plan,

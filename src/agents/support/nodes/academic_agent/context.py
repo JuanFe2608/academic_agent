@@ -1,7 +1,11 @@
 """Context builder para el sistema prompt del agente académico Lara.
 
-Construye la cadena de contexto completa del estudiante que se inyecta como
-system message en cada invocación del agente ReAct.
+Separa el prompt en dos partes:
+- _STATIC_INSTRUCTIONS: rol + instrucciones, nunca cambia entre turnos.
+  Azure OpenAI lo cachea automáticamente junto con las definiciones de tools
+  (~1450 tokens estables), reduciendo el procesamiento por turno.
+- build_dynamic_context: datos del estudiante (perfil, horario, actividades,
+  plan) — se recalcula cada turno e inyecta como SystemMessage adicional.
 """
 
 from __future__ import annotations
@@ -22,9 +26,43 @@ _DAYS_ES: dict[str, str] = {
 
 _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
+# Parte invariante del prompt — idéntica en todos los turnos y para todos los estudiantes.
+# Al ser el primer SystemMessage de la request, Azure OpenAI la cachea junto con las
+# definiciones de tools, eliminando ~1450 tokens de procesamiento por invocación.
+_STATIC_INSTRUCTIONS = (
+    "Eres Lara, asistente académica autónoma.\n"
+    "\n"
+    "Tu objetivo es ayudar al estudiante a:\n"
+    "1. Planificar su tiempo de estudio de forma efectiva\n"
+    "2. Registrar y hacer seguimiento de actividades académicas (parciales, tareas, proyectos)\n"
+    "3. Recomendar técnicas de estudio adaptadas a su perfil (usa search_study_methods)\n"
+    "4. Mantener su plan semanal actualizado\n"
+    "\n"
+    "CÓMO ACTUAR:\n"
+    "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity\n"
+    "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan\n"
+    "- Cuando pregunte cómo estudiar algo → usa search_study_methods con sus técnicas top\n"
+    "- Cuando pida ver su agenda o plan → usa get_weekly_plan + get_schedule\n"
+    "- Actúa proactivamente: si registras una actividad urgente, sugiere una técnica inmediatamente\n"
+    "- Si recibes una imagen: interpreta su contenido académico (enunciado, rúbrica, fecha de entrega, etc.) "
+    "y ofrece ayuda concreta — registra actividades, sugiere técnicas o ajusta el plan según corresponda\n"
+    "\n"
+    "LÍMITES:\n"
+    "- Solo apoyas con planificación académica y técnicas de estudio\n"
+    "- No resuelves ejercicios ni tareas directamente\n"
+    "- Si el estudiante necesita apoyo emocional, reconócelo brevemente y redirige a recursos de bienestar\n"
+    "\n"
+    "FORMATO DE RESPUESTAS:\n"
+    "- Usa emojis de forma natural para hacer la conversación más amigable y visual 📚✅\n"
+    "- Organiza la información con listas con guion o viñetas cuando presentes varios elementos\n"
+    "- Usa **negrita** para resaltar fechas, nombres de materias o puntos clave\n"
+    "- Cuando la respuesta tenga varias secciones (plan, actividades, recomendaciones), sepáralas con un título corto en negrita\n"
+    "- Sé conciso: respuestas claras y directas, sin relleno ni frases de cortesía innecesarias"
+)
 
-def build_agent_context(state: AgentState) -> str:
-    """Construye el contexto completo del estudiante para inyectarlo como system prompt."""
+
+def build_dynamic_context(state: AgentState) -> str:
+    """Parte dinámica: datos del estudiante que varían con el estado (perfil, horario, actividades, plan)."""
     profile = state.student_profile
     study_profile = state.study_profile
     today = date.today().isoformat()
@@ -34,28 +72,6 @@ def build_agent_context(state: AgentState) -> str:
     weakness = ", ".join(study_profile.weakness_tags) if study_profile.weakness_tags else "ninguna"
 
     return (
-        f"Eres Lara, asistente académica autónoma de {profile.full_name or 'el estudiante'}.\n"
-        "\n"
-        "Tu objetivo es ayudar al estudiante a:\n"
-        "1. Planificar su tiempo de estudio de forma efectiva\n"
-        "2. Registrar y hacer seguimiento de actividades académicas (parciales, tareas, proyectos)\n"
-        "3. Recomendar técnicas de estudio adaptadas a su perfil (usa search_study_methods)\n"
-        "4. Mantener su plan semanal actualizado\n"
-        "\n"
-        "CÓMO ACTUAR:\n"
-        "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity\n"
-        "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan\n"
-        "- Cuando pregunte cómo estudiar algo → usa search_study_methods con sus técnicas top\n"
-        "- Cuando pida ver su agenda o plan → usa get_weekly_plan + get_schedule\n"
-        "- Actúa proactivamente: si registras una actividad urgente, sugiere una técnica inmediatamente\n"
-        "- Si recibes una imagen: interpreta su contenido académico (enunciado, rúbrica, fecha de entrega, etc.) "
-        "y ofrece ayuda concreta — registra actividades, sugiere técnicas o ajusta el plan según corresponda\n"
-        "\n"
-        "LÍMITES:\n"
-        "- Solo apoyas con planificación académica y técnicas de estudio\n"
-        "- No resuelves ejercicios ni tareas directamente\n"
-        "- Si el estudiante necesita apoyo emocional, reconócelo brevemente y redirige a recursos de bienestar\n"
-        "\n"
         "---\n"
         "PERFIL DEL ESTUDIANTE:\n"
         f"- Nombre: {profile.full_name or '—'}\n"
@@ -81,6 +97,11 @@ def build_agent_context(state: AgentState) -> str:
         "\n"
         f"Fecha actual: {today} | Zona horaria: {state.timezone}"
     )
+
+
+def build_agent_context(state: AgentState) -> str:
+    """Deprecated: retorna el contexto completo como string único (usado solo en tests legacy)."""
+    return _STATIC_INSTRUCTIONS + "\n\n" + build_dynamic_context(state)
 
 
 def format_schedule_blocks(blocks: list) -> str:
@@ -119,19 +140,25 @@ def format_subjects(subjects: list) -> str:
 
 
 def format_activities(activities: list) -> str:
-    from services.planning.academic_activity_service import active_academic_activities
+    from services.planning.academic_activity_service import (
+        active_academic_activities,
+        sort_academic_activities,
+    )
 
     active = active_academic_activities(list(activities)) if activities else []
-    pending = [a for a in active if getattr(a, "status", "") == "pending"]
+    pending = sort_academic_activities([a for a in active if getattr(a, "status", "") == "pending"])
     if not pending:
         return "  Sin actividades pendientes."
     lines = []
-    for a in pending[:10]:
+    for a in pending[:20]:
         due = getattr(a, "due_date", None) or "sin fecha"
         lines.append(
             f"  - [{a.activity_type}] {a.subject_name}: {a.activity_title}"
             f" — vence {due} (prioridad {a.priority_level or 'media'})"
         )
+    extra = len(pending) - 20
+    if extra > 0:
+        lines.append(f"  ... y {extra} actividad(es) más")
     return "\n".join(lines)
 
 
@@ -156,6 +183,8 @@ def format_study_plan(study_plan) -> str:
 
 
 __all__ = [
+    "_STATIC_INSTRUCTIONS",
+    "build_dynamic_context",
     "build_agent_context",
     "format_schedule_blocks",
     "format_subjects",

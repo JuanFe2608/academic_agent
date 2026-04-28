@@ -12,11 +12,12 @@ CalendarProvider = Literal["outlook", "google"]
 
 
 class CalendarState(BaseSchemaModel):
-    """Metadatos de integracion de calendario."""
+    """Metadatos de integracion de calendario y Microsoft To Do."""
 
     provider: Optional[CalendarProvider] = None
     authorized: bool = False
     calendar_id: Optional[str] = None
+    todo_task_list_id: Optional[str] = None
     synced_event_map: dict[str, str] = Field(default_factory=dict)
 
 

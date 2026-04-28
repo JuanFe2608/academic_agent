@@ -216,6 +216,18 @@ class WhatsAppCloudClient:
         }
         return self._send_message_payload(payload)
 
+    def mark_as_read(self, message_id: str) -> None:
+        """Marca un mensaje entrante como leido (checkmarks azules en WhatsApp)."""
+        payload = {
+            "messaging_product": "whatsapp",
+            "status": "read",
+            "message_id": message_id,
+        }
+        try:
+            self._request_json("POST", self._phone_url("messages"), json_payload=payload)
+        except Exception:
+            pass  # Best-effort — no interrumpir el flujo si falla
+
     def get_media_url(self, media_id: str) -> dict[str, Any]:
         return self._request_json("GET", self._graph_url(media_id))
 

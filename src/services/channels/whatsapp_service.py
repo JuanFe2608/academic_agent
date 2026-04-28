@@ -77,6 +77,13 @@ class WhatsAppChannelService:
             detail=f"Tipo de mensaje no soportado: {outbound.kind}",
         )
 
+    def mark_message_read(self, message_id: str) -> None:
+        """Marca un mensaje entrante como leido. Best-effort, nunca lanza excepcion."""
+        try:
+            self.client.mark_as_read(message_id)
+        except Exception:
+            pass
+
     def download_inbound(
         self,
         inbound: WhatsAppInboundMessage,
@@ -254,7 +261,7 @@ def whatsapp_inbound_to_human_message(inbound: ChannelInboundMessage) -> HumanMe
         if media.media_type == "image":
             content.append(
                 {
-                    "type": "input_image",
+                    "type": "image_url",
                     "image_url": {"url": materialize_image_reference(media.reference)},
                 }
             )
