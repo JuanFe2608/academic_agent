@@ -7,18 +7,22 @@ from agents.support.nodes.collect_extracurricular_details import (
     parse_extracurricular_text,
 )
 from agents.support.nodes.utils import has_time_range, normalize_text
+from agents.support.scheduling.state_helpers import (
+    ensure_schedule_flow_state,
+    schedule_flow_state_to_update,
+)
 from agents.support.state import AgentState
 from schemas.scheduling import Event
+from services.scheduling.event_projection import events_to_schedule_blocks
 from services.scheduling.text_parser import parse_academic_schedule_text, parse_work_schedule_text
 from services.scheduling.validation import validate_event
 
 from ._activity_additions import (
     build_add_clarification_prompt,
-    build_events_for_new_extracurricular_items,
+    build_events_from_extracurricular_item,
     ensure_item,
     match_extracurricular,
     parse_activity_additions,
-    rebuild_extracurricular_events,
     strip_change_intent,
 )
 from ._prompts import PROMPT_EXTRAS, PROMPT_HORARIO, PROMPT_HORARIO_ACADEMICO
@@ -48,11 +52,14 @@ def apply_laboral_change(
         return build_prompt_update(ctx, replan, PROMPT_HORARIO, errors=errors)
 
     new_events = _validated_schedule_events(parsed, errors, "laboral")
+    new_work_blocks = events_to_schedule_blocks(new_events, "work")
+
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
     if operation == "add":
-        updated_events = list(state.get("events", [])) + new_events
+        updated_blocks = list(schedule_state.blocks) + new_work_blocks
     else:
-        remaining = [event for event in state.get("events", []) if event.get("categoria") != "laboral"]
-        updated_events = remaining + new_events
+        non_work = [b for b in schedule_state.blocks if b.block_type != "work"]
+        updated_blocks = non_work + new_work_blocks
 
     raw_inputs = dict(state.get("raw_inputs", {}))
     raw_inputs["horario_laboral_text"] = details
@@ -62,7 +69,7 @@ def apply_laboral_change(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=errors,
         raw_inputs=raw_inputs,
     )
@@ -86,11 +93,14 @@ def apply_academic_change(
         return build_prompt_update(ctx, replan, PROMPT_HORARIO_ACADEMICO, errors=errors)
 
     new_events = _validated_schedule_events(parsed, errors, "academico")
+    new_academic_blocks = events_to_schedule_blocks(new_events, "academic")
+
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
     if operation == "add":
-        updated_events = list(state.get("events", [])) + new_events
+        updated_blocks = list(schedule_state.blocks) + new_academic_blocks
     else:
-        remaining = [event for event in state.get("events", []) if event.get("categoria") != "academico"]
-        updated_events = remaining + new_events
+        non_academic = [b for b in schedule_state.blocks if b.block_type != "academic"]
+        updated_blocks = non_academic + new_academic_blocks
 
     raw_inputs = dict(state.get("raw_inputs", {}))
     raw_inputs["horario_academico_text"] = details
@@ -100,7 +110,7 @@ def apply_academic_change(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=errors,
         raw_inputs=raw_inputs,
     )
@@ -154,20 +164,11 @@ def apply_extracurricular_change(
             for item in extracurricular_items
             if normalize_text(item.nombre) != normalize_text(target_item.nombre)
         ]
-        updated_events = [
-            event
-            for event in state.get("events", [])
-            if not (
-                event.get("categoria") == "extracurricular"
-                and normalize_text(str(event.get("titulo") or "")) == normalize_text(target_item.nombre)
-            )
-        ]
         clear_replan_change_request(replan)
         return build_validate_update(
             ctx,
             replan=replan,
             awaiting_user_input=False,
-            events=updated_events,
             errors=list(state.get("errors", [])),
             extracurricular=updated_extracurricular,
         )
@@ -180,24 +181,28 @@ def apply_extracurricular_change(
             f"{PROMPT_EXTRAS}\nActividad actual: {activity_label}.",
         )
 
+    tz = state.get("timezone", "America/Bogota")
+
     if operation == "add":
         items, missing = parse_extracurricular_items(details)
         if missing:
             return build_prompt_update(ctx, replan, build_add_clarification_prompt(missing))
 
-        new_events, errors = build_events_for_new_extracurricular_items(
-            items,
-            state.get("timezone", "America/Bogota"),
-            list(state.get("errors", [])),
-        )
+        errors = list(state.get("errors", []))
+        items_with_events = []
+        for item in items:
+            generated = _valid_extracurricular_events(
+                build_events_from_extracurricular_item(item, tz), errors
+            )
+            items_with_events.append(item.model_copy(update={"tentativo": generated}))
+
         clear_replan_change_request(replan)
         return build_validate_update(
             ctx,
             replan=replan,
             awaiting_user_input=False,
-            events=list(state.get("events", [])) + new_events,
             errors=errors,
-            extracurricular=extracurricular_items + items,
+            extracurricular=extracurricular_items + items_with_events,
         )
 
     reference_name = target_item.nombre if target_item else ""
@@ -222,23 +227,21 @@ def apply_extracurricular_change(
         if hasattr(item, "model_copy")
         else item.copy(update={"nombre": target_item.nombre})
     )
+    errors = list(state.get("errors", []))
+    new_tentativo = _valid_extracurricular_events(
+        build_events_from_extracurricular_item(updated_item, tz), errors
+    )
+    updated_item = updated_item.model_copy(update={"tentativo": new_tentativo})
     updated_extracurricular = [
         updated_item if normalize_text(existing.nombre) == normalize_text(target_item.nombre) else existing
         for existing in extracurricular_items
     ]
-    updated_events, errors = rebuild_extracurricular_events(
-        updated_extracurricular,
-        state.get("events", []),
-        state.get("timezone", "America/Bogota"),
-        list(state.get("errors", [])),
-    )
 
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
         errors=errors,
         extracurricular=updated_extracurricular,
     )
@@ -265,25 +268,38 @@ def apply_activity_additions(
         return build_prompt_update(ctx, replan, str(parsed["prompt"]))
 
     errors = list(state.get("errors", []))
-    validated_events: list[Event] = []
-    for event in list(parsed["events"]):
-        try:
-            validate_event(event)
-        except ValueError as exc:
-            errors.append(f"Evento invalido al anadir actividad: {exc}")
-            continue
-        validated_events.append(event)
+    tz = state.get("timezone", "America/Bogota")
+
+    # Convertir eventos académicos/laborales a bloques y actualizar schedule
+    academic_blocks = events_to_schedule_blocks(
+        _filter_valid_events(list(parsed["events"]), errors), "academic"
+    )
+    work_blocks = events_to_schedule_blocks(
+        _filter_valid_events(list(parsed["events"]), errors), "work"
+    )
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    updated_blocks = list(schedule_state.blocks) + academic_blocks + work_blocks
+
+    # Agregar eventos generados a los items extracurriculares nuevos
+    new_extra_items = list(parsed["extracurricular"])
+    new_extra_items_with_events = []
+    for item in new_extra_items:
+        generated = _valid_extracurricular_events(
+            build_events_from_extracurricular_item(item, tz), errors
+        )
+        new_extra_items_with_events.append(item.model_copy(update={"tentativo": generated}))
 
     clear_replan_change_request(replan)
-    return build_validate_update(
-        ctx,
-        replan=replan,
-        awaiting_user_input=False,
-        events=list(state.get("events", [])) + validated_events,
-        errors=errors,
-        extracurricular=[ensure_item(item) for item in state.get("extracurricular", [])]
-        + list(parsed["extracurricular"]),
-    )
+    update: dict = {
+        "errors": errors,
+        "extracurricular": [ensure_item(item) for item in state.get("extracurricular", [])]
+        + new_extra_items_with_events,
+    }
+    if updated_blocks != list(schedule_state.blocks):
+        update["schedule"] = schedule_flow_state_to_update(
+            schedule_state.model_copy(update={"blocks": updated_blocks})
+        )
+    return build_validate_update(ctx, replan=replan, awaiting_user_input=False, **update)
 
 
 def _validated_schedule_events(
@@ -300,6 +316,33 @@ def _validated_schedule_events(
             continue
         new_events.append(event)
     return new_events
+
+
+def _filter_valid_events(events: list[Event], errors: list[str]) -> list[Event]:
+    valid: list[Event] = []
+    for event in events:
+        try:
+            validate_event(event)
+        except ValueError as exc:
+            errors.append(f"Evento invalido al anadir actividad: {exc}")
+            continue
+        valid.append(event)
+    return valid
+
+
+def _valid_extracurricular_events(
+    events: list[Event],
+    errors: list[str],
+) -> list[Event]:
+    valid: list[Event] = []
+    for event in events:
+        try:
+            validate_event(event)
+        except ValueError as exc:
+            errors.append(f"Evento extracurricular invalido: {exc}")
+            continue
+        valid.append(event)
+    return valid
 
 
 __all__ = [

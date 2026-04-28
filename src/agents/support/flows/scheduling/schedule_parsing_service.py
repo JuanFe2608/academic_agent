@@ -12,7 +12,6 @@ from dataclasses import dataclass
 from agents.support.nodes.utils import append_message
 from agents.support.scheduling import replace_section_blocks
 from agents.support.scheduling.pipeline import parse_fixed_schedule_section
-from agents.support.scheduling.render import blocks_to_events
 from agents.support.scheduling.state_helpers import (
     ensure_raw_inputs,
     ensure_schedule_flow_state,
@@ -138,7 +137,6 @@ def handle_schedule_parsing_turn(
         return {
             "phase": "schedules",
             "raw_inputs": raw_inputs_update,
-            "events": blocks_to_events(blocks),
             "academic_pending_items": [],
             "work_pending_items": [],
             "schedule": update_schedule_flow_state(
@@ -158,7 +156,6 @@ def handle_schedule_parsing_turn(
 
     return {
         "raw_inputs": raw_inputs_update,
-        "events": blocks_to_events(blocks),
         "academic_pending_items": [],
         "work_pending_items": [],
         "schedule": reset_schedule_review_state(
@@ -208,7 +205,6 @@ def _build_pending_section_update(
     return {
         "phase": "schedules",
         "raw_inputs": raw_inputs_update,
-        "events": blocks_to_events(blocks),
         "academic_pending_items": pending_items if target == "academic" else [],
         "work_pending_items": pending_items if target == "work" else [],
         "schedule": update_schedule_flow_state(
@@ -244,7 +240,6 @@ def _build_more_prompt_update(
     return {
         "phase": "schedules",
         "raw_inputs": raw_inputs_update,
-        "events": blocks_to_events(blocks),
         "academic_pending_items": [],
         "work_pending_items": [],
         "schedule": update_schedule_flow_state(

@@ -6,7 +6,6 @@ from agents.support.dependencies import get_study_recommendation_service
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
 from schemas.rag import StudyRecommendationQuery
-from utils.avatar_assets import AVATAR_HORA_DE_ESTUDIAR, with_avatar
 from services.study_recommendations import (
     AppliedStudyMethodService,
     build_applied_method_request_from_text,
@@ -67,7 +66,7 @@ def answer_study_recommendation(state: AgentState) -> dict:
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": return_phase != "end",
-        "messages": append_message(messages, "assistant", with_avatar(answer, AVATAR_HORA_DE_ESTUDIAR)),
+        "messages": append_message(messages, "assistant", answer),
     }
 
 

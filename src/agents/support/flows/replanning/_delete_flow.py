@@ -3,7 +3,16 @@
 from __future__ import annotations
 
 from agents.support.nodes.utils import parse_yes_no
+from agents.support.scheduling.state_helpers import (
+    ensure_schedule_flow_state,
+    get_all_schedule_events,
+    schedule_flow_state_to_update,
+)
 from agents.support.state import AgentState
+from services.scheduling.event_projection import (
+    SCHEDULE_BLOCK_EVENT_ID_PREFIX,
+    event_block_id,
+)
 
 from ._activity_additions import delete_from_extracurricular, ensure_item, extract_activity_name_from_delete_text
 from ._matching import (
@@ -34,6 +43,8 @@ def apply_delete_change(
     candidate_ids = list(change_request.get("candidate_event_ids") or [])
     details = details.strip()
 
+    all_events = get_all_schedule_events(state)
+
     if stage == "awaiting_delete_confirmation":
         answer = parse_yes_no(details)
         if answer is None:
@@ -44,12 +55,12 @@ def apply_delete_change(
         if answer is False:
             clear_replan_change_request(replan)
             return build_validate_update(ctx, replan=replan, awaiting_user_input=False)
-        return _delete_selected_events(state, candidate_ids, replan, ctx)
+        return _delete_selected_events(state, candidate_ids, all_events, replan, ctx)
 
     if stage == "awaiting_delete_scope":
         scope = parse_delete_scope(details)
         if scope == "all":
-            selected = events_from_ids(state.get("events", []), candidate_ids)
+            selected = events_from_ids(all_events, candidate_ids)
             change_request["stage"] = "awaiting_delete_confirmation"
             change_request["candidate_event_ids"] = [str(event.get("id")) for event in selected]
             replan["change_request"] = change_request
@@ -84,7 +95,7 @@ def apply_delete_change(
                 replan,
                 "Indica el dia y horario exactos de la actividad que deseas eliminar.",
             )
-        selected = filter_events_by_hint(events_from_ids(state.get("events", []), candidate_ids), details)
+        selected = filter_events_by_hint(events_from_ids(all_events, candidate_ids), details)
         if not selected:
             return build_prompt_update(
                 ctx,
@@ -109,7 +120,6 @@ def apply_delete_change(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, build_delete_confirmation_prompt(selected))
 
-    events = list(state.get("events", []))
     requested_name = (
         str(change_request.get("activity_name") or "").strip()
         or extract_activity_name_from_delete_text(details)
@@ -120,9 +130,11 @@ def apply_delete_change(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, "Cual es la actividad que deseas eliminar?")
 
-    matches = find_delete_matches(events, requested_name)
+    matches = find_delete_matches(all_events, requested_name)
     if not matches:
-        disponibles = ", ".join(sorted({str(event.get("titulo") or "") for event in events if event.get("titulo")}))
+        disponibles = ", ".join(
+            sorted({str(event.get("titulo") or "") for event in all_events if event.get("titulo")})
+        )
         return build_prompt_update(
             ctx,
             replan,
@@ -168,25 +180,39 @@ def apply_delete_change(
 def _delete_selected_events(
     state: AgentState,
     candidate_ids: list[str],
+    all_events: list,
     replan: dict,
     ctx: ReplanTurnContext,
 ) -> dict:
     id_set = set(candidate_ids)
-    selected_events = [event for event in state.get("events", []) if str(event.get("id")) in id_set]
-    updated_events = [event for event in state.get("events", []) if str(event.get("id")) not in id_set]
+    selected_events = [e for e in all_events if str(e.get("id")) in id_set]
+
+    # Eliminar bloques de schedule correspondientes a eventos schedule_block
+    block_ids_to_remove = {
+        event_block_id(e)
+        for e in selected_events
+        if str(e.get("id", "")).startswith(SCHEDULE_BLOCK_EVENT_ID_PREFIX + ":")
+    } - {None}
+
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    updated_blocks = [b for b in schedule_state.blocks if b.block_id not in block_ids_to_remove]
+
+    # Eliminar items extracurriculares correspondientes
     updated_extracurricular = delete_from_extracurricular(
         [ensure_item(item) for item in state.get("extracurricular", [])],
         selected_events,
     )
+
     clear_replan_change_request(replan)
-    return build_validate_update(
-        ctx,
-        replan=replan,
-        awaiting_user_input=False,
-        events=updated_events,
-        extracurricular=updated_extracurricular,
-        errors=list(state.get("errors", [])),
-    )
+    update: dict = {
+        "extracurricular": updated_extracurricular,
+        "errors": list(state.get("errors", [])),
+    }
+    if updated_blocks != list(schedule_state.blocks):
+        update["schedule"] = schedule_flow_state_to_update(
+            schedule_state.model_copy(update={"blocks": updated_blocks})
+        )
+    return build_validate_update(ctx, replan=replan, awaiting_user_input=False, **update)
 
 
 __all__ = ["apply_delete_change"]

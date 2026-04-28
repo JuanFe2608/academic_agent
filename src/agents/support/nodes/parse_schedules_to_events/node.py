@@ -12,7 +12,6 @@ from agents.support.flows.scheduling.schedule_parsing_service import (
     handle_schedule_parsing_turn,
 )
 from agents.support.state import AgentState
-from utils.avatar_assets import AVATAR_ESTOY_ANALIZANDO, inject_avatar_into_update
 
 
 def parse_schedules_to_events(state: AgentState) -> dict:
@@ -26,4 +25,4 @@ def parse_schedules_to_events(state: AgentState) -> dict:
         more_work=PROMPT_MORE_WORK,
     )
     update = handle_schedule_parsing_turn(state, prompts=prompts)
-    return inject_avatar_into_update(update, AVATAR_ESTOY_ANALIZANDO)
+    return update

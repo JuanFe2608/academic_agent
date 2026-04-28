@@ -7,7 +7,6 @@ from agents.support.flows.scheduling.schedule_review_service import (
     handle_schedule_review_turn,
 )
 from agents.support.state import AgentState
-from utils.avatar_assets import AVATAR_CONFIRMACION, inject_avatar_into_update
 
 
 def validate_schedule(state: AgentState) -> dict:
@@ -26,4 +25,4 @@ def validate_schedule(state: AgentState) -> dict:
         last_text=last_text,
         current_count=current_count,
     )
-    return inject_avatar_into_update(update, AVATAR_CONFIRMACION)
+    return update

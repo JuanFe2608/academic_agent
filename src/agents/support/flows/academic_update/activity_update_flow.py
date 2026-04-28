@@ -14,11 +14,6 @@ from services.planning import (
     parse_academic_activity_request,
 )
 from services.planning.academic_update_orchestrator import reference_datetime
-from utils.avatar_assets import (
-    AVATAR_BUEN_TRABAJO,
-    AVATAR_SE_ACERCA_ENTREGA,
-    inject_avatar_into_update,
-)
 
 
 def handle_activity_confirmation(
@@ -142,14 +137,11 @@ def try_handle_session_tracking(
     if not tracking_result.detected:
         return None
 
-    return inject_avatar_into_update(
-        _tracking_result_update(
-            state,
-            result=tracking_result,
-            current_count=current_count,
-            last_text=last_text,
-        ),
-        AVATAR_BUEN_TRABAJO,
+    return _tracking_result_update(
+        state,
+        result=tracking_result,
+        current_count=current_count,
+        last_text=last_text,
     )
 
 
@@ -180,14 +172,11 @@ def try_handle_activity_request(
     if not activity_result.detected:
         return None
 
-    return inject_avatar_into_update(
-        _activity_result_update(
-            state,
-            result=activity_result,
-            current_count=current_count,
-            last_text=last_text,
-        ),
-        AVATAR_SE_ACERCA_ENTREGA,
+    return _activity_result_update(
+        state,
+        result=activity_result,
+        current_count=current_count,
+        last_text=last_text,
     )
 
 

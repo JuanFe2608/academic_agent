@@ -175,6 +175,19 @@ class InMemoryOnboardingRepository:
             self._students_by_code[student_code] = existing
             return expected_id
 
+        # Si el mismo email y código ya apuntan al mismo estudiante (p.ej. insertado
+        # parcialmente por el flujo OAuth), completar el perfil en lugar de rechazar.
+        if (
+            existing_by_email
+            and existing_by_code
+            and int(existing_by_email["id"]) == int(existing_by_code["id"])
+        ):
+            existing = existing_by_email
+            existing.update(_student_payload(profile, student_id=int(existing["id"])))
+            self._students_by_email[institutional_email] = existing
+            self._students_by_code[student_code] = existing
+            return int(existing["id"])
+
         if self.student_exists_by_email(institutional_email):
             raise DuplicateInstitutionalEmailError(institutional_email)
         if self.student_exists_by_code(student_code):
@@ -399,9 +412,17 @@ class PostgresOnboardingRepository:
                 student_id=int(persisted_student_id),
             )
 
-        if self.student_exists_by_email(institutional_email):
+        # Si el mismo email y código ya apuntan al mismo estudiante (p.ej. insertado
+        # parcialmente por el flujo OAuth), completar el perfil en lugar de rechazar.
+        with self._connect() as conn:
+            email_id = self._student_id_by_email(conn, institutional_email)
+            code_id = self._student_id_by_code(conn, student_code)
+
+        if email_id is not None and code_id is not None and int(email_id) == int(code_id):
+            return self._complete_existing_student(profile, student_id=int(email_id))
+        if email_id is not None:
             raise DuplicateInstitutionalEmailError(institutional_email)
-        if self.student_exists_by_code(student_code):
+        if code_id is not None:
             raise DuplicateStudentCodeError(student_code)
 
         academic_program = _profile_value(profile, "academic_program")

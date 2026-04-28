@@ -17,7 +17,6 @@ from services.planning import (
     sync_subjects_and_study_plan,
 )
 from services.priorities import subject_items_to_update
-from utils.avatar_assets import AVATAR_PLAN_LISTO, with_avatar
 
 
 def build_study_plan(state: AgentState) -> dict:
@@ -65,14 +64,11 @@ def build_study_plan(state: AgentState) -> dict:
     persisted_update["messages"] = append_message(
         messages,
         "assistant",
-        with_avatar(
-            build_study_plan_summary(
-                subject_items_to_update(persisted_update.get("subjects", result.subjects)),
-                ensure_study_plan_state(persisted_update.get("study_plan", study_plan)),
-                academic_activities=active_academic_activities(academic_activities),
-                reminders=persisted_update.get("reminders", state.get("reminders", {})),
-            ),
-            AVATAR_PLAN_LISTO,
+        build_study_plan_summary(
+            subject_items_to_update(persisted_update.get("subjects", result.subjects)),
+            ensure_study_plan_state(persisted_update.get("study_plan", study_plan)),
+            academic_activities=active_academic_activities(academic_activities),
+            reminders=persisted_update.get("reminders", state.get("reminders", {})),
         ),
     )
     return persisted_update

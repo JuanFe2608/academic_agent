@@ -18,7 +18,6 @@ from services.personalization import (
     parse_likert_answer,
 )
 from services.personalization.runtime import coerce_int_answer_map, current_timestamp
-from utils.avatar_assets import AVATAR_TE_ESCUCHO, with_avatar
 
 from .prompt import build_question_prompt
 
@@ -81,7 +80,7 @@ def _do_collect_study_profile(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                with_avatar(question_content, AVATAR_TE_ESCUCHO) if is_intro else question_content,
+                question_content,
             ),
         }
 

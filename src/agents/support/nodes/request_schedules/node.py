@@ -13,7 +13,6 @@ from agents.support.flows.scheduling.schedule_capture_service import (
     handle_schedule_capture_turn,
 )
 from agents.support.state import AgentState
-from utils.avatar_assets import AVATAR_ORGANICEMOS_TU_SEMANA, inject_avatar_into_update
 
 from .prompt import (
     PROMPT_ACADEMICO,
@@ -53,4 +52,4 @@ def request_schedules(state: AgentState) -> dict:
         current_count=current_count,
         prompts=prompts,
     )
-    return inject_avatar_into_update(update, AVATAR_ORGANICEMOS_TU_SEMANA)
+    return update

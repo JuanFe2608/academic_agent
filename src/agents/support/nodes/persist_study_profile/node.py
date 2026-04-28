@@ -10,7 +10,6 @@ from agents.support.nodes.utils import append_message
 from agents.support.personalization.formatter import build_personalization_summary
 from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
-from utils.avatar_assets import AVATAR_PERFIL_LISTO, with_avatar
 
 
 _OPERATIONAL_WELCOME = (
@@ -55,10 +54,7 @@ def persist_study_profile(state: AgentState) -> dict:
             "messages": append_message(
                 messages,
                 "assistant",
-                with_avatar(
-                    _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
-                    AVATAR_PERFIL_LISTO,
-                ),
+                _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
             ),
         }
 

@@ -390,15 +390,20 @@ def _start_update_operation(
     if not operation.reference_text:
         change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_identifier")
         change_request["candidate_block_ids"] = [block.block_id for block in _target_blocks(blocks, operation.target)]
+        _update_text = (
+            "Que bloque de tu horario fijo quieres modificar?\n"
+            f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
+        )
         return _prompt_update(
             state,
             phase="fixed_schedule_management",
             current_count=current_count,
             last_text=text,
             awaiting_user_input=True,
-            prompt=(
-                "Que bloque de tu horario fijo quieres modificar?\n"
-                f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
+            prompt=_try_render_schedule_content(
+                _target_blocks(blocks, operation.target) or blocks,
+                _update_text,
+                str(state.get("timezone", "America/Bogota")),
             ),
             replan=_store_change_request(dict(state.get("replan", {})), change_request),
             interaction=_pending_interaction(
@@ -495,15 +500,20 @@ def _start_delete_operation(
     if not operation.reference_text:
         change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_identifier")
         change_request["candidate_block_ids"] = [block.block_id for block in _target_blocks(blocks, operation.target)]
+        _delete_text = (
+            "Que bloque de tu horario fijo quieres eliminar?\n"
+            f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
+        )
         return _prompt_update(
             state,
             phase="fixed_schedule_management",
             current_count=current_count,
             last_text=text,
             awaiting_user_input=True,
-            prompt=(
-                "Que bloque de tu horario fijo quieres eliminar?\n"
-                f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
+            prompt=_try_render_schedule_content(
+                _target_blocks(blocks, operation.target) or blocks,
+                _delete_text,
+                str(state.get("timezone", "America/Bogota")),
             ),
             replan=_store_change_request(dict(state.get("replan", {})), change_request),
             interaction=_pending_interaction(
@@ -606,13 +616,18 @@ def _queue_update_confirmation(
         "requires_persistence": True,
         "requires_outlook_sync": True,
     }
-    prompt = (
+    prompt_text = (
         "Voy a modificar este bloque de tu horario fijo.\n\n"
         "Actual:\n"
         f"{format_fixed_schedule_blocks([selected])}\n\n"
         "Quedara asi:\n"
         f"{format_fixed_schedule_blocks(preview.replacement_blocks)}\n\n"
         "Confirmas el cambio?"
+    )
+    prompt = _try_render_schedule_content(
+        blocks,
+        prompt_text,
+        str(state.get("timezone", "America/Bogota")),
     )
     change_request.update(
         {
@@ -624,7 +639,7 @@ def _queue_update_confirmation(
         }
     )
     replan = _store_change_request(replan, change_request)
-    replan["pending_prompt"] = prompt
+    replan["pending_prompt"] = prompt_text
     return _prompt_update(
         state,
         phase="fixed_schedule_management",
@@ -657,9 +672,14 @@ def _queue_delete_confirmation(
         "requires_persistence": True,
         "requires_outlook_sync": True,
     }
-    prompt = (
+    prompt_text = (
         "Estas seguro de que deseas eliminar este bloque de tu horario fijo?\n\n"
         f"{format_fixed_schedule_blocks(selected)}"
+    )
+    prompt = _try_render_schedule_content(
+        blocks,
+        prompt_text,
+        str(state.get("timezone", "America/Bogota")),
     )
     change_request.update(
         {
@@ -671,7 +691,7 @@ def _queue_delete_confirmation(
         }
     )
     replan = _store_change_request(replan, change_request)
-    replan["pending_prompt"] = prompt
+    replan["pending_prompt"] = prompt_text
     return _prompt_update(
         state,
         phase="fixed_schedule_management",

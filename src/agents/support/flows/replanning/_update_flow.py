@@ -6,10 +6,21 @@ import re
 
 from agents.support.nodes.collect_extracurricular_details import parse_extracurricular_text
 from agents.support.nodes.utils import normalize_text, parse_yes_no
+from agents.support.scheduling.state_helpers import (
+    ensure_schedule_flow_state,
+    get_all_schedule_events,
+    schedule_flow_state_to_update,
+)
 from agents.support.state import AgentState
 from schemas.scheduling import Event
 from services.scheduling.activity_matching import suggest_similar_titles
+from services.scheduling.event_projection import (
+    blocks_to_schedule_events,
+    event_block_id,
+    events_to_schedule_blocks,
+)
 from services.scheduling.text_parser import extract_natural_schedule_components
+from services.scheduling.validation import validate_event
 
 from ._prompts import PROMPT_EXTRAS
 from ._activity_additions import (
@@ -20,7 +31,6 @@ from ._activity_additions import (
     format_extracurricular_update_summary,
     has_explicit_activity_name,
     infer_activity_title,
-    rebuild_extracurricular_events,
     strip_change_intent,
 )
 from ._matching import (
@@ -51,9 +61,10 @@ def handle_activity_update(
     details = str(details or "").strip()
     candidate_ids = list(change_request.get("candidate_event_ids") or [])
     selected_event_id = str(change_request.get("selected_event_id") or "")
-    selected_event = event_from_id(state.get("events", []), selected_event_id)
     selected_event_ids = list(change_request.get("selected_event_ids") or [])
-    selected_events = events_from_ids(state.get("events", []), selected_event_ids)
+    all_events = get_all_schedule_events(state)
+    selected_event = event_from_id(all_events, selected_event_id)
+    selected_events = events_from_ids(all_events, selected_event_ids)
     apply_to_all = bool(change_request.get("apply_to_all"))
 
     if stage == "awaiting_update_identifier":
@@ -227,15 +238,10 @@ def handle_activity_update(
 
 
 def candidate_events_for_target(state: AgentState, target: str) -> list[Event]:
+    all_events = get_all_schedule_events(state)
     if target == "activity_lookup":
-        return list(state.get("events", []))
-    events = [event for event in state.get("events", []) if event.get("categoria") == target]
-    if events or target != "extracurricular":
-        return events
-    generated: list[Event] = []
-    for item in [ensure_item(item) for item in state.get("extracurricular", [])]:
-        generated.extend(build_events_from_extracurricular_item(item, state.get("timezone", "America/Bogota")))
-    return generated
+        return all_events
+    return [event for event in all_events if event.get("categoria") == target]
 
 
 def extract_update_reference_and_payload(details: str, activity_name: str) -> tuple[str, str]:
@@ -659,19 +665,24 @@ def _apply_selected_academic_update(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, str(parsed["prompt"]))
 
-    updated_events = replace_selected_event(
-        state.get("events", []),
-        str(selected_event.get("id")),
-        list(parsed["events"]),
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    old_block_id = event_block_id(selected_event)
+    remaining_blocks = [b for b in schedule_state.blocks if b.block_id != old_block_id]
+    new_blocks = events_to_schedule_blocks(list(parsed["events"]), "academic")
+    updated_blocks = remaining_blocks + new_blocks
+
+    updated_academic_events = blocks_to_schedule_events(
+        [b for b in updated_blocks if b.block_type == "academic"]
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
-    raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_events, "academico")
+    raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_academic_events, "academico")
+
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -696,19 +707,24 @@ def _apply_selected_laboral_update(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, str(parsed["prompt"]))
 
-    updated_events = replace_selected_event(
-        state.get("events", []),
-        str(selected_event.get("id")),
-        list(parsed["events"]),
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    old_block_id = event_block_id(selected_event)
+    remaining_blocks = [b for b in schedule_state.blocks if b.block_id != old_block_id]
+    new_blocks = events_to_schedule_blocks(list(parsed["events"]), "work")
+    updated_blocks = remaining_blocks + new_blocks
+
+    updated_work_events = blocks_to_schedule_events(
+        [b for b in updated_blocks if b.block_type == "work"]
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
-    raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_events, "laboral")
+    raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_work_events, "laboral")
+
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -733,19 +749,24 @@ def _apply_selected_academic_update_all(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, str(parsed["prompt"]))
 
-    updated_events = replace_selected_events(
-        state.get("events", []),
-        [str(event.get("id")) for event in selected_events],
-        list(parsed["events"]),
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    old_block_ids = {event_block_id(e) for e in selected_events} - {None}
+    remaining_blocks = [b for b in schedule_state.blocks if b.block_id not in old_block_ids]
+    new_blocks = events_to_schedule_blocks(list(parsed["events"]), "academic")
+    updated_blocks = remaining_blocks + new_blocks
+
+    updated_academic_events = blocks_to_schedule_events(
+        [b for b in updated_blocks if b.block_type == "academic"]
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
-    raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_events, "academico")
+    raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_academic_events, "academico")
+
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -770,19 +791,24 @@ def _apply_selected_laboral_update_all(
         replan["change_request"] = change_request
         return build_prompt_update(ctx, replan, str(parsed["prompt"]))
 
-    updated_events = replace_selected_events(
-        state.get("events", []),
-        [str(event.get("id")) for event in selected_events],
-        list(parsed["events"]),
+    schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
+    old_block_ids = {event_block_id(e) for e in selected_events} - {None}
+    remaining_blocks = [b for b in schedule_state.blocks if b.block_id not in old_block_ids]
+    new_blocks = events_to_schedule_blocks(list(parsed["events"]), "work")
+    updated_blocks = remaining_blocks + new_blocks
+
+    updated_work_events = blocks_to_schedule_events(
+        [b for b in updated_blocks if b.block_type == "work"]
     )
     raw_inputs = dict(state.get("raw_inputs", {}))
-    raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_events, "laboral")
+    raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_work_events, "laboral")
+
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
+        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -835,21 +861,22 @@ def _apply_selected_extracurricular_update(
         if hasattr(item, "model_copy")
         else item.copy(update={"nombre": updated_name})
     )
-    extracurricular_items[target_item_index] = updated_item
-    updated_events, errors = rebuild_extracurricular_events(
-        extracurricular_items,
-        state.get("events", []),
-        state.get("timezone", "America/Bogota"),
-        list(state.get("errors", [])),
+
+    errors = list(state.get("errors", []))
+    tz = state.get("timezone", "America/Bogota")
+    new_tentativo = _validated_extracurricular_events(
+        build_events_from_extracurricular_item(updated_item, tz), errors
     )
+    updated_item = updated_item.model_copy(update={"tentativo": new_tentativo})
+    extracurricular_items[target_item_index] = updated_item
+
     clear_replan_change_request(replan)
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        events=updated_events,
-        errors=errors,
         extracurricular=extracurricular_items,
+        errors=errors,
     )
 
 
@@ -884,23 +911,16 @@ def parse_updated_schedule_payload(
     }
 
 
-def replace_selected_event(
-    events: list[Event],
-    selected_event_id: str,
-    replacement_events: list[Event],
-) -> list[Event]:
-    updated = [event for event in events if str(event.get("id")) != str(selected_event_id)]
-    return updated + replacement_events
-
-
-def replace_selected_events(
-    events: list[Event],
-    selected_event_ids: list[str],
-    replacement_events: list[Event],
-) -> list[Event]:
-    id_set = {str(event_id) for event_id in selected_event_ids}
-    updated = [event for event in events if str(event.get("id")) not in id_set]
-    return updated + replacement_events
+def _validated_extracurricular_events(events: list[Event], errors: list[str]) -> list[Event]:
+    valid: list[Event] = []
+    for event in events:
+        try:
+            validate_event(event)
+        except ValueError as exc:
+            errors.append(f"Evento extracurricular invalido: {exc}")
+            continue
+        valid.append(event)
+    return valid
 
 
 def serialize_events_for_category(events: list[Event], category: str) -> str:

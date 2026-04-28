@@ -8,12 +8,11 @@ from agents.support.flows.planning.persistence_support import (
 from agents.support.flows.priorities.priority_capture_service import (
     handle_priorities_turn,
 )
+from agents.support.nodes.build_study_plan.node import build_study_plan as _build_study_plan
 from agents.support.nodes.utils import append_message
 from agents.support.priorities.config import is_post_radar_flow_enabled
 from agents.support.state import AgentState
-from services.conversation.state_helpers import update_interaction_state
 from services.planning import coerce_academic_activities
-from utils.avatar_assets import AVATAR_PRIORIDAD_ALTA, inject_avatar_into_update
 
 
 _NO_ACTIVITIES_REDIRECT = (
@@ -35,24 +34,28 @@ def collect_priorities(state: AgentState) -> dict:
     has_pending = any(a.status == "pending" for a in activities)
     if not has_pending:
         messages = state.get("messages", [])
-        return inject_avatar_into_update(
-            {
-                "phase": "running",
-                "awaiting_user_input": True,
-                "messages": append_message(messages, "assistant", _NO_ACTIVITIES_REDIRECT),
-            },
-            AVATAR_PRIORIDAD_ALTA,
-        )
+        return {
+            "phase": "running",
+            "awaiting_user_input": True,
+            "messages": append_message(messages, "assistant", _NO_ACTIVITIES_REDIRECT),
+        }
 
     update = handle_priorities_turn(state)
     priorities_state = dict(update.get("priorities") or state.get("priorities", {}))
     status = priorities_state.get("status")
-    study_plan_interaction = update_interaction_state(state, active_subflow="study_plan")
+
     if status == "completed" and is_post_radar_flow_enabled():
-        final = {**update, **study_plan_interaction}
-    elif status in {"completed", "skipped"}:
-        persisted = persist_planning_snapshot_for_update(state, update)
-        final = {**persisted, **study_plan_interaction}
-    else:
-        final = update
-    return inject_avatar_into_update(final, AVATAR_PRIORIDAD_ALTA)
+        # Inyectar avatar de prioridades antes de crear el estado intermedio
+        # para que el mensaje de confirmación ya tenga el avatar cuando
+        # build_study_plan lea el historial.
+        priority_final = dict(update)
+        intermediate = state.model_copy(
+            update={k: v for k, v in priority_final.items() if k in state.model_fields}
+        )
+        plan_result = _build_study_plan(intermediate)
+        return {**priority_final, **plan_result}
+
+    if status in {"completed", "skipped"}:
+        return persist_planning_snapshot_for_update(state, update)
+
+    return update

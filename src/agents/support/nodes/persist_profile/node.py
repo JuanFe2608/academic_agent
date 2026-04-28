@@ -9,6 +9,7 @@ from agents.support.nodes.utils import append_message, copy_onboarding_state
 from agents.support.onboarding.messages import build_field_prompt
 from agents.support.state import AgentState
 from services.onboarding import load_onboarding_config
+from services.sync.microsoft_oauth_flow_service import is_microsoft_oauth_required
 
 
 def persist_profile(state: AgentState) -> dict:
@@ -18,6 +19,12 @@ def persist_profile(state: AgentState) -> dict:
     profile = dict(state.get("student_profile", {}))
     onboarding = copy_onboarding_state(state)
     config = load_onboarding_config()
+
+    # Cuando OAuth no es requerido no hay mecanismo de verificación de correo en el
+    # flujo — el OTP fue removido y el gate de OAuth está desactivado. En ese caso
+    # se acepta el correo tal como fue ingresado.
+    if not is_microsoft_oauth_required() and not profile.get("email_verified"):
+        profile["email_verified"] = True
 
     try:
         result = get_onboarding_service().persist_student(profile)

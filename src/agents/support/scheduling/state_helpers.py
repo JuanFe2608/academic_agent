@@ -329,7 +329,6 @@ def _serialize_scheduling_field(state: Any, field_name: str) -> object:
     if field_name == "schedule":
         return schedule_flow_state_to_update(value)
     if field_name in {
-        "events",
         "extracurricular",
         "extras_pending_items",
         "academic_pending_items",
@@ -337,3 +336,37 @@ def _serialize_scheduling_field(state: Any, field_name: str) -> object:
     }:
         return list(value)
     return value
+
+
+def get_all_schedule_events(state: AgentState | Mapping[str, object]) -> list[Event]:
+    """Deriva todos los eventos del horario a partir de bloques y extracurriculares.
+
+    schedule.blocks es la fuente de verdad para el horario fijo (académico/laboral).
+    Los eventos extracurriculares se recuperan del campo `tentativo` de cada item,
+    que se popula en el nodo generate_tentative_extracurricular durante el setup.
+    """
+    from services.scheduling.extracurricular_events import build_fixed_events
+
+    raw_schedule = (
+        state.get("schedule", {}) if hasattr(state, "get") else getattr(state, "schedule", {})
+    )
+    schedule_state = ensure_schedule_flow_state(raw_schedule)
+    block_events: list[Event] = blocks_to_schedule_events(list(schedule_state.blocks))
+
+    tz = str(
+        state.get("timezone", "America/Bogota")
+        if hasattr(state, "get")
+        else getattr(state, "timezone", "America/Bogota")
+    )
+    raw_extras = (
+        state.get("extracurricular", []) if hasattr(state, "get") else getattr(state, "extracurricular", [])
+    )
+    extra_events: list[Event] = []
+    for raw_item in raw_extras:
+        item = ensure_extracurricular_item(raw_item)
+        if item.tentativo:
+            extra_events.extend(item.tentativo)
+        elif not item.es_variable and item.dias and item.hora_inicio:
+            extra_events.extend(build_fixed_events(item, tz))
+
+    return block_events + extra_events

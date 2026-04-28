@@ -36,7 +36,6 @@ from schemas.planning import (
 )
 from schemas.reminders import RemindersState as _RemindersState
 from schemas.scheduling import (
-    Event as _Event,
     ExtracurricularItem as _ExtracurricularItem,
     PendingExtracurricularItem as _PendingExtracurricularItem,
     PendingScheduleItem as _PendingScheduleItem,
@@ -113,7 +112,6 @@ class _SchedulingDomainState(_BaseSchemaModel):
     academic_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     work_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     extracurricular: list[_ExtracurricularItem] = Field(default_factory=list)
-    events: list[_Event] = Field(default_factory=list)
     schedule_preview: _SchedulePreview = Field(default_factory=_SchedulePreview)
     schedule: _ScheduleFlowState = Field(default_factory=_ScheduleFlowState)
 
@@ -184,7 +182,6 @@ class AgentState(_BaseSchemaModel):
             "academic_pending_items",
             "work_pending_items",
             "extracurricular",
-            "events",
             "schedule_preview",
             "schedule",
         ),
@@ -200,9 +197,7 @@ class AgentState(_BaseSchemaModel):
         ),
         "integrations": ("calendar",),
     }
-    _DERIVATION_CANDIDATES: ClassVar[dict[str, str]] = {
-        "events": "Copia de trabajo para replanning; schedule.blocks es la fuente de verdad. Migración pendiente Fase 1.",
-    }
+    _DERIVATION_CANDIDATES: ClassVar[dict[str, str]] = {}
 
     messages: Annotated[list[BaseMessage], add_sanitized_messages] = Field(default_factory=list)
     phase: Phase = "consent"
@@ -226,7 +221,6 @@ class AgentState(_BaseSchemaModel):
     academic_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     work_pending_items: list[_PendingScheduleItem] = Field(default_factory=list)
     extracurricular: list[_ExtracurricularItem] = Field(default_factory=list)
-    events: list[_Event] = Field(default_factory=list)
     schedule_preview: _SchedulePreview = Field(default_factory=_SchedulePreview)
     schedule: _ScheduleFlowState = Field(default_factory=_ScheduleFlowState)
     calendar: _CalendarState = Field(default_factory=_CalendarState)

@@ -54,16 +54,20 @@ _ALL_DAYS_PATTERN = re.compile(
 
 
 def generate_tentative_extracurricular(state: Mapping[str, object]) -> dict:
-    """Genera eventos para actividades variables y fijas."""
+    """Genera y almacena eventos para actividades variables y fijas.
+
+    Todos los eventos válidos quedan en `item.tentativo` para que puedan
+    recuperarse en fases posteriores sin necesidad de un campo `events` en
+    el estado del grafo.
+    """
 
     timezone = str(state.get("timezone", "America/Bogota"))
-    events: list[Event] = list(state.get("events", []))
     errors = list(state.get("errors", []))
     extracurricular_updated: list[ExtracurricularItem] = []
 
     for item in state.get("extracurricular", []):
         updated_item = ensure_extracurricular_item(item)
-        tentativos: list[Event] = []
+        valid_events: list[Event] = []
         generated_events = (
             build_tentative_events(updated_item, timezone)
             if updated_item.get("es_variable")
@@ -75,15 +79,12 @@ def generate_tentative_extracurricular(state: Mapping[str, object]) -> dict:
             except ValueError as exc:
                 errors.append(f"Evento extracurricular invalido: {exc}")
                 continue
-            events.append(event)
-            if event.get("tipo") == "tentativo":
-                tentativos.append(event)
-        updated_item.tentativo = tentativos
+            valid_events.append(event)
+        updated_item.tentativo = valid_events
         extracurricular_updated.append(updated_item)
 
     return {
         "extracurricular": extracurricular_updated,
-        "events": events,
         "errors": errors,
         "phase": "draft",
     }

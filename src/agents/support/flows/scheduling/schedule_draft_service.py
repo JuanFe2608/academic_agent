@@ -11,7 +11,6 @@ from agents.support.scheduling import (
     build_schedule_summary,
     detect_schedule_conflicts,
 )
-from agents.support.scheduling.render import blocks_to_events
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
     update_schedule_flow_state,
@@ -35,7 +34,6 @@ def build_schedule_draft_turn(state: AgentState) -> dict:
             summary_text=summary_text,
             review_stage="idle",
         ),
-        "events": blocks_to_events(updated_blocks),
         "schedule_preview": {"text": summary_text, "image_path": None},
         "phase": "validate",
     }

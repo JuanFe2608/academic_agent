@@ -8,11 +8,54 @@ import mimetypes
 import os
 import re
 from pathlib import Path
+from typing import Any
 
 _DATA_IMAGE_RE = re.compile(
     r"^data:(?P<mime>image/[a-zA-Z0-9.+-]+);base64,(?P<data>.*)$",
     re.DOTALL,
 )
+
+IMAGE_RECEIVED_MARKER = "[imagen recibida]"
+
+
+def strip_image_to_marker(content: Any) -> Any:
+    """Reemplaza datos de imagen con un marcador de texto. Sin I/O — seguro en async."""
+    if isinstance(content, str):
+        return IMAGE_RECEIVED_MARKER if is_data_image_url(content) else content
+    if isinstance(content, list):
+        return [strip_image_to_marker(item) for item in content]
+    if isinstance(content, tuple):
+        return tuple(strip_image_to_marker(item) for item in content)
+    if isinstance(content, dict):
+        return _strip_image_dict(content)
+    return content
+
+
+def _strip_image_dict(item: dict) -> dict:
+    item_type = str(item.get("type") or "")
+
+    if item_type in {"image", "input_image"}:
+        if item.get("data") or item.get("base64"):
+            return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
+        return item
+
+    if item_type == "image_url":
+        image_url = item.get("image_url")
+        if isinstance(image_url, dict):
+            url = str(image_url.get("url") or "")
+            # Solo strip data URLs (base64 inline) — las rutas locales de WhatsApp
+            # se preservan para que el nodo pueda leerlas y enviarlas al LLM.
+            if is_data_image_url(url):
+                return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
+        elif isinstance(image_url, str) and is_data_image_url(image_url):
+            return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
+        return item
+
+    source = item.get("source")
+    if isinstance(source, dict) and (source.get("data") or source.get("base64")):
+        return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
+
+    return {k: strip_image_to_marker(v) for k, v in item.items()}
 
 
 def project_media_dir() -> Path:

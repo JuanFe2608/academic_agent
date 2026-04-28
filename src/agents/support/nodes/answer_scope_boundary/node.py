@@ -6,7 +6,6 @@ from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
 from services.conversation.scope_policy import decide_scope, render_scope_response
 from services.conversation.state_helpers import update_interaction_state
-from utils.avatar_assets import AVATAR_NECESITO_CONTEXTO, with_avatar
 
 _ACADEMIC_AMBIGUOUS_RESPONSE = (
     "Reconozco que es una pregunta académica, pero está fuera de lo que puedo responder "
@@ -51,7 +50,7 @@ def answer_scope_boundary(state: AgentState) -> dict:
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": False,
-        "messages": append_message(messages, "assistant", with_avatar(response_text, AVATAR_NECESITO_CONTEXTO)),
+        "messages": append_message(messages, "assistant", response_text),
         **interaction_update,
     }
 

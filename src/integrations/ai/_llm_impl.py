@@ -542,6 +542,11 @@ def _normalize_schedule_blocks_payload(data: Any) -> dict[str, Any] | None:
     }
 
 
+def load_image_as_data_url(image_ref: str) -> str:
+    """Convierte ruta local o URL de imagen a data URL base64. Retorna '' si no aplica."""
+    return _coerce_image_url(image_ref)
+
+
 def _coerce_image_url(image_ref: str) -> str:
     raw = str(image_ref or "").strip()
     if not raw:
