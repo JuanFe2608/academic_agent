@@ -16,7 +16,7 @@ from typing import Annotated, ClassVar, Literal
 from langchain_core.messages import BaseMessage
 from pydantic import Field, field_validator
 
-from agents.support.media import add_sanitized_messages, materialize_image_reference, sanitize_messages
+from agents.support.media import add_sanitized_messages, sanitize_messages
 from schemas.common import BaseSchemaModel as _BaseSchemaModel
 from schemas.conversation import InteractionState as _InteractionState
 from schemas.microsoft_graph import CalendarState as _CalendarState
@@ -375,9 +375,10 @@ def _sanitize_image_ref_list(value: object) -> object:
     if value is None:
         return []
     if isinstance(value, str):
-        return [materialize_image_reference(value)]
+        raw = value.strip()
+        return [raw] if raw else []
     if isinstance(value, (list, tuple)):
-        return [materialize_image_reference(str(item)) for item in value if str(item or "").strip()]
+        return [str(item) for item in value if str(item or "").strip()]
     return value
 
 

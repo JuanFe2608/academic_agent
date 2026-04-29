@@ -156,14 +156,16 @@ class AgentRunner:
         """Invoca el agente sincrono y envia las respuestas generadas."""
         thread_id = message.from_number
 
-        human_message = self._build_human_message(message)
+        human_message, image_refs = self._build_human_message(message)
         if human_message is None:
             return
 
         logger.info("Procesando mensaje de %s: %.60s...", thread_id, str(human_message.content))
 
         config = {"configurable": {"thread_id": thread_id}}
-        input_data = {"messages": [human_message]}
+        input_data: dict = {"messages": [human_message]}
+        if image_refs:
+            input_data["last_user_images"] = image_refs
 
         try:
             result = self._agent.invoke(input_data, config=config)
@@ -188,36 +190,47 @@ class AgentRunner:
         except Exception:
             logger.exception("Error al enviar respuestas a %s", thread_id)
 
-    def _build_human_message(self, message: WhatsAppInboundMessage) -> HumanMessage | None:
-        """Construye el HumanMessage adecuado segun el tipo de contenido recibido."""
+    def _build_human_message(
+        self, message: WhatsAppInboundMessage
+    ) -> tuple[HumanMessage | None, list[str]]:
+        """Construye el HumanMessage y extrae referencias de imagen por separado.
+
+        Las imágenes se devuelven como data URLs base64 en la segunda parte de la
+        tupla para ser almacenadas en state.last_user_images (checkpoint PostgreSQL),
+        no en state.messages.  Esto garantiza que cualquier instancia pueda acceder
+        a la imagen sin depender del filesystem local.
+        """
+        from utils.media_artifacts import IMAGE_RECEIVED_MARKER, path_to_data_url
+
         text = (message.text or "").strip()
 
         if message.media is None:
             if not text:
-                return None
-            return HumanMessage(content=text)
+                return None, []
+            return HumanMessage(content=text), []
 
         if message.media.media_type in {"image", "sticker"}:
             content: list[dict] = []
             if text:
                 content.append({"type": "text", "text": text})
+            content.append({"type": "text", "text": IMAGE_RECEIVED_MARKER})
+
+            image_refs: list[str] = []
             try:
                 channel_msg = self._whatsapp_service.download_inbound(message)
                 if channel_msg.media:
-                    image_ref = channel_msg.media[0].reference
-                    from utils.media_artifacts import is_inline_preview_enabled, path_to_data_url
-                    url = path_to_data_url(image_ref) if is_inline_preview_enabled() else image_ref
-                    content.append({"type": "image_url", "image_url": {"url": url}})
-                else:
-                    content.append({"type": "text", "text": f"[imagen no disponible id={message.media.id}]"})
+                    local_path = channel_msg.media[0].reference
+                    data_url = path_to_data_url(local_path)
+                    if data_url and data_url.startswith("data:image"):
+                        image_refs.append(data_url)
             except Exception:
                 logger.warning("No se pudo descargar la imagen %s", message.media.id, exc_info=True)
-                content.append({"type": "text", "text": f"[imagen no disponible id={message.media.id}]"})
-            return HumanMessage(content=content)
+
+            return HumanMessage(content=content), image_refs
 
         ref = message.media.caption or f"[{message.media.media_type} adjunto]"
         combined = f"{text}\n{ref}".strip() if text else ref
-        return HumanMessage(content=combined)
+        return HumanMessage(content=combined), []
 
     def _send_error_message(self, recipient_id: str) -> None:
         """Notifica al estudiante que ocurrio un error temporal."""

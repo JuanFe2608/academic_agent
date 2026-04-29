@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from langchain_core.messages import HumanMessage
 
-from agents.support.agent import _route_handle_academic_update
 from agents.support.dependencies import (
     set_study_planning_persistence_service,
     set_study_replanning_service,
@@ -134,7 +133,6 @@ def test_replan_node_requires_confirmation_before_applying_and_then_persists() -
     )
 
     try:
-        assert _route_handle_academic_update(state) == "request_replan"
         proposal_update = handle_replan_turn(state)
         assert proposal_update["phase"] == "running"
         assert proposal_update["awaiting_user_input"] is True

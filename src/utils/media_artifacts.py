@@ -80,13 +80,16 @@ def is_inline_preview_enabled() -> bool:
 
 
 def path_to_data_url(path: str) -> str:
-    """Convierte una ruta local de imagen a data: URL (base64). Util para debugging."""
+    """Convierte una ruta local de imagen a data: URL (base64). Retorna '' si no existe."""
     raw = str(path or "").strip()
     if not raw or not os.path.exists(raw):
-        return raw
+        return ""
     mime_type = mimetypes.guess_type(raw)[0] or "image/png"
     with open(raw, "rb") as f:
-        encoded = base64.b64encode(f.read()).decode("ascii")
+        data = f.read()
+    if not data:
+        return ""
+    encoded = base64.b64encode(data).decode("ascii")
     return f"data:{mime_type};base64,{encoded}"
 
 

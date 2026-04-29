@@ -1,10 +1,11 @@
-"""Nodo único del modo operativo — agente ReAct autónomo (Fase 3/4).
+"""Nodo único del modo operativo — agente ReAct autónomo.
 
 Arquitectura:
-  - Fases de mantenimiento (schedule_renewal, schedule_repair,
-    fixed_schedule_management): handlers deterministas sin cambios.
-  - Fase running: create_react_agent con 11 tools y contexto completo
-    del estudiante. El LLM decide qué hacer, en qué orden y qué combinar.
+  - Fases de mantenimiento (schedule_renewal, schedule_repair): handlers
+    deterministas de renovación/reparación de horario (multi-turno estructurado).
+  - Fase running: create_react_agent con 15 tools. El LLM decide qué hacer,
+    en qué orden y qué combinar — incluyendo gestión directa del horario fijo
+    (add_schedule_block / update_schedule_block / delete_schedule_block).
 
 Fases siguientes:
   Fase 5 — RAG como tool de primera clase (search_study_methods ya wired).
@@ -20,12 +21,13 @@ from agents.support.flows.scheduling.fixed_schedule_repair_service import (
 )
 from agents.support.nodes.academic_agent.context import _STATIC_INSTRUCTIONS, build_dynamic_context
 from agents.support.nodes.academic_agent.tools import extract_tool_state_updates, make_tools
-from agents.support.nodes.manage_fixed_schedule.node import manage_fixed_schedule as _manage_fixed_schedule
 from agents.support.nodes.renew_fixed_schedule.node import renew_fixed_schedule as _renew_fixed_schedule
 from agents.support.nodes.repair_fixed_schedule.node import repair_fixed_schedule as _repair_fixed_schedule
 from agents.support.nodes.request_replan.node import request_replan as _request_replan
-from agents.support.nodes.utils import append_message, detect_new_input, get_last_user_images
+from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
+
+_MAX_PERSISTED_MESSAGES: int = 20  # ~10 Human+AI pairs; older messages are trimmed from the checkpoint
 
 
 def academic_agent(state: AgentState) -> dict:
@@ -34,13 +36,13 @@ def academic_agent(state: AgentState) -> dict:
     phase = conversation.phase
 
     # 1. Dispatch basado en fase para sub-flujos de mantenimiento.
-    #    Estos flujos son multi-turno con diálogo estructurado.
+    #    Estos flujos son multi-turno con diálogo estructurado (renovación/reparación).
+    #    La gestión del horario fijo (add/update/delete de bloques) ya NO usa flujo
+    #    determinista — el agente ReAct la maneja directamente con sus tools.
     if phase == "schedule_renewal":
         return _renew_fixed_schedule(state)
     if phase == "schedule_repair":
         return _repair_fixed_schedule(state)
-    if phase == "fixed_schedule_management":
-        return _dispatch_and_maybe_chain_replan(state, _manage_fixed_schedule)
 
     # 2. Guard: esperar nuevo input del usuario antes de procesar.
     if _should_wait(state):
@@ -77,18 +79,18 @@ def academic_agent(state: AgentState) -> dict:
     from langchain_core.messages import HumanMessage, SystemMessage
     from langgraph.prebuilt import create_react_agent
 
-    last_images = get_last_user_images(list(state.messages or []))
+    last_images = list(state.last_user_images or [])
     has_image_marker = IMAGE_RECEIVED_MARKER in (last_text or "")
 
     # 6a. Imagen enviada desde Studio (data URL stripeada) → fallback sin visión.
     if has_image_marker and not last_images:
         return {
-            "messages": append_message(
+            "messages": _capped_messages_update(
                 list(state.messages or []),
-                "assistant",
                 "Recibí una imagen 📷. Por ahora puedo ayudarte mejor si me describes qué contiene: "
                 "¿es un horario, una actividad, una entrega, un parcial u otro asunto académico?",
             ),
+            "last_user_images": [],
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
@@ -99,11 +101,11 @@ def academic_agent(state: AgentState) -> dict:
     llm = maybe_get_llm(temperature=0.0)
     if llm is None:
         return {
-            "messages": append_message(
+            "messages": _capped_messages_update(
                 list(state.messages or []),
-                "assistant",
                 "Lo siento, el servicio de IA no está disponible en este momento. Por favor intenta más tarde.",
             ),
+            "last_user_images": [],
             "user_message_count": current_count,
             "last_user_text": last_text,
             "awaiting_user_input": True,
@@ -120,13 +122,23 @@ def academic_agent(state: AgentState) -> dict:
     human_msg = _build_human_message(last_text, last_images)
     recent_history = _build_recent_history(list(state.messages or []))
     dynamic_msg = SystemMessage(content=build_dynamic_context(state))
-    result = react_agent.invoke({"messages": [dynamic_msg, *recent_history, human_msg]})
+    try:
+        result = react_agent.invoke({"messages": [dynamic_msg, *recent_history, human_msg]})
+    except Exception as exc:
+        # Si Azure rechaza la imagen (base64 inválido, formato no soportado, etc.)
+        # y había imágenes en el turno, reintentar con solo texto para no bloquear al estudiante.
+        if last_images and _is_image_api_error(exc):
+            human_msg = _build_human_message(last_text, [])
+            result = react_agent.invoke({"messages": [dynamic_msg, *recent_history, human_msg]})
+        else:
+            raise
 
     tool_updates = extract_tool_state_updates(result)
     final_message = result["messages"][-1].content
 
     return_dict: dict = {
-        "messages": append_message(list(state.messages or []), "assistant", final_message),
+        "messages": _capped_messages_update(list(state.messages or []), final_message),
+        "last_user_images": [],
         "user_message_count": current_count,
         "last_user_text": last_text,
         "awaiting_user_input": True,
@@ -144,55 +156,6 @@ def academic_agent(state: AgentState) -> dict:
 # ---------------------------------------------------------------------------
 # Helpers internos
 # ---------------------------------------------------------------------------
-
-def _dispatch_and_maybe_chain_replan(state: AgentState, handler) -> dict:
-    """Ejecuta handler determinista y encadena replan si el resultado lo activa."""
-    result = handler(state)
-    return _maybe_chain_replan(state, result)
-
-
-def _maybe_chain_replan(state: AgentState, result: dict) -> dict:
-    """Si el resultado no espera input y hay un replan pendiente, lo encadena."""
-    if result.get("awaiting_user_input", True):
-        return result
-    if _pending_replan_in(state, result):
-        merged = state.model_copy(
-            update={k: v for k, v in result.items() if k in state.model_fields}
-        )
-        replan_result = _request_replan(merged)
-        return {**result, **replan_result}
-    return result
-
-
-def _pending_replan_in(state: AgentState, update: dict) -> bool:
-    """Verifica si el update activa un candidato de replanificación."""
-    replan_raw = update.get("replan")
-    if replan_raw is None:
-        repl = state.planning_state.replan
-        trigger = repl.trigger
-        change_req = repl.change_request
-        status = repl.status
-        proposal = repl.active_proposal
-    else:
-        rd = dict(replan_raw) if isinstance(replan_raw, dict) else {}
-        trigger = rd.get("trigger")
-        change_req = rd.get("change_request")
-        status = rd.get("status")
-        proposal = rd.get("active_proposal")
-
-    plan_raw = update.get("study_plan") or {}
-    plan_events = (
-        dict(plan_raw).get("plan_events") if isinstance(plan_raw, dict) else None
-    )
-    if plan_events is None:
-        plan_events = state.planning_state.study_plan.plan_events
-    has_plan = bool(plan_events)
-
-    return bool(
-        ((trigger or change_req) and has_plan)
-        or (status == "proposed" and proposal)
-    )
-
 
 def _should_wait(state: AgentState) -> bool:
     """True cuando el grafo debe detenerse esperando nuevo input del usuario."""
@@ -270,6 +233,43 @@ def _build_human_message(text: str, image_paths: list[str]):
         })
 
     return HumanMessage(content=content)
+
+
+def _capped_messages_update(current: list, content: str) -> list:
+    """Returns the reducer payload: new AIMessage plus RemoveMessage ops for overflow.
+
+    Keeps at most _MAX_PERSISTED_MESSAGES in state.  Messages without an id (e.g.
+    those constructed directly in unit tests) are skipped in the removal list so
+    the reducer never receives a RemoveMessage with id=None.
+    """
+    from langchain_core.messages import AIMessage
+    from langchain_core.messages import RemoveMessage
+
+    from utils.message_sanitizer import sanitize_message_content
+
+    new_msg = AIMessage(content=sanitize_message_content(content))
+    overflow = len(current) + 1 - _MAX_PERSISTED_MESSAGES
+    if overflow <= 0:
+        return [new_msg]
+
+    removals = [
+        RemoveMessage(id=m.id)
+        for m in current[:overflow]
+        if getattr(m, "id", None)
+    ]
+    return removals + [new_msg]
+
+
+def _is_image_api_error(exc: Exception) -> bool:
+    """True si el error de Azure/OpenAI es por imagen inválida o no soportada."""
+    err = str(exc).lower()
+    return (
+        "invalid_base64" in err
+        or "invalid base64" in err
+        or "image_url" in err
+        or "image url" in err
+        or "unsupported image" in err
+    )
 
 
 __all__ = ["academic_agent"]

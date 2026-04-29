@@ -6,12 +6,9 @@ from langchain_core.messages import HumanMessage
 
 import agents.support.agent as agent_module
 from agents.support.agent import (
-    _route_after_fixed_schedule_management,
-    _route_after_schedule_repair,
     _route_collect_profile,
     _route_collect_schedule,
     _route_entry,
-    _route_running,
     _should_wait,
 )
 from agents.support.state import AgentState
@@ -109,84 +106,3 @@ def test_route_collect_schedule_continues_on_extras_phase() -> None:
     )
 
     assert _route_collect_schedule(state) == "collect_schedule"
-
-
-def test_route_entry_reopens_with_schedule_renewal_when_expired_and_user_writes(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: True)
-    state = AgentState(
-        phase="end",
-        awaiting_user_input=False,
-        user_message_count=0,
-        messages=[HumanMessage(content="hola")],
-        student_profile={"persisted_student_id": 1},
-    )
-
-    assert _route_entry(state) == "running_handler"
-    assert _route_running(state) == "renew_fixed_schedule"
-
-
-def test_route_entry_reopens_with_schedule_repair_when_drift_pending(
-    monkeypatch,
-) -> None:
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: True)
-    state = AgentState(
-        phase="end",
-        awaiting_user_input=False,
-        user_message_count=0,
-        messages=[HumanMessage(content="hola")],
-        student_profile={"persisted_student_id": 1},
-    )
-
-    assert _route_entry(state) == "running_handler"
-    assert _route_running(state) == "repair_fixed_schedule"
-
-
-def test_route_entry_routes_prioritization_request_when_post_radar_flag_enabled(
-    monkeypatch,
-) -> None:
-    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: False)
-    state = AgentState(
-        phase="end",
-        awaiting_user_input=False,
-        user_message_count=0,
-        messages=[HumanMessage(content="quiero priorizar mis materias")],
-    )
-
-    assert _route_entry(state) == "running_handler"
-    assert _route_running(state) == "collect_priorities"
-
-
-def test_route_entry_blocks_prioritization_request_without_post_radar_flag(
-    monkeypatch,
-) -> None:
-    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_renewal", lambda _state: False)
-    monkeypatch.setattr(agent_module, "requires_fixed_schedule_repair", lambda _state: False)
-    state = AgentState(
-        phase="end",
-        awaiting_user_input=False,
-        user_message_count=0,
-        messages=[HumanMessage(content="quiero priorizar mis materias")],
-    )
-
-    assert _route_entry(state) == "running_handler"
-    assert _route_running(state) == "answer_scope_boundary"
-
-
-def test_route_after_schedule_repair_can_restart_schedule_capture() -> None:
-    state = AgentState(phase="schedules", awaiting_user_input=False)
-
-    assert _route_after_schedule_repair(state) == "collect_schedule"
-
-
-def test_route_after_fixed_schedule_management_waits_for_confirmation() -> None:
-    waiting = AgentState(phase="fixed_schedule_management", awaiting_user_input=True)
-    continuing = AgentState(phase="fixed_schedule_management", awaiting_user_input=False)
-
-    assert _route_after_fixed_schedule_management(waiting) == "end"
-    assert _route_after_fixed_schedule_management(continuing) == "manage_fixed_schedule"

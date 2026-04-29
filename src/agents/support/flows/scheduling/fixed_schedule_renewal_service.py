@@ -24,6 +24,7 @@ from services.scheduling import (
     is_schedule_expired,
     parse_schedule_end_date,
 )
+from services.scheduling.end_date_support import schedule_end_date_max_date
 
 
 def requires_fixed_schedule_renewal(state: AgentState) -> bool:
@@ -139,7 +140,7 @@ def handle_fixed_schedule_renewal_turn(
                 awaiting_user_input=True,
                 current_count=current_count,
                 last_text=last_text,
-                prompt=_build_new_end_date_prompt(),
+                prompt=_build_new_end_date_prompt(timezone_name),
             )
         if decision == "replace":
             return _build_renewal_update(
@@ -177,7 +178,7 @@ def handle_fixed_schedule_renewal_turn(
                 awaiting_user_input=True,
                 current_count=current_count,
                 last_text=last_text,
-                prompt=_build_new_end_date_prompt(),
+                prompt=_build_new_end_date_prompt(timezone_name),
             )
 
         update_result = get_schedule_service().update_schedule_end_date(
@@ -374,11 +375,16 @@ def _build_expired_schedule_prompt(profile) -> str:
     )
 
 
-def _build_new_end_date_prompt() -> str:
+def _build_new_end_date_prompt(timezone_name: str = "America/Bogota") -> str:
+    max_date = schedule_end_date_max_date(timezone_name)
     return (
         "📅 Perfecto. Voy a mantener tu mismo horario fijo.\n"
-        "Ahora envíame la nueva fecha límite para agendarlo en Outlook.\n"
-        "Puedes escribirla como `2026-06-30` o `30/06/2026`."
+        "Envíame la nueva fecha límite para agendarlo en Outlook.\n"
+        f"Debe ser una fecha futura y como máximo hasta el {format_schedule_end_date(max_date)} "
+        f"(7 meses desde hoy).\n"
+        "Formatos válidos:\n"
+        "  • YYYY-MM-DD  (ej: 2026-06-30)\n"
+        "  • DD/MM/YYYY  (ej: 30/06/2026)"
     )
 
 

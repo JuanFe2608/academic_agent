@@ -129,6 +129,7 @@ def event_to_schedule_block(event: Event | dict) -> WeeklyScheduleBlock | None:
         title=titulo,
         block_type=block_type,
         timezone=tz,
+        source_text=f"{titulo} {dia} {inicio}-{fin}",
     )
 
 

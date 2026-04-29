@@ -37,6 +37,7 @@ from repositories.microsoft_graph.sync_repository import (
 )
 
 _TODO_ACTIONABLE_STATUSES = {"missed", "skipped"}
+_PRIORITY_TO_IMPORTANCE = {"alta": "high", "media": "normal", "baja": "normal"}
 
 
 @dataclass(frozen=True)
@@ -64,6 +65,17 @@ class MicrosoftTodoSyncResult:
     upserted_count: int = 0
     deleted_count: int = 0
     synced_task_map: dict[str, str] = field(default_factory=dict)
+    error_code: str | None = None
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
+class MicrosoftTodoActivitySyncResult:
+    """Resultado de sync de actividades académicas hacia Microsoft To Do."""
+
+    synced: bool
+    upserted_count: int = 0
+    synced_activities: list = field(default_factory=list)
     error_code: str | None = None
     detail: str | None = None
 
@@ -362,6 +374,120 @@ class MicrosoftTodoSyncService:
         )
 
 
+    def sync_academic_activities_to_todo(
+        self,
+        *,
+        student_id: int | None,
+        task_list_id: str | None,
+        activities: list,
+    ) -> MicrosoftTodoActivitySyncResult:
+        """Sincroniza actividades académicas pendientes con Microsoft To Do.
+
+        Cada actividad con priority_level='alta' se marca con importance='high' (⭐).
+        Usa activity.todo_task_id como id externo para evitar duplicados.
+        Retorna las actividades con todo_task_id actualizado.
+        """
+        from schemas.planning import AcademicActivity
+
+        if not student_id:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="missing_student_id",
+                detail="No encontré el estudiante persistido para sincronizar Microsoft To Do.",
+            )
+
+        try:
+            connection = self.state_repository.get_connection(student_id=int(student_id))
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError) as exc:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="microsoft_graph_state_error",
+                detail=str(exc),
+            )
+        if connection is None:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="microsoft_connection_not_found",
+                detail=(
+                    "No existe una conexión Microsoft persistida para este estudiante. "
+                    "Completa OAuth antes de sincronizar Microsoft To Do."
+                ),
+            )
+
+        token_result = self.auth_client.get_valid_access_token(student_id=int(student_id))
+        if not token_result.ok or token_result.token is None:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code=token_result.error_code or "microsoft_oauth_error",
+                detail=token_result.detail,
+            )
+
+        try:
+            connection = _resolve_task_list_connection(
+                state_repository=self.state_repository,
+                connection=connection,
+                explicit_task_list_id=task_list_id,
+                client=self.client,
+                access_token=token_result.token.access_token,
+            )
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError) as exc:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="microsoft_todo_repository_error",
+                detail=str(exc),
+            )
+
+        effective_task_list_id = str(connection.todo_task_list_id or "").strip()
+        if not effective_task_list_id:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="missing_task_list_id",
+                detail="Debes configurar un task_list_id para sincronizar actividades con Microsoft To Do.",
+            )
+
+        # Coerce activities to AcademicActivity objects
+        coerced: list[AcademicActivity] = []
+        for act in activities:
+            if isinstance(act, AcademicActivity):
+                coerced.append(act)
+            elif isinstance(act, dict):
+                try:
+                    coerced.append(AcademicActivity.model_validate(act))
+                except Exception:
+                    pass
+
+        if not coerced:
+            return MicrosoftTodoActivitySyncResult(synced=True, upserted_count=0, synced_activities=[])
+
+        tasks = [_build_activity_todo_task(act) for act in coerced]
+
+        try:
+            upserted = self.client.upsert_tasks(
+                access_token=token_result.token.access_token,
+                task_list_id=effective_task_list_id,
+                tasks=tasks,
+            )
+        except MicrosoftGraphClientError as exc:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code=getattr(exc, "error_code", "microsoft_todo_sync_error"),
+                detail=getattr(exc, "detail", str(exc)),
+            )
+
+        # Build a map activity_id → task_id and update activities
+        task_id_map = {record.external_key: record.external_task_id for record in upserted}
+        updated_activities = [
+            act.model_copy(update={"todo_task_id": task_id_map.get(act.activity_id, act.todo_task_id)})
+            for act in coerced
+        ]
+
+        return MicrosoftTodoActivitySyncResult(
+            synced=True,
+            upserted_count=len(upserted),
+            synced_activities=updated_activities,
+        )
+
+
 def build_microsoft_todo_sync_service(
     *,
     instances_repository: Any | None = None,
@@ -394,6 +520,48 @@ def build_microsoft_todo_sync_service(
         state_repository=state_repository,
         auth_client=auth_client,
         client=client,
+    )
+
+
+def _build_activity_todo_task(activity: object) -> "MicrosoftTodoTaskUpsert":
+    """Mapea una AcademicActivity a MicrosoftTodoTaskUpsert.
+
+    priority_level='alta' → importance='high' (⭐ en To Do).
+    Usa activity.todo_task_id como existing_external_task_id para deduplicar.
+    """
+    from datetime import datetime, timezone as _tz
+
+    activity_id = str(getattr(activity, "activity_id", "") or "")
+    subject_name = str(getattr(activity, "subject_name", "") or "")
+    activity_type = str(getattr(activity, "activity_type", "") or "")
+    title = str(getattr(activity, "activity_title", "") or activity_type)
+    due_date_str = getattr(activity, "due_date", None)
+    priority_level = str(getattr(activity, "priority_level", None) or "")
+    status = str(getattr(activity, "status", "pending") or "pending")
+    existing_task_id = getattr(activity, "todo_task_id", None) or None
+
+    importance = _PRIORITY_TO_IMPORTANCE.get(priority_level)
+
+    due_at: datetime | None = None
+    if due_date_str:
+        try:
+            from datetime import date as _date
+            d = _date.fromisoformat(str(due_date_str))
+            due_at = datetime(d.year, d.month, d.day, 23, 59, 0, tzinfo=_tz.utc)
+        except (ValueError, TypeError):
+            pass
+
+    star_prefix = "⭐ " if importance == "high" else ""
+    task_title = f"{star_prefix}[{activity_type}] {subject_name}: {title}" if subject_name else title
+
+    return MicrosoftTodoTaskUpsert(
+        external_key=activity_id,
+        title=task_title,
+        body_preview=f"Tipo: {activity_type} | Materia: {subject_name} | Vence: {due_date_str or 'sin fecha'}",
+        due_at=due_at,
+        importance=importance,
+        is_completed=(status == "completed"),
+        existing_external_task_id=existing_task_id,
     )
 
 
@@ -501,6 +669,7 @@ def _instance_id_for_key(
 
 
 __all__ = [
+    "MicrosoftTodoActivitySyncResult",
     "MicrosoftTodoSyncPreviewResult",
     "MicrosoftTodoSyncResult",
     "MicrosoftTodoSyncService",

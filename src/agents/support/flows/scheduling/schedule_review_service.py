@@ -52,6 +52,7 @@ from services.scheduling.extracurricular_parsing import (
 )
 from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
 from services.scheduling import format_schedule_end_date, parse_schedule_end_date
+from services.scheduling.end_date_support import schedule_end_date_max_date
 
 from .schedule_pending_resolution_service import coerce_schedule_pending_items
 from .section_confirmation_service import (
@@ -247,9 +248,10 @@ def handle_schedule_review_turn(
         )
 
     if stage == "awaiting_schedule_end_date":
+        tz = state.get("timezone", "America/Bogota")
         parsed_end_date = parse_schedule_end_date(
             last_text,
-            timezone_name=state.get("timezone", "America/Bogota"),
+            timezone_name=tz,
         ) if has_new_input else None
         if parsed_end_date is None:
             return _prompt_again(
@@ -257,7 +259,7 @@ def handle_schedule_review_turn(
                 current_count,
                 last_text,
                 schedule_state,
-                _build_schedule_end_date_prompt(),
+                _build_schedule_end_date_prompt(tz),
             )
         return _build_schedule_review_update(
             state,
@@ -294,7 +296,7 @@ def handle_schedule_review_turn(
             current_count=current_count,
             last_text=last_text,
             awaiting_user_input=True,
-            prompt=_build_schedule_end_date_prompt(),
+            prompt=_build_schedule_end_date_prompt(state.get("timezone", "America/Bogota")),
         )
     if answer is False:
         return _prompt_correction_target(
@@ -801,13 +803,15 @@ def _build_extracurricular_correction_prompt(
     return "\n".join(lines)
 
 
-def _build_schedule_end_date_prompt() -> str:
+def _build_schedule_end_date_prompt(timezone_name: str = "America/Bogota") -> str:
+    max_date = schedule_end_date_max_date(timezone_name)
     return (
         "📅 Antes de guardarlo en Outlook, necesito la fecha límite de este horario fijo.\n"
+        f"Debe ser una fecha futura y como máximo hasta el {format_schedule_end_date(max_date)} "
+        f"(7 meses desde hoy).\n"
         "Escríbela en uno de estos formatos:\n"
-        "1. YYYY-MM-DD\n"
-        "2. DD/MM/YYYY\n"
-        "Ejemplo: 2026-06-30"
+        "  • YYYY-MM-DD  (ej: 2026-06-30)\n"
+        "  • DD/MM/YYYY  (ej: 30/06/2026)"
     )
 
 

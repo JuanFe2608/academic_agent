@@ -30,6 +30,7 @@ from services.scheduling.fixed_schedule_management import (
     delete_fixed_schedule_blocks,
     format_fixed_schedule_block_options,
     format_fixed_schedule_blocks,
+    infer_fixed_schedule_target,
     match_fixed_schedule_blocks,
     parse_fixed_schedule_operation,
     replace_fixed_schedule_blocks,
@@ -40,6 +41,12 @@ from services.scheduling.raw_input_sync import sync_schedule_blocks_to_raw_input
 
 _FLOW_DOMAIN = "fixed_schedule_management"
 _CONFIRMATION_STAGE = "awaiting_fixed_schedule_confirmation"
+_BLOCK_TYPE_QUESTION = (
+    "¿El bloque que quieres agregar es:\n"
+    "1. Académico (clase, materia, asignatura)\n"
+    "2. Laboral (trabajo)\n"
+    "3. Extracurricular (deporte, actividad personal)"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -99,6 +106,16 @@ def handle_fixed_schedule_management_turn(state: AgentState) -> dict:
 
     if stage == "awaiting_fixed_schedule_add_details":
         return _handle_add_details_turn(
+            state,
+            blocks,
+            schedule_patch,
+            replan,
+            change_request,
+            str(last_text or ""),
+            current_count,
+        )
+    if stage == "awaiting_fixed_schedule_block_type":
+        return _handle_block_type_turn(
             state,
             blocks,
             schedule_patch,
@@ -623,10 +640,35 @@ def _start_add_operation(
     text: str,
     current_count: int,
 ) -> dict:
-    block_type = operation.target or "academic"
-    timezone = str(state.get("timezone", "America/Bogota"))
     add_text = operation.reference_text or text
 
+    if operation.target:
+        block_type: ScheduleBlockType = operation.target
+    else:
+        inferred = infer_fixed_schedule_target(add_text)
+        if inferred:
+            block_type = inferred
+        else:
+            change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_block_type")
+            change_request["add_text"] = add_text
+            return _prompt_update(
+                state,
+                phase="fixed_schedule_management",
+                current_count=current_count,
+                last_text=text,
+                awaiting_user_input=True,
+                prompt=_BLOCK_TYPE_QUESTION,
+                replan=_store_change_request(dict(state.get("replan", {})), change_request),
+                interaction=_pending_interaction(
+                    state,
+                    active_intent="add_fixed_schedule_item",
+                    pending_action="provide_fixed_schedule_block_type",
+                    current_step="awaiting_block_type",
+                ),
+                **schedule_patch,
+            )
+
+    timezone = str(state.get("timezone", "America/Bogota"))
     preview = build_fixed_schedule_add_preview(add_text, block_type, timezone=timezone)
     if preview.prompt:
         change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_add_details")
@@ -669,7 +711,31 @@ def _handle_add_details_turn(
     text: str,
     current_count: int,
 ) -> dict:
-    block_type = str(change_request.get("target") or "academic")
+    block_type_raw = str(change_request.get("target") or "").strip()
+    if not block_type_raw:
+        inferred = infer_fixed_schedule_target(text)
+        if inferred:
+            block_type_raw = inferred
+        else:
+            change_request["add_text"] = text
+            change_request["stage"] = "awaiting_fixed_schedule_block_type"
+            return _prompt_update(
+                state,
+                phase="fixed_schedule_management",
+                current_count=current_count,
+                last_text=text,
+                awaiting_user_input=True,
+                prompt=_BLOCK_TYPE_QUESTION,
+                replan=_store_change_request(replan, change_request),
+                interaction=_pending_interaction(
+                    state,
+                    active_intent="add_fixed_schedule_item",
+                    pending_action="provide_fixed_schedule_block_type",
+                    current_step="awaiting_block_type",
+                ),
+                **schedule_patch,
+            )
+    block_type = block_type_raw
     timezone = str(state.get("timezone", "America/Bogota"))
 
     preview = build_fixed_schedule_add_preview(text, block_type, timezone=timezone)  # type: ignore[arg-type]
@@ -751,6 +817,112 @@ def _queue_add_confirmation(
         interaction=_confirmation_interaction(state, payload),
         **schedule_patch,
     )
+
+
+def _handle_block_type_turn(
+    state: AgentState,
+    blocks: list[WeeklyScheduleBlock],
+    schedule_patch: dict[str, object],
+    replan: dict,
+    change_request: dict,
+    text: str,
+    current_count: int,
+) -> dict:
+    """Procesa la respuesta del usuario sobre el tipo de bloque y avanza al preview."""
+    block_type = _parse_block_type_answer(text)
+    if block_type is None:
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=text,
+            awaiting_user_input=True,
+            prompt=(
+                "No reconocí el tipo. Elige:\n"
+                "1. Académico (clase, materia)\n"
+                "2. Laboral (trabajo)\n"
+                "3. Extracurricular (deporte, actividad personal)"
+            ),
+            replan=_store_change_request(replan, change_request),
+            interaction=_pending_interaction(
+                state,
+                active_intent="add_fixed_schedule_item",
+                pending_action="provide_fixed_schedule_block_type",
+                current_step="awaiting_block_type",
+            ),
+            **schedule_patch,
+        )
+
+    add_text = str(change_request.get("add_text") or "").strip()
+    timezone = str(state.get("timezone", "America/Bogota"))
+    change_request["target"] = block_type
+
+    if not add_text:
+        change_request["stage"] = "awaiting_fixed_schedule_add_details"
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=text,
+            awaiting_user_input=True,
+            prompt="Indica el nombre, día y horario del nuevo bloque.",
+            replan=_store_change_request(replan, change_request),
+            interaction=_pending_interaction(
+                state,
+                active_intent="add_fixed_schedule_item",
+                pending_action="provide_fixed_schedule_add_details",
+                current_step="awaiting_add_details",
+            ),
+            **schedule_patch,
+        )
+
+    preview = build_fixed_schedule_add_preview(add_text, block_type, timezone=timezone)
+    if preview.prompt:
+        change_request["stage"] = "awaiting_fixed_schedule_add_details"
+        return _prompt_update(
+            state,
+            phase="fixed_schedule_management",
+            current_count=current_count,
+            last_text=text,
+            awaiting_user_input=True,
+            prompt=str(preview.prompt),
+            replan=_store_change_request(replan, change_request),
+            interaction=_pending_interaction(
+                state,
+                active_intent="add_fixed_schedule_item",
+                pending_action="provide_fixed_schedule_add_details",
+                current_step="awaiting_add_details",
+            ),
+            **schedule_patch,
+        )
+
+    change_request["stage"] = ""
+    return _queue_add_confirmation(
+        state,
+        blocks,
+        schedule_patch,
+        replan,
+        change_request,
+        preview.replacement_blocks,
+        add_text,
+        current_count,
+    )
+
+
+def _parse_block_type_answer(text: str) -> "ScheduleBlockType | None":
+    """Parsea la respuesta del usuario sobre el tipo de bloque a agregar."""
+    clean = str(text or "").strip()
+    inferred = infer_fixed_schedule_target(clean)
+    if inferred:
+        return inferred
+    normalized = clean.strip(" .)").rstrip(".")
+    if normalized in ("1", "1)", "1."):
+        return "academic"
+    if normalized in ("2", "2)", "2."):
+        return "work"
+    if normalized in ("3", "3)", "3."):
+        return "extracurricular"
+    return None
 
 
 def _queue_update_confirmation(

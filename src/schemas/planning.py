@@ -41,6 +41,7 @@ class AcademicActivity(BaseSchemaModel):
     updated_at: Optional[str] = None
     persisted_activity_id: Optional[int] = None
     persistence_error: Optional[str] = None
+    todo_task_id: Optional[str] = None
 
 
 class SubjectItem(BaseSchemaModel):

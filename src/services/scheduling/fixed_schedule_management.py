@@ -333,7 +333,8 @@ _ADD_TITLE_TIME_PATTERN = re.compile(
 )
 _ADD_TITLE_FILLER = re.compile(
     r"\b(?:el|los|la|las|de|a|para|en|al|del|y|todas?|todos?|fijo|cada|clase|clases|"
-    r"materia|asignatura|actividad|extracurricular|acad[eé]mic[ao]|laboral)\b",
+    r"materia|asignatura|actividad|extracurricular|acad[eé]mic[ao]|laboral|"
+    r"tengo|tienes?|tiene|tenemos|mi|me|lo|le|que|se|con)\b",
     re.IGNORECASE,
 )
 

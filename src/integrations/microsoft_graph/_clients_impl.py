@@ -87,6 +87,8 @@ class MicrosoftTodoTaskUpsert:
     title: str
     body_preview: str
     due_at: datetime | None
+    importance: str | None = None  # "high" = ⭐, "normal" = sin estrella
+    is_completed: bool = False
     metadata: dict[str, object] = field(default_factory=dict)
     existing_external_task_id: str | None = None
 
@@ -680,6 +682,10 @@ def _todo_task_payload(task: MicrosoftTodoTaskUpsert) -> dict[str, Any]:
     }
     if task.due_at is not None:
         payload["dueDateTime"] = _graph_datetime_payload(task.due_at)
+    if task.importance is not None:
+        payload["importance"] = task.importance
+    if task.is_completed:
+        payload["status"] = "completed"
     return payload
 
 
