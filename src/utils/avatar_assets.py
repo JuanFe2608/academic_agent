@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from langchain_core.messages import AIMessage
+from utils.media_artifacts import materialize_image_reference
 
 _ASSETS_DIR = Path(__file__).resolve().parents[2] / "assets" / "whatsapp"
 
@@ -30,7 +31,10 @@ def with_avatar(text: str, avatar_path: Path | str) -> list[dict]:
     """Retorna contenido multimodal: texto + imagen de avatar del personaje."""
     return [
         {"type": "text", "text": text},
-        {"type": "image_url", "image_url": {"url": str(avatar_path)}},
+        {
+            "type": "image_url",
+            "image_url": {"url": materialize_image_reference(str(avatar_path))},
+        },
     ]
 
 
@@ -56,7 +60,10 @@ def inject_avatar_into_update(update: dict, avatar_path: Path | str) -> dict:
         new_content: list = with_avatar(content, avatar_path)
     elif isinstance(content, list):
         new_content = list(content) + [
-            {"type": "image_url", "image_url": {"url": str(avatar_path)}}
+            {
+                "type": "image_url",
+                "image_url": {"url": materialize_image_reference(str(avatar_path))},
+            }
         ]
     else:
         return update

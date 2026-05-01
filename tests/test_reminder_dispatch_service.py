@@ -10,8 +10,10 @@ from integrations.whatsapp import WhatsAppClientError, WhatsAppMessageSend
 from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
 from repositories.reminders.repository import (
     InMemoryRemindersRepository,
+    LeasedReminderDispatch,
     ReminderDispatchSeed,
 )
+from schemas.planning import AcademicActivity
 from schemas.scheduling import Event
 from services.channels import WhatsAppChannelService
 from services.planning import StudyPlanMaterializationService
@@ -19,6 +21,7 @@ from services.reminders import (
     ReminderDispatchRunner,
     StudyPlanRemindersService,
     WhatsAppReminderSender,
+    render_whatsapp_reminder_message,
 )
 
 
@@ -132,6 +135,82 @@ def test_reminders_service_persists_default_policies_and_dispatches(monkeypatch)
     assert {row["status"] for row in reminders_repository._dispatches_by_id.values()} == {
         "pending"
     }
+
+
+def test_reminders_service_schedules_academic_activity_dispatches(monkeypatch) -> None:
+    monkeypatch.setattr(reminders_module, "datetime", _FrozenDateTime)
+    reminders_repository = InMemoryRemindersRepository()
+    reminders_service = StudyPlanRemindersService(repository=reminders_repository)
+
+    result = reminders_service.sync_reminders_for_academic_activities(
+        student_id=7,
+        activities=[
+            AcademicActivity(
+                activity_id="act-parcial-calculo",
+                activity_type="parcial",
+                subject_name="Calculo",
+                activity_title="Parcial 1",
+                due_date="2026-01-06",
+                due_time="12:00",
+                priority_level="alta",
+            )
+        ],
+        reminders_state={"enabled": True, "policy": {"channels": ["in_app"]}},
+        timezone="America/Bogota",
+    )
+
+    assert result.synced is True
+    assert result.policy_count == 5
+    assert result.schedulable_instance_count == 1
+    assert result.created_dispatch_count == 5
+    assert result.canceled_dispatch_count == 0
+    assert len(reminders_repository._dispatches_by_id) == 5
+    dispatch_types = {
+        row["dispatch_type"] for row in reminders_repository._dispatches_by_id.values()
+    }
+    assert "daily_agenda_2026-01-06" in dispatch_types
+    assert any(item.startswith("activity_due_180m_") for item in dispatch_types)
+    assert any(item.startswith("activity_due_60m_") for item in dispatch_types)
+    assert any(item.startswith("activity_due_15m_") for item in dispatch_types)
+    assert any(item.startswith("activity_overdue_15m_") for item in dispatch_types)
+    assert {
+        row["payload"]["reminder_domain"]
+        for row in reminders_repository._dispatches_by_id.values()
+    } == {"academic_activity"}
+
+
+def test_reminders_service_cancels_activity_dispatches_when_completed(monkeypatch) -> None:
+    monkeypatch.setattr(reminders_module, "datetime", _FrozenDateTime)
+    reminders_repository = InMemoryRemindersRepository()
+    reminders_service = StudyPlanRemindersService(repository=reminders_repository)
+    activity = AcademicActivity(
+        activity_id="act-tarea-fisica",
+        activity_type="tarea",
+        subject_name="Fisica",
+        activity_title="Tarea de laboratorio",
+        due_date="2026-01-06",
+        due_time="12:00",
+    )
+
+    first = reminders_service.sync_reminders_for_academic_activities(
+        student_id=7,
+        activities=[activity],
+        reminders_state={"enabled": True, "policy": {"channels": ["in_app"]}},
+        timezone="America/Bogota",
+    )
+    second = reminders_service.sync_reminders_for_academic_activities(
+        student_id=7,
+        activities=[activity.model_copy(update={"status": "completed"})],
+        reminders_state={"enabled": True, "policy": {"channels": ["in_app"]}},
+        timezone="America/Bogota",
+    )
+
+    assert first.created_dispatch_count == 5
+    assert second.created_dispatch_count == 0
+    assert second.canceled_dispatch_count == 5
+    assert {
+        row["status"] for row in reminders_repository._dispatches_by_id.values()
+    } == {"canceled"}
 
 
 def test_reminders_service_cancels_pending_dispatches_for_superseded_instances(
@@ -292,6 +371,54 @@ def test_due_reminder_runner_sends_whatsapp_and_avoids_duplicate_dispatch() -> N
     row = next(iter(repository._dispatches_by_id.values()))
     assert row["status"] == "sent"
     assert row["provider_message_id"] == "wamid.1"
+
+
+def test_whatsapp_renderer_handles_activity_due_and_overdue_messages() -> None:
+    due_dispatch = LeasedReminderDispatch(
+        id=1,
+        student_id=7,
+        reminder_policy_id=1,
+        study_plan_event_instance_id=None,
+        dispatch_type="activity_due_180m_act",
+        channel="whatsapp",
+        scheduled_for=real_datetime(2026, 1, 6, 9, 0),
+        payload={
+            "kind": "activity_due",
+            "reminder_type": "activity_due",
+            "title": "Parcial 1",
+            "lead_minutes": 180,
+            "due_at": "2026-01-06T12:00:00-05:00",
+            "starts_at": "2026-01-06T12:00:00-05:00",
+            "timezone": "America/Bogota",
+        },
+    )
+    overdue_dispatch = LeasedReminderDispatch(
+        id=2,
+        student_id=7,
+        reminder_policy_id=2,
+        study_plan_event_instance_id=None,
+        dispatch_type="activity_overdue_15m_act",
+        channel="whatsapp",
+        scheduled_for=real_datetime(2026, 1, 6, 12, 15),
+        payload={
+            "kind": "activity_overdue",
+            "reminder_type": "activity_overdue",
+            "title": "Parcial 1",
+            "lead_minutes": 15,
+            "due_at": "2026-01-06T12:00:00-05:00",
+            "starts_at": "2026-01-06T12:00:00-05:00",
+            "timezone": "America/Bogota",
+        },
+    )
+
+    due_message = render_whatsapp_reminder_message(due_dispatch)
+    overdue_message = render_whatsapp_reminder_message(overdue_dispatch)
+
+    assert "Recordatorio de actividad academica" in due_message
+    assert "Faltan 3 horas." in due_message
+    assert "Seguimiento de actividad vencida" in overdue_message
+    assert "¿La completaste?" in overdue_message
+    assert "complete Parcial 1" in overdue_message
 
 
 def test_due_reminder_runner_retries_retryable_whatsapp_failures() -> None:

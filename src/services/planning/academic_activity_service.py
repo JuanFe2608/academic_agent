@@ -16,7 +16,7 @@ _ACTIVITY_TYPE_KEYWORDS: dict[AcademicActivityType, set[str]] = {
     "quiz": {"quiz", "quices", "control", "prueba corta"},
     "tarea": {"tarea", "deber"},
     "taller": {"taller"},
-    "entrega": {"entrega", "trabajo"},
+    "entrega": {"entrega"},
     "exposicion": {"exposicion", "presentacion"},
     "proyecto": {"proyecto"},
     "estudio_pendiente": {
@@ -622,7 +622,23 @@ def _detect_activity_type(normalized_text: str) -> AcademicActivityType | None:
     for activity_type, keywords in _ACTIVITY_TYPE_KEYWORDS.items():
         if _contains_any(normalized_text, keywords):
             return activity_type
+    if _contains_phrase(normalized_text, "trabajo") and _looks_like_academic_work(normalized_text):
+        return "entrega"
     return None
+
+
+def _looks_like_academic_work(normalized_text: str) -> bool:
+    if _contains_any(
+        normalized_text,
+        {"laboral", "turno", "oficina", "empleo", "empresa", "jornada"},
+    ):
+        return False
+    if re.search(r"\btrabajo\s+(?:de\s+)?\d{1,2}(?::\d{2})?\s*(?:am|pm)?\s+a\s+\d{1,2}", normalized_text):
+        return False
+    return _contains_any(
+        normalized_text,
+        {"trabajo de", "trabajo para", "trabajo sobre", "entregar trabajo"},
+    )
 
 
 def _extract_subject_name(

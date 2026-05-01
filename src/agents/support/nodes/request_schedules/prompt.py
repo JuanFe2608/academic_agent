@@ -43,9 +43,17 @@ PROMPT_LABORAL = build_schedule_capture_prompt(
 )
 PROMPT_AMBOS = PROMPT_ACADEMICO
 PROMPT_NINGUNA = (
-    "Soy un agente especializado en gestión del tiempo, planificación de actividades y "
-    "recomendación de métodos de estudio. Lo siento, no puedo ayudarte en este momento "
-    "porque necesito que actualmente estés estudiando."
+    "¡Entiendo! 😊 Soy un asistente especializado en gestión del tiempo académico, "
+    "planificación de materias y métodos de estudio, por lo que solo puedo acompañarte "
+    "si actualmente estás en un proceso de estudio activo. "
+    "Cuando empieces a estudiar, ¡estaré aquí para ayudarte a organizar tu agenda! 📚\n\n"
+    "Si elegiste esta opción por error o tu situación cambió, selecciona de nuevo:\n"
+    "Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
+    "(Escribe el número de la opción que quieres elegir)\n"
+    "Elige una opción:\n"
+    "1. Solo estudio\n"
+    "2. Estudio y trabajo\n"
+    "3. Ninguna de las anteriores"
 )
 PROMPT_MORE_ACADEMIC = (
     "📚 ¿Quieres agregar más materias o ya terminamos con esta parte?\n"

@@ -26,6 +26,29 @@ _DAYS_ES: dict[str, str] = {
 
 _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
 
+# Mapa de etiquetas internas del radar → descripción legible para el estudiante.
+# Evita que el LLM cite códigos como "explanation_gap" en sus respuestas.
+_WEAKNESS_LABELS: dict[str, str] = {
+    "procrastination": "Inicio y foco",
+    "distraction": "Inicio y foco",
+    "start_friction": "Inicio y foco",
+    "explanation_gap": "Explicación poco sólida",
+    "retrieval_gap": "Recuperación activa",
+    "passive_review_dependence": "Dependencia de relectura",
+    "note_organization": "Apuntes poco útiles",
+    "review_design": "Diseño de repaso",
+    "concept_connections": "Conectar ideas",
+    "theory_structure": "Estructura teórica",
+    "exact_memory": "Memoria de detalle",
+    "detail_recall": "Recuerdo de detalles",
+    "rapid_forgetting": "Olvido rápido",
+    "review_decay": "Olvido rápido",
+    "difficulty_switching_topics": "Alternar materias",
+    "subject_balance": "Equilibrio entre materias",
+    "strategy_switching": "Cambio de estrategia",
+    "practice_variety": "Variedad de práctica",
+}
+
 # Parte invariante del prompt — idéntica en todos los turnos y para todos los estudiantes.
 # Al ser el primer SystemMessage de la request, Azure OpenAI la cachea junto con las
 # definiciones de tools, eliminando ~1450 tokens de procesamiento por invocación.
@@ -39,8 +62,8 @@ _STATIC_INSTRUCTIONS = (
     "4. Mantener su plan semanal actualizado\n"
     "\n"
     "CÓMO ACTUAR:\n"
-    "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity\n"
-    "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan\n"
+    "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity, luego update_study_plan\n"
+    "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan directamente\n"
     "- Cuando pregunte cómo estudiar algo → usa search_study_methods con sus técnicas top\n"
     "- Cuando pida ver su agenda o plan → usa get_weekly_plan + get_schedule\n"
     "- Actúa proactivamente: si registras una actividad urgente, sugiere una técnica inmediatamente\n"
@@ -52,8 +75,9 @@ _STATIC_INSTRUCTIONS = (
     "2. Pregunta UNA SOLA VEZ: '¿Quieres marcarla como prioritaria? ⭐' (sí = is_priority=True)\n"
     "   NO preguntes prioridad alta/media/baja, ni urgencia — eso se calcula solo.\n"
     "3. Llama add_academic_activity con los datos y is_priority según la respuesta\n"
-    "4. Sincroniza con To Do: llama sync_tasks_to_todo de forma proactiva\n"
-    "5. Si el estudiante dice que ya completó algo → usa mark_activity_done\n"
+    "4. Llama update_study_plan con el motivo para incorporar la actividad al plan de sesiones\n"
+    "5. Sincroniza con To Do: llama sync_tasks_to_todo de forma proactiva\n"
+    "6. Si el estudiante dice que ya completó algo → usa mark_activity_done\n"
     "\n"
     "CALENDARIO vs MICROSOFT TO DO:\n"
     "- Outlook Calendar: horario fijo (clases, trabajo, extracurriculares) + sesiones de estudio\n"
@@ -62,9 +86,21 @@ _STATIC_INSTRUCTIONS = (
     "\n"
     "PLANIFICACIÓN DE ESTUDIO — REGLAS CRÍTICAS:\n"
     "- Cuando pidan planificar → llama update_study_plan DIRECTAMENTE. NO hagas preguntas previas.\n"
+    "- update_study_plan genera y aplica el plan en un solo paso — NO pidas confirmación al estudiante.\n"
     "- Las materias y su orden de prioridad se derivan automáticamente del horario fijo registrado.\n"
+    "- NUNCA razciones por tu cuenta si hay espacio disponible en el horario — SIEMPRE llama update_study_plan\n"
+    "  y deja que el servicio calcule. Tú no decides si caben bloques nuevos.\n"
+    "- Si update_study_plan responde que no hubo cambios, el plan actual ya es óptimo — preséntalo al estudiante.\n"
     "- NUNCA preguntes: '¿cuáles son tus materias?', '¿qué prioridad tiene X?', '¿cómo calificarías tu urgencia?'\n"
     "- NUNCA pidas al estudiante que 'confirme materias' ni que 'complete el flujo de prioridades'.\n"
+    "\n"
+    "RESTRICCIONES DE PLANIFICACIÓN (update_constraints):\n"
+    "- Cuando el estudiante diga cuánto puede concentrarse seguido → actualiza study_session_min / study_session_max\n"
+    "- Cuando diga cuánto puede estudiar al día → actualiza max_study_per_day_min\n"
+    "- Cuando diga en qué franja prefiere estudiar → actualiza preferred_study_start y preferred_study_end\n"
+    "- Cuando mencione su hora de dormir o levantarse → actualiza sleep_start / sleep_end\n"
+    "- Llama update_constraints DIRECTAMENTE sin pedir confirmación — igual que update_study_plan.\n"
+    "- Después de update_constraints siempre llama update_study_plan para regenerar el plan con los nuevos límites.\n"
     "\n"
     "GESTIÓN DEL HORARIO FIJO (clases, trabajo y extracurriculares del onboarding):\n"
     "- VER el horario: usa get_schedule(). Para ver solo un tipo usa filter_type:\n"
@@ -103,19 +139,55 @@ def build_dynamic_context(state: AgentState) -> str:
 
     techniques = list(study_profile.top_techniques or [])
     tech_lines = "\n".join(f"  - {t}" for t in techniques[:3]) or "  - No configuradas"
-    weakness = ", ".join(study_profile.weakness_tags) if study_profile.weakness_tags else "ninguna"
+    _raw_weakness = list(study_profile.weakness_tags or [])
+    _seen: set[str] = set()
+    _weakness_labels: list[str] = []
+    for tag in _raw_weakness:
+        label = _WEAKNESS_LABELS.get(tag, tag)
+        if label not in _seen:
+            _seen.add(label)
+            _weakness_labels.append(label)
+    weakness = ", ".join(_weakness_labels) if _weakness_labels else "ninguna"
+    method_name = study_profile.method or None
+    how_to = study_profile.how_to or None
+    confidence = study_profile.confidence or None
+
+    method_block = ""
+    if method_name:
+        method_block = f"Método principal: {method_name}\n"
+        if how_to:
+            method_block += f"Cómo aplicarlo: {how_to}\n"
+        if confidence:
+            method_block += f"Confianza del perfil: {confidence}\n"
+
+    constraints = state.constraints
+    pref_window = (
+        f"{constraints.preferred_study_start} – {constraints.preferred_study_end}"
+        if constraints.preferred_study_start and constraints.preferred_study_end
+        else "No configurado"
+    )
 
     return (
         "---\n"
         "PERFIL DEL ESTUDIANTE:\n"
         f"- Nombre: {profile.full_name or '—'}\n"
+        f"- Edad: {profile.age or '—'}\n"
+        f"- Programa: {profile.academic_program or 'Ingeniería de Sistemas y Computación'}\n"
         f"- Semestre: {profile.semester or '—'}\n"
         f"- Promedio: {profile.average_grade or '—'}\n"
         f"- Ocupación: {profile.occupation or '—'}\n"
         "\n"
         "TÉCNICAS DE ESTUDIO PREFERIDAS (Radar):\n"
+        f"{method_block}"
         f"{tech_lines}\n"
         f"Señales de debilidad: {weakness}\n"
+        "\n"
+        "LÍMITES DE PLANIFICACIÓN:\n"
+        f"- Sesión mínima: {constraints.study_session_min} min\n"
+        f"- Sesión máxima: {constraints.study_session_max} min\n"
+        f"- Máximo de estudio diario: {constraints.max_study_per_day_min} min\n"
+        f"- Horario de sueño: {constraints.sleep_end} – {constraints.sleep_start}\n"
+        f"- Franja preferida de estudio: {pref_window}\n"
         "\n"
         "HORARIO FIJO:\n"
         f"{format_schedule_blocks(state.schedule.blocks)}\n"

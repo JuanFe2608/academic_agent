@@ -120,9 +120,10 @@ class PostgresAcademicActivityRepository:
                     priority_level,
                     difficulty_level,
                     status,
-                    source_text
+                    source_text,
+                    todo_task_id
                 ) VALUES (
-                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                    %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
                 )
                 ON CONFLICT (student_id, activity_uid)
                 DO UPDATE SET
@@ -136,6 +137,7 @@ class PostgresAcademicActivityRepository:
                     difficulty_level = EXCLUDED.difficulty_level,
                     status = EXCLUDED.status,
                     source_text = EXCLUDED.source_text,
+                    todo_task_id = COALESCE(EXCLUDED.todo_task_id, academic_activities.todo_task_id),
                     updated_at = NOW()
                 RETURNING
                     id,
@@ -150,6 +152,7 @@ class PostgresAcademicActivityRepository:
                     difficulty_level,
                     status,
                     source_text,
+                    todo_task_id,
                     created_at,
                     updated_at
                 """,
@@ -166,6 +169,7 @@ class PostgresAcademicActivityRepository:
                     item.difficulty_level,
                     item.status,
                     item.source_text,
+                    item.todo_task_id,
                 ),
             ).fetchone()
             conn.commit()
@@ -194,6 +198,7 @@ class PostgresAcademicActivityRepository:
                     difficulty_level,
                     status,
                     source_text,
+                    todo_task_id,
                     created_at,
                     updated_at
                 FROM academic_activities
@@ -233,6 +238,7 @@ class PostgresAcademicActivityRepository:
                     difficulty_level,
                     status,
                     source_text,
+                    todo_task_id,
                     created_at,
                     updated_at
                 """,
@@ -295,6 +301,7 @@ def _activity_from_row(row: Any) -> AcademicActivity:
         difficulty_level=_optional_int(_row_value(row, "difficulty_level")),
         status=str(_row_value(row, "status", "pending")),
         source_text=_optional_str(_row_value(row, "source_text")),
+        todo_task_id=_optional_str(_row_value(row, "todo_task_id")),
         created_at=_datetime_str(_row_value(row, "created_at")),
         updated_at=_datetime_str(_row_value(row, "updated_at")),
     )
@@ -318,8 +325,9 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
         "difficulty_level": 9,
         "status": 10,
         "source_text": 11,
-        "created_at": 12,
-        "updated_at": 13,
+        "todo_task_id": 12,
+        "created_at": 13,
+        "updated_at": 14,
     }
     index = order.get(key)
     if index is None or index >= len(row):

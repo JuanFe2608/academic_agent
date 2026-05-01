@@ -95,9 +95,9 @@ _MICROSOFT_PERSONAL_DOMAIN_ROOTS = frozenset({"outlook", "hotmail", "live", "msn
 
 def validate_institutional_email(
     raw: str,
-    config: OnboardingConfig,  # noqa: ARG001 — mantenido por firma del Protocol
+    config: OnboardingConfig,
 ) -> ValidationResult:
-    """Valida que el correo sea una cuenta personal de Microsoft (outlook/hotmail/live/msn)."""
+    """Valida correo permitido para OAuth Microsoft."""
 
     normalized = str(raw or "").strip().lower()
     if not normalized or " " in normalized:
@@ -105,6 +105,14 @@ def validate_institutional_email(
     if not _EMAIL_PATTERN.fullmatch(normalized):
         return ValidationResult(error="invalid_institutional_email")
     domain = normalized.rsplit("@", 1)[-1]
+    allowed_domains = {
+        str(item or "").strip().lower()
+        for item in getattr(config, "allowed_email_domains", ())
+        if str(item or "").strip()
+    }
+    if domain in allowed_domains:
+        return ValidationResult(value=normalized)
+
     domain_root = domain.split(".")[0]
     if domain_root not in _MICROSOFT_PERSONAL_DOMAIN_ROOTS:
         return ValidationResult(error="non_microsoft_personal_email")

@@ -288,10 +288,20 @@ def _build_available_windows(
         sleep_end=constraints.sleep_end,
     )
 
+    pref_start = getattr(constraints, "preferred_study_start", None)
+    pref_end = getattr(constraints, "preferred_study_end", None)
+    if pref_start and pref_end:
+        pref_start_min = _to_minutes(pref_start)
+        pref_end_min = _to_minutes(pref_end)
+        if pref_start_min < pref_end_min:
+            preferred = _intersect_intervals(awake_intervals, [(pref_start_min, pref_end_min)])
+            if preferred:
+                awake_intervals = preferred
+
     available: dict[str, list[tuple[int, int]]] = {}
     for day in DAY_ORDER:
         merged_busy = _merge_intervals(busy_by_day[day])
-        free_windows = awake_intervals
+        free_windows = list(awake_intervals)
         for interval in merged_busy:
             free_windows = _subtract_interval_list(free_windows, interval)
         available[day] = free_windows
@@ -307,6 +317,20 @@ def _awake_intervals(*, sleep_start: str, sleep_end: str) -> list[tuple[int, int
     if start < end:
         return _merge_intervals([(0, start), (end, 24 * 60)])
     return [(end, start)]
+
+
+def _intersect_intervals(
+    a: list[tuple[int, int]],
+    b: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    result: list[tuple[int, int]] = []
+    for a_start, a_end in a:
+        for b_start, b_end in b:
+            lo = max(a_start, b_start)
+            hi = min(a_end, b_end)
+            if lo < hi:
+                result.append((lo, hi))
+    return result
 
 
 def _merge_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:

@@ -64,7 +64,7 @@ class ReminderDispatchSeed:
 
     student_id: int
     reminder_policy_id: int | None
-    study_plan_event_instance_id: int
+    study_plan_event_instance_id: int | None
     dispatch_type: str
     channel: str
     scheduled_for: datetime
@@ -106,6 +106,13 @@ class RemindersRepository(Protocol):
     def sync_dispatches(self, *, dispatches: list[ReminderDispatchSeed]) -> int: ...
 
     def cancel_dispatches_for_superseded_instances(self, *, student_id: int) -> int: ...
+
+    def cancel_stale_activity_dispatches(
+        self,
+        *,
+        student_id: int,
+        valid_source_keys: set[str],
+    ) -> int: ...
 
     def lease_due_dispatches(
         self,
@@ -245,6 +252,24 @@ class InMemoryRemindersRepository:
                 dispatch.scheduled_for,
             )
             if key in existing_keys:
+                if row := next(
+                    (
+                        item
+                        for item in self._dispatches_by_id.values()
+                        if (
+                            item["student_id"],
+                            item["channel"],
+                            item["reminder_policy_id"],
+                            item["study_plan_event_instance_id"],
+                            item["dispatch_type"],
+                            item["scheduled_for"],
+                        ) == key
+                    ),
+                    None,
+                ):
+                    if row["status"] in {"pending", "leased", "retryable"}:
+                        row["payload"] = dict(dispatch.payload)
+                        row["updated_at"] = datetime.now(tz=dispatch.scheduled_for.tzinfo)
                 continue
             self._dispatches_by_id[self._next_dispatch_id] = {
                 "id": self._next_dispatch_id,
@@ -287,10 +312,35 @@ class InMemoryRemindersRepository:
                 continue
             if row["study_plan_event_instance_id"] not in superseded_instance_ids:
                 continue
-            if row["status"] not in {"pending", "leased"}:
+            if row["status"] not in {"pending", "leased", "retryable"}:
                 continue
             row["status"] = "canceled"
             row["failure_reason"] = row["failure_reason"] or "instance_superseded"
+            row["updated_at"] = datetime.now(tz=row["scheduled_for"].tzinfo)
+            canceled += 1
+        return canceled
+
+    def cancel_stale_activity_dispatches(
+        self,
+        *,
+        student_id: int,
+        valid_source_keys: set[str],
+    ) -> int:
+        canceled = 0
+        valid = {str(key) for key in valid_source_keys if str(key).strip()}
+        for row in self._dispatches_by_id.values():
+            if row["student_id"] != student_id:
+                continue
+            if row["status"] not in {"pending", "leased", "retryable"}:
+                continue
+            payload = dict(row.get("payload") or {})
+            if payload.get("reminder_domain") != "academic_activity":
+                continue
+            source_key = str(payload.get("reminder_source") or "")
+            if source_key in valid:
+                continue
+            row["status"] = "canceled"
+            row["failure_reason"] = row["failure_reason"] or "academic_activity_dispatch_stale"
             row["updated_at"] = datetime.now(tz=row["scheduled_for"].tzinfo)
             canceled += 1
         return canceled
@@ -493,8 +543,26 @@ class PostgresRemindersRepository:
                     ) VALUES (
                         %s, %s, %s, %s, %s, %s, 'pending', %s::jsonb
                     )
-                    ON CONFLICT DO NOTHING
-                    RETURNING id
+                    ON CONFLICT (
+                        student_id,
+                        channel,
+                        (COALESCE(reminder_policy_id, -1)),
+                        (COALESCE(study_plan_event_instance_id, -1)),
+                        dispatch_type,
+                        scheduled_for
+                    )
+                    DO UPDATE SET
+                        payload = CASE
+                            WHEN reminder_dispatches.status IN ('pending', 'leased', 'retryable')
+                                THEN EXCLUDED.payload
+                            ELSE reminder_dispatches.payload
+                        END,
+                        updated_at = CASE
+                            WHEN reminder_dispatches.status IN ('pending', 'leased', 'retryable')
+                                THEN NOW()
+                            ELSE reminder_dispatches.updated_at
+                        END
+                    RETURNING id, (xmax = 0) AS inserted
                     """,
                     (
                         dispatch.student_id,
@@ -507,7 +575,7 @@ class PostgresRemindersRepository:
                     ),
                 )
                 row = cursor.fetchone()
-                if row is not None:
+                if row is not None and bool(_row_value(row, "inserted", False)):
                     created += 1
             conn.commit()
         return created
@@ -524,14 +592,45 @@ class PostgresRemindersRepository:
                     FROM study_plan_event_instances AS spi
                     WHERE rd.study_plan_event_instance_id = spi.id
                       AND rd.student_id = %s
-                      AND spi.student_id = %s
-                      AND spi.status = 'superseded'
-                      AND rd.status IN ('pending', 'leased')
+                    AND spi.student_id = %s
+                    AND spi.status = 'superseded'
+                      AND rd.status IN ('pending', 'leased', 'retryable')
                     RETURNING rd.id
                 )
                 SELECT COUNT(*) AS total FROM canceled
                 """,
                 (student_id, student_id),
+            ).fetchone()
+            conn.commit()
+        return int(_row_value(row, "total", 0))
+
+    def cancel_stale_activity_dispatches(
+        self,
+        *,
+        student_id: int,
+        valid_source_keys: set[str],
+    ) -> int:
+        valid = [str(key) for key in valid_source_keys if str(key).strip()]
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                WITH canceled AS (
+                    UPDATE reminder_dispatches
+                    SET status = 'canceled',
+                        failure_reason = COALESCE(
+                            failure_reason,
+                            'academic_activity_dispatch_stale'
+                        ),
+                        updated_at = NOW()
+                    WHERE student_id = %s
+                      AND status IN ('pending', 'leased', 'retryable')
+                      AND payload->>'reminder_domain' = 'academic_activity'
+                      AND NOT (COALESCE(payload->>'reminder_source', '') = ANY(%s))
+                    RETURNING id
+                )
+                SELECT COUNT(*) AS total FROM canceled
+                """,
+                (student_id, valid),
             ).fetchone()
             conn.commit()
         return int(_row_value(row, "total", 0))
@@ -689,6 +788,7 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
         "scheduled_for": 6,
         "payload": 7,
         "attempt_count": 8,
+        "inserted": 1,
         "total": 0,
     }
     index = mapping.get(key)

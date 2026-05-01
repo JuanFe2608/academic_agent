@@ -67,6 +67,16 @@ def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
     assert "Lara AI / Universidad Católica de Colombia" in messages[2].content
 
 
+def test_welcome_consent_inlines_welcome_image_for_debugger(monkeypatch) -> None:
+    monkeypatch.setenv("MEDIA_INLINE_PREVIEW", "true")
+    state = AgentState()
+
+    update = welcome_consent(state)
+
+    image_url = update["messages"][1].content[0]["image_url"]["url"]
+    assert image_url.startswith("data:image/")
+
+
 def test_welcome_consent_sends_welcome_first_for_any_initial_user_message() -> None:
     state = AgentState(
         messages=[HumanMessage(content="quiero crear mi horario")],

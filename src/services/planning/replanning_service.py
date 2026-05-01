@@ -72,16 +72,16 @@ class StudyReplanningService:
         change_request = dict(replan.get("change_request") or {})
         trigger = _effective_trigger(replan, explicit_request_text)
         reason_text = _reason_text(trigger, change_request, explicit_request_text)
-        if not current_plan.plan_events and not subjects:
+        if not current_plan.plan_events and not subjects and not schedule_blocks:
             return StudyReplanProposalResult(
                 proposed=False,
                 no_changes=True,
                 reason_text=reason_text,
                 prompt_text=(
-                    "Todavia no tengo un plan semanal base para replanificar. "
-                    "Primero necesito que completes prioridades y plan de estudio."
+                    "Todavia no tienes horario fijo registrado. "
+                    "Agrega tus bloques de clases o trabajo para que pueda generar un plan de estudio."
                 ),
-                error_code="missing_current_study_plan",
+                error_code="missing_schedule_and_subjects",
             )
 
         try:
@@ -621,6 +621,20 @@ def _find_next_slot(
         sleep_start=normalized_constraints.sleep_start,
         sleep_end=normalized_constraints.sleep_end,
     )
+    pref_start = getattr(normalized_constraints, "preferred_study_start", None)
+    pref_end = getattr(normalized_constraints, "preferred_study_end", None)
+    if pref_start and pref_end:
+        pref_start_min = _to_minutes(pref_start)
+        pref_end_min = _to_minutes(pref_end)
+        if pref_start_min < pref_end_min:
+            preferred = [
+                (max(ws, pref_start_min), min(we, pref_end_min))
+                for ws, we in awake_windows
+                if max(ws, pref_start_min) < min(we, pref_end_min)
+            ]
+            if preferred:
+                awake_windows = preferred
+
     start_day_index = _start_day_index(change_request, fallback_day, timezone, as_of)
     for offset in range(1, len(DAY_ORDER) + 1):
         day = DAY_ORDER[(start_day_index + offset) % len(DAY_ORDER)]

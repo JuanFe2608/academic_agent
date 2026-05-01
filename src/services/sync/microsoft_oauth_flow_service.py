@@ -12,6 +12,7 @@ from bootstrap.settings import database_url_from_env
 from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
     MicrosoftOAuthClient,
+    MicrosoftTokenRecord,
     build_microsoft_oauth_client_from_env,
 )
 from project_env import load_project_env
@@ -138,11 +139,23 @@ class MicrosoftOAuthFlowService:
         pending = self.state_repository.get_oauth_pending_state(
             state_token=normalized_state
         )
-        if pending is None or pending.status != "pending":
+        if pending is None:
             return MicrosoftOAuthCallbackResult(
                 ok=False,
                 error_code="oauth_state_not_found",
                 detail="No encontre un state OAuth pendiente para este callback.",
+            )
+        if pending.status == "completed":
+            return MicrosoftOAuthCallbackResult(
+                ok=True,
+                student_id=pending.student_id,
+            )
+        if pending.status != "pending":
+            return MicrosoftOAuthCallbackResult(
+                ok=False,
+                student_id=pending.student_id,
+                error_code="oauth_state_not_pending",
+                detail="El state OAuth ya no esta pendiente para este callback.",
             )
 
         if _ensure_aware(pending.expires_at) <= self.now_factory():
@@ -174,6 +187,18 @@ class MicrosoftOAuthFlowService:
                 detail=exchange.detail,
             )
 
+        identity_error = self._validate_authorized_microsoft_identity(
+            pending=pending,
+            token=exchange.token,
+        )
+        if identity_error is not None:
+            self.state_repository.delete_connection(student_id=pending.student_id)
+            self.state_repository.mark_oauth_pending_state_failed(
+                state_token=normalized_state,
+                last_error=identity_error.error_code or "microsoft_oauth_identity_error",
+            )
+            return identity_error
+
         self.state_repository.mark_oauth_pending_state_completed(
             state_token=normalized_state
         )
@@ -181,6 +206,46 @@ class MicrosoftOAuthFlowService:
             ok=True,
             student_id=pending.student_id,
         )
+
+    def _validate_authorized_microsoft_identity(
+        self,
+        *,
+        pending: MicrosoftOAuthPendingStateRecord,
+        token: MicrosoftTokenRecord | None,
+    ) -> MicrosoftOAuthCallbackResult | None:
+        if token is None:
+            return None
+
+        account_identifiers = _account_identifiers_from_token(token)
+        expected_email = _normalize_email(pending.institutional_email)
+        if expected_email and account_identifiers and expected_email not in account_identifiers:
+            return MicrosoftOAuthCallbackResult(
+                ok=False,
+                student_id=pending.student_id,
+                error_code="microsoft_account_mismatch",
+                detail=(
+                    "La cuenta Microsoft autorizada no coincide con el correo que "
+                    "escribiste en el chat. Vuelve a WhatsApp y usa la cuenta correcta "
+                    "o corrige el correo."
+                ),
+            )
+
+        duplicate = self.state_repository.find_connection_by_microsoft_identity(
+            microsoft_user_id=token.microsoft_user_id,
+            account_identifiers=tuple(account_identifiers),
+            exclude_student_id=pending.student_id,
+        )
+        if duplicate is not None:
+            return MicrosoftOAuthCallbackResult(
+                ok=False,
+                student_id=pending.student_id,
+                error_code="microsoft_account_already_connected",
+                detail=(
+                    "Esa cuenta Microsoft ya esta conectada a otra cuenta de estudiante. "
+                    "Vuelve a WhatsApp y escribe otro correo."
+                ),
+            )
+        return None
 
 
 def is_microsoft_oauth_required() -> bool:
@@ -224,6 +289,15 @@ def _generate_state_token(student_id: int) -> str:
 def _normalize_email(value: str | None) -> str | None:
     normalized = str(value or "").strip().lower()
     return normalized or None
+
+
+def _account_identifiers_from_token(token: MicrosoftTokenRecord) -> set[str]:
+    identifiers: set[str] = set()
+    for value in (token.email, token.user_principal_name):
+        normalized = _normalize_email(value)
+        if normalized:
+            identifiers.add(normalized)
+    return identifiers
 
 
 def _ensure_aware(value: datetime) -> datetime:

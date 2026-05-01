@@ -441,6 +441,7 @@ def render_whatsapp_reminder_message(dispatch: LeasedReminderDispatch) -> str:
     """Renderiza un recordatorio académico breve para WhatsApp."""
 
     title = str(dispatch.payload.get("title") or "Sesion de estudio").strip()
+    kind = str(dispatch.payload.get("kind") or "").strip()
     reminder_type = str(dispatch.payload.get("reminder_type") or "").strip()
     starts_at = _format_dispatch_datetime(
         dispatch.payload.get("starts_at"),
@@ -453,6 +454,32 @@ def render_whatsapp_reminder_message(dispatch: LeasedReminderDispatch) -> str:
         timezone_name=str(dispatch.payload.get("timezone") or "America/Bogota"),
     )
     lead_minutes = _int_payload(dispatch.payload.get("lead_minutes"))
+
+    if kind == "daily_agenda" or reminder_type == "daily_agenda":
+        return _render_daily_agenda_message(dispatch)
+
+    if kind == "activity_due" or reminder_type == "activity_due":
+        lead_text = _lead_text(lead_minutes)
+        return "\n".join(
+            [
+                "Recordatorio de actividad academica",
+                f"Actividad: {title}",
+                f"Vence: {starts_at}",
+                f"Faltan {lead_text}.",
+                "Prioriza cerrar esta entrega antes de abrir nuevas tareas.",
+            ]
+        )
+
+    if kind == "activity_overdue" or reminder_type == "activity_overdue":
+        return "\n".join(
+            [
+                "Seguimiento de actividad vencida",
+                f"Actividad: {title}",
+                f"Vencio: {starts_at}",
+                "¿La completaste?",
+                f"Responde \"complete {title}\" para marcarla como completada, o \"dejala pendiente\" para mantenerla.",
+            ]
+        )
 
     if reminder_type == "pre_session" or dispatch.dispatch_type.startswith("pre_session"):
         lead_text = _lead_text(lead_minutes)
@@ -496,8 +523,42 @@ def render_whatsapp_reminder_message(dispatch: LeasedReminderDispatch) -> str:
     )
 
 
+def _render_daily_agenda_message(dispatch: LeasedReminderDispatch) -> str:
+    agenda_date = str(dispatch.payload.get("agenda_date") or "").strip()
+    activities = [
+        item
+        for item in list(dispatch.payload.get("activities") or [])
+        if isinstance(item, dict)
+    ]
+    lines = ["Agenda academica de hoy"]
+    if agenda_date:
+        lines.append(f"Fecha: {agenda_date}")
+    if activities:
+        lines.append("Tienes pendiente:")
+        for item in activities[:6]:
+            title = str(item.get("title") or "Actividad").strip()
+            subject = str(item.get("subject_name") or "").strip()
+            due_at = _format_dispatch_datetime(
+                item.get("due_at"),
+                fallback=dispatch.scheduled_for,
+                timezone_name=str(dispatch.payload.get("timezone") or "America/Bogota"),
+            )
+            label = title if not subject or subject.lower() in title.lower() else f"{title} ({subject})"
+            lines.append(f"- {label}: vence {due_at}")
+        extra = len(activities) - 6
+        if extra > 0:
+            lines.append(f"- Y {extra} pendiente(s) mas.")
+    else:
+        lines.append("No tengo actividades academicas puntuales para hoy.")
+    lines.append("Al terminar una, dime que la completaste para actualizar tu To Do y tus recordatorios.")
+    return "\n".join(lines)
+
+
 def _email_subject(dispatch: LeasedReminderDispatch) -> str:
     title = str(dispatch.payload.get("title") or "Sesion de estudio")
+    kind = str(dispatch.payload.get("kind") or dispatch.payload.get("reminder_type") or "")
+    if kind in {"daily_agenda", "activity_due", "activity_overdue"}:
+        return f"Lara: {title}"
     return f"Recordatorio de estudio: {title}"
 
 

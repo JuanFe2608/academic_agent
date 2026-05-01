@@ -14,30 +14,11 @@ from integrations.langgraph.checkpointer import (
     checkpoint_database_url_from_env,
 )
 from integrations.whatsapp import WhatsAppCloudClient, WhatsAppInboundMessage
+from repositories.webhook import InMemoryWebhookMessageRepository, WebhookMessageRepository
+from services.channels.input_normalization import NormalizedAgentInput, WhatsAppInputNormalizer
 from services.channels.whatsapp_service import WhatsAppChannelService
 
 logger = logging.getLogger(__name__)
-
-
-class _BoundedIdSet:
-    """Conjunto acotado con política FIFO para deduplicar message_ids.
-
-    Evita que el mismo webhook procesado dos veces (retry de WhatsApp)
-    ejecute el agente dos veces. maxsize limita el uso de memoria.
-    """
-
-    def __init__(self, maxsize: int = 500) -> None:
-        self._data: OrderedDict[str, None] = OrderedDict()
-        self._maxsize = maxsize
-
-    def contains_and_add(self, item: str) -> bool:
-        """Retorna True si el item ya existía (duplicado). Lo registra si es nuevo."""
-        if item in self._data:
-            return True
-        self._data[item] = None
-        if len(self._data) > self._maxsize:
-            self._data.popitem(last=False)  # Evicta el más antiguo
-        return False
 
 
 class _BoundedLockMap:
@@ -80,16 +61,23 @@ class AgentRunner:
         *,
         whatsapp_service: WhatsAppChannelService,
         checkpointer: PostgresLangGraphCheckpointer,
+        dedup_repo: WebhookMessageRepository | None = None,
+        input_normalizer: WhatsAppInputNormalizer | None = None,
         max_workers: int = 4,
     ) -> None:
         from agents.support.agent import build_agent
 
         self._whatsapp_service = whatsapp_service
+        self._input_normalizer = input_normalizer or WhatsAppInputNormalizer(
+            whatsapp_service=whatsapp_service,
+            audio_transcriber=_build_audio_transcriber(),
+        )
         self._checkpointer = checkpointer
         self._agent = build_agent(checkpointer=checkpointer)
         self._executor = ThreadPoolExecutor(max_workers=max_workers, thread_name_prefix="lara-agent")
-        # Deduplicación: evita procesar el mismo message_id dos veces (retries de WhatsApp)
-        self._seen_ids: _BoundedIdSet = _BoundedIdSet(maxsize=500)
+        # Deduplicación durable: persiste message_ids en PostgreSQL para sobrevivir
+        # reinicios y ser compartida entre réplicas. Fallback a in-memory si no hay DB.
+        self._dedup_repo: WebhookMessageRepository = dedup_repo or InMemoryWebhookMessageRepository()
         # Lock por thread_id: garantiza procesamiento secuencial por usuario (acotado a 1000 entradas)
         self._thread_locks: _BoundedLockMap = _BoundedLockMap(maxsize=1000)
 
@@ -100,6 +88,9 @@ class AgentRunner:
     @classmethod
     def from_env(cls) -> "AgentRunner":
         """Construye un AgentRunner desde variables de entorno."""
+        from bootstrap.settings import database_url_from_env
+        from repositories.webhook import PostgresWebhookMessageRepository
+
         checkpoint_url = checkpoint_database_url_from_env()
         if not checkpoint_url:
             raise RuntimeError(
@@ -111,9 +102,22 @@ class AgentRunner:
         client = WhatsAppCloudClient.from_env()
         whatsapp_service = WhatsAppChannelService(client)
 
+        dedup_repo: WebhookMessageRepository | None = None
+        try:
+            db_url = database_url_from_env()
+            dedup_repo = PostgresWebhookMessageRepository(db_url)
+            logger.info("Deduplicacion de webhooks: PostgreSQL activo.")
+        except Exception:
+            logger.warning(
+                "No se pudo inicializar la deduplicacion PostgreSQL. "
+                "Usando fallback in-memory (no es seguro con multiples replicas).",
+                exc_info=True,
+            )
+
         return cls(
             whatsapp_service=whatsapp_service,
             checkpointer=checkpointer,
+            dedup_repo=dedup_repo,
         )
 
     # ------------------------------------------------------------------
@@ -129,10 +133,18 @@ class AgentRunner:
           para el mismo thread_id, evitando race conditions en el checkpointer.
         - Feedback inmediato: marca el mensaje como leído antes de invocar el agente.
         """
-        # 1. Dedup — silenciosamente ignorar si ya se procesó este message_id
-        if self._seen_ids.contains_and_add(message.message_id):
-            logger.info("Mensaje duplicado %s ignorado.", message.message_id)
-            return
+        # 1. Dedup — silenciosamente ignorar si ya se procesó este message_id.
+        # Fail-open: si el repo falla, procesamos el mensaje para no perderlo.
+        try:
+            if self._dedup_repo.is_duplicate_and_register(message.message_id):
+                logger.info("Mensaje duplicado %s ignorado.", message.message_id)
+                return
+        except Exception:
+            logger.warning(
+                "Error al verificar deduplicacion para %s. Procesando de todas formas.",
+                message.message_id,
+                exc_info=True,
+            )
 
         # 2. Marcar como leído inmediatamente (checkmarks azules al usuario)
         self._executor.submit(self._whatsapp_service.mark_message_read, message.message_id)
@@ -156,7 +168,15 @@ class AgentRunner:
         """Invoca el agente sincrono y envia las respuestas generadas."""
         thread_id = message.from_number
 
-        human_message, image_refs = self._build_human_message(message)
+        normalized = self._normalize_inbound_message(message)
+        if normalized is None:
+            return
+        if normalized.direct_response:
+            self._send_direct_message(thread_id, normalized.direct_response)
+            return
+
+        human_message = normalized.human_message
+        image_refs = normalized.image_refs
         if human_message is None:
             return
 
@@ -209,7 +229,8 @@ class AgentRunner:
                 return None, []
             return HumanMessage(content=text), []
 
-        if message.media.media_type in {"image", "sticker"}:
+        media_type = str(message.media.media_type or "").strip().lower()
+        if media_type == "image":
             content: list[dict] = []
             if text:
                 content.append({"type": "text", "text": text})
@@ -228,9 +249,25 @@ class AgentRunner:
 
             return HumanMessage(content=content), image_refs
 
-        ref = message.media.caption or f"[{message.media.media_type} adjunto]"
+        ref = message.media.caption or f"[{media_type or 'media'} adjunto]"
         combined = f"{text}\n{ref}".strip() if text else ref
         return HumanMessage(content=combined), []
+
+    def _normalize_inbound_message(
+        self,
+        message: WhatsAppInboundMessage,
+    ) -> NormalizedAgentInput | None:
+        """Normaliza modalidades no textuales antes de invocar LangGraph."""
+
+        normalized = self._input_normalizer.normalize(message)
+        if normalized is None:
+            human_message, image_refs = self._build_human_message(message)
+
+            return NormalizedAgentInput(
+                human_message=human_message,
+                image_refs=image_refs,
+            )
+        return normalized
 
     def _send_error_message(self, recipient_id: str) -> None:
         """Notifica al estudiante que ocurrio un error temporal."""
@@ -241,6 +278,17 @@ class AgentRunner:
             )
         except Exception:
             logger.exception("Error al enviar mensaje de error a %s", recipient_id)
+
+    def _send_direct_message(self, recipient_id: str, text: str) -> None:
+        """Envía una respuesta determinística sin invocar el agente."""
+
+        try:
+            self._whatsapp_service.send_agent_messages(
+                recipient_id=recipient_id,
+                messages=[text],
+            )
+        except Exception:
+            logger.exception("Error al enviar mensaje directo a %s", recipient_id)
 
 
 # ---------------------------------------------------------------------------
@@ -265,6 +313,14 @@ def _extract_new_ai_messages(messages: list) -> list[AIMessage]:
         m for m in messages[slice_start:]
         if isinstance(m, AIMessage) and not m.tool_calls and m.content
     ]
+
+
+def _build_audio_transcriber():
+    """Construye transcriptor de audio si las variables Azure están configuradas."""
+
+    from integrations.ai.audio_transcription import maybe_build_audio_transcription_service
+
+    return maybe_build_audio_transcription_service()
 
 
 __all__ = ["AgentRunner"]

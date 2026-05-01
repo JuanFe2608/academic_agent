@@ -200,6 +200,7 @@ class AppContainer:
         self,
         service: StudyRecommendationService | None,
     ) -> None:
+        self._instances.pop("study_plan_enrichment_service", None)
         self._set_override("study_recommendation_service", service)
 
     def get_study_plan_enrichment_service(self) -> StudyPlanEnrichmentService:

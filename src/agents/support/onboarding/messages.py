@@ -34,16 +34,25 @@ VALIDATION_ERROR_MESSAGES = {
         "Necesito tu codigo estudiantil solo en numeros 😊 "
         "Por ejemplo: 67000912"
     ),
+    "duplicate_student_code": (
+        "Ese codigo estudiantil ya esta registrado en otra cuenta 🆔 "
+        "Escribe un codigo diferente 😊"
+    ),
     "age": "Necesito tu edad en numero 😊 Por ejemplo: 18 o 21",
     "institutional_email": (
         "Ese correo no tiene un formato valido 😕 Por favor ingresa tu correo "
-        "Microsoft personal, por ejemplo: usuario@outlook.com"
+        "Microsoft, por ejemplo: usuario@outlook.com"
+    ),
+    "duplicate_email": (
+        "Ese correo Microsoft ya esta registrado en otra cuenta de estudiante. "
+        "Escribe otro correo 📧 Puedes usar @ucatolica.edu.co o una cuenta "
+        "Microsoft personal (@outlook.com, @hotmail.com, @live.com). "
+        "Por ejemplo: usuario@outlook.com"
     ),
     "non_microsoft_personal_email": (
-        "Ese dominio no esta permitido 😕 Solo acepto cuentas personales de Microsoft "
-        "(@outlook.com, @hotmail.com, @live.com, etc.). "
-        "Los correos institucionales como @ucatolica.edu.co requieren permisos adicionales "
-        "que no estan disponibles en este momento."
+        "Ese dominio no esta permitido 😕 Usa una cuenta Microsoft personal "
+        "(@outlook.com, @hotmail.com, @live.com, etc.) o un dominio habilitado "
+        "para la prueba."
     ),
     "supported_program": "Responde si o no, por favor 😊",
     "semester": "Necesito el semestre en numero 😊 Por ejemplo: 1, 5 u 8",
@@ -81,9 +90,13 @@ def build_field_prompt(
         )
 
     if field == "institutional_email":
+        allowed_domains = ", ".join(
+            f"@{domain}" for domain in config.allowed_email_domains
+        )
         return (
-            "Para conectar tu cuenta Microsoft necesito tu correo personal 📧 "
-            "Puede ser @outlook.com, @hotmail.com, @live.com u otro dominio Microsoft. "
+            "Para conectar tu cuenta Microsoft necesito tu correo 📧 "
+            f"Puedes usar {allowed_domains} o una cuenta Microsoft personal "
+            "(@outlook.com, @hotmail.com, @live.com). "
             "Por ejemplo: usuario@outlook.com"
         )
 
@@ -123,6 +136,8 @@ def build_prompt_with_error(
     """
 
     message = VALIDATION_ERROR_MESSAGES.get(error_key or field, VALIDATION_ERROR_MESSAGES.get(field, ""))
+    if error_key in {"duplicate_student_code", "duplicate_email"}:
+        return message
     parts = [message, build_field_prompt(field, config, first_name)]
     if extra_note:
         parts.append(extra_note)
@@ -182,5 +197,3 @@ def build_low_grade_motivation_message() -> str:
         "¡Tu puedes lograrlo! Con constancia y las herramientas correctas, "
         "los resultados van a llegar. Juntos vamos a trabajar en eso 🎯✨"
     )
-
-

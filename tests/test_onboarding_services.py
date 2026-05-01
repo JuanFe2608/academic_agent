@@ -106,6 +106,27 @@ def test_onboarding_service_rejects_duplicate_student_code_on_persist() -> None:
     assert second_result.error_code == "duplicate_student_code"
 
 
+def test_onboarding_service_prepares_oauth_identity_without_email_verification() -> None:
+    config = OnboardingConfig()
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(config=config, repository=repository)
+    profile = {
+        "full_name": "Ana Maria Perez",
+        "student_code": "67000912",
+        "age": 20,
+        "institutional_email": "ana@outlook.com",
+        "email_verified": False,
+        "academic_program": "Ingenieria de Sistemas y Computacion",
+        "supported_program": True,
+    }
+
+    result = service.persist_verified_identity(profile)
+
+    assert result.persisted is True
+    assert result.student_id == 1
+    assert repository._students_by_email["ana@outlook.com"]["email_verified"] is False
+
+
 def test_onboarding_service_can_skip_verification_in_disabled_mode() -> None:
     config = OnboardingConfig(verification_mode="disabled")
     repository = InMemoryOnboardingRepository()

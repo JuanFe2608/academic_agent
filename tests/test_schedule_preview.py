@@ -132,3 +132,29 @@ def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_p
     # El review_stage queda correctamente seteado para que validate_schedule emita el conflicto
     schedule_state_dict = update["schedule"]
     assert schedule_state_dict.get("review_stage") == "awaiting_conflict_decision"
+
+
+def test_render_schedule_preview_inlines_image_for_debugger(monkeypatch) -> None:
+    monkeypatch.setenv("MEDIA_INLINE_PREVIEW", "true")
+    blocks = [
+        WeeklyScheduleBlock(
+            block_type="academic",
+            title="Calculo",
+            day_of_week="monday",
+            start_time="06:00",
+            end_time="08:00",
+            source_text="Lunes cálculo de 6 a 8 am",
+        )
+    ]
+    state = AgentState(
+        schedule={
+            "blocks": blocks,
+            "conflicts": [],
+            "summary_text": build_schedule_summary(blocks),
+        }
+    )
+
+    update = render_schedule_preview(state)
+
+    rendered_image = update["messages"][0].content[1]["image_url"]["url"]
+    assert rendered_image.startswith("data:image/")

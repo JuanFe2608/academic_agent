@@ -122,3 +122,30 @@ def test_parse_activity_update_changes_due_date_after_confirmation() -> None:
     assert parsed_update.requires_confirmation is True
     assert parsed_update.confirmation_payload["operation"] == "update"
     assert applied_update.activity.due_date == "2026-04-20"
+
+
+def test_parse_work_shift_is_not_academic_activity() -> None:
+    result = parse_academic_activity_request(
+        "tengo trabajo de 2 pm a 6 pm",
+        existing_activities=[],
+        subjects=[SubjectItem(nombre="Calculo", prioridad="media", dificultad=3)],
+        reference_date=date(2026, 4, 18),
+        timezone="America/Bogota",
+    )
+
+    assert result.detected is False
+
+
+def test_parse_academic_work_assignment_still_detects_activity() -> None:
+    result = parse_academic_activity_request(
+        "tengo trabajo de Calculo para el viernes",
+        existing_activities=[],
+        subjects=[SubjectItem(nombre="Calculo", prioridad="media", dificultad=3)],
+        reference_date=date(2026, 4, 18),
+        timezone="America/Bogota",
+    )
+
+    assert result.detected is True
+    assert result.action == "create"
+    assert result.slots["activity_type"] == "entrega"
+    assert result.slots["subject_name"] == "Calculo"

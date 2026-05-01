@@ -22,7 +22,10 @@ from schemas.channels import (
     ChannelSendResult,
 )
 from services.channels.message_buffer import MessageBuffer
-from utils.media_artifacts import materialize_image_reference
+from utils.media_artifacts import (
+    materialize_image_reference,
+    materialize_image_reference_for_transport,
+)
 
 _WHATSAPP_IMAGE_CAPTION_LIMIT = 1024
 
@@ -314,7 +317,7 @@ def _content_blocks(content: Any) -> list[Any]:
 def _media_from_content_block(block: dict[str, Any]) -> ChannelMedia | None:
     image_ref = _image_reference(block)
     if image_ref:
-        reference = materialize_image_reference(image_ref)
+        reference = materialize_image_reference_for_transport(image_ref)
         return ChannelMedia(
             media_type="image",
             reference=reference,

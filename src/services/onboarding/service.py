@@ -128,6 +128,18 @@ class OnboardingService:
             resend_count=record.resend_count,
         )
 
+    def student_code_exists(self, student_code: str) -> bool:
+        """Indica si el codigo estudiantil ya esta registrado."""
+
+        return self.repository.student_exists_by_code(str(student_code or "").strip())
+
+    def institutional_email_exists(self, institutional_email: str) -> bool:
+        """Indica si el correo ya esta registrado."""
+
+        return self.repository.student_exists_by_email(
+            str(institutional_email or "").strip().lower()
+        )
+
     def verify_email_code(
         self,
         institutional_email: str,
@@ -223,14 +235,13 @@ class OnboardingService:
         return PersistStudentResult(persisted=True, student_id=student_id)
 
     def persist_verified_identity(self, profile: Any) -> PersistStudentResult:
-        """Crea o actualiza la identidad minima antes del OAuth bloqueante."""
+        """Crea o actualiza la identidad minima antes del OAuth bloqueante.
 
-        if not bool(_profile_value(profile, "email_verified", False)):
-            return PersistStudentResult(
-                persisted=False,
-                error_code="email_not_verified",
-                detail="El correo institucional aun no ha sido verificado.",
-            )
+        El OAuth de Microsoft es el mecanismo que confirma la conexion de la
+        cuenta. Por eso esta persistencia preliminar no exige `email_verified`;
+        solo reserva la identidad necesaria para asociar el state OAuth.
+        """
+
         required_fields = (
             "full_name",
             "student_code",

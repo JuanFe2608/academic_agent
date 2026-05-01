@@ -84,7 +84,21 @@ def request_microsoft_oauth(state: AgentState) -> dict:
             student_id = int(identity_result.student_id)
             profile["persisted_student_id"] = student_id
         else:
-            detail = identity_result.detail or "No pude preparar tu identidad para Microsoft."
+            conflict_update = _identity_conflict_update(
+                state=state,
+                messages=messages,
+                profile=profile,
+                onboarding=onboarding,
+                interaction=interaction,
+                error_code=identity_result.error_code,
+                has_new_input=has_new_input,
+                current_count=current_count,
+                last_text=last_text,
+            )
+            if conflict_update is not None:
+                return conflict_update
+
+            detail = _identity_persistence_error_message(identity_result.error_code)
             onboarding["microsoft_oauth"] = _oauth_state(
                 onboarding,
                 status="failed",
@@ -103,10 +117,7 @@ def request_microsoft_oauth(state: AgentState) -> dict:
                 "messages": append_message(
                     messages,
                     "assistant",
-                    (
-                        "Antes de conectar Microsoft necesito dejar lista tu identidad academica. "
-                        f"{detail} Escribe reintentar cuando este corregido."
-                    ),
+                    detail,
                 ),
             }
 
@@ -312,6 +323,106 @@ def _profile_student_id(profile: dict[str, Any]) -> int | None:
         return None
 
 
+def _identity_conflict_update(
+    *,
+    state: AgentState,
+    messages: list,
+    profile: dict[str, Any],
+    onboarding: dict[str, Any],
+    interaction: dict[str, Any],
+    error_code: str | None,
+    has_new_input: bool,
+    current_count: int,
+    last_text: str,
+) -> dict | None:
+    conflict_field = _identity_conflict_field(error_code)
+    if conflict_field is None:
+        return None
+
+    _clear_conflicting_identity_field(profile, conflict_field)
+    slot_errors = dict(onboarding.get("slot_errors", {}))
+    slot_errors[conflict_field] = error_code or "identity_conflict"
+    onboarding["slot_errors"] = slot_errors
+    onboarding["current_field"] = conflict_field
+    onboarding["persistence_error"] = error_code or "identity_conflict"
+    onboarding["microsoft_oauth"] = _oauth_state(
+        onboarding,
+        status="idle",
+        state_token=None,
+        authorization_url=None,
+        expires_at=None,
+        last_error=error_code or "identity_conflict",
+    )
+    interaction["is_waiting_for_oauth"] = False
+    interaction["current_step"] = conflict_field
+    return {
+        "student_profile": profile,
+        "onboarding": onboarding,
+        "interaction": interaction,
+        "phase": "profile",
+        "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+        "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+        "awaiting_user_input": True,
+        "messages": append_message(
+            messages,
+            "assistant",
+            _identity_conflict_message(error_code),
+        ),
+    }
+
+
+def _identity_conflict_field(error_code: str | None) -> str | None:
+    if error_code == "duplicate_student_code":
+        return "student_code"
+    if error_code == "duplicate_email":
+        return "institutional_email"
+    return None
+
+
+def _clear_conflicting_identity_field(profile: dict[str, Any], field: str) -> None:
+    profile.pop("persisted_student_id", None)
+    if field == "student_code":
+        profile.pop("student_code", None)
+        profile.pop("supported_program", None)
+        profile.pop("academic_program", None)
+        return
+    if field == "institutional_email":
+        profile.pop("institutional_email", None)
+        profile["email_verified"] = False
+
+
+def _identity_conflict_message(error_code: str | None) -> str:
+    if error_code == "duplicate_student_code":
+        return (
+            "Ese codigo estudiantil ya esta registrado en otra cuenta 🆔 "
+            "Escribe un codigo diferente 😊"
+        )
+    if error_code == "duplicate_email":
+        return (
+            "Ese correo Microsoft ya esta registrado en otra cuenta de estudiante. "
+            "Escribe otro correo 📧 Puedes usar @ucatolica.edu.co o una cuenta "
+            "Microsoft personal (@outlook.com, @hotmail.com, @live.com). "
+            "Por ejemplo: usuario@outlook.com"
+        )
+    return (
+        "No pude conectar Microsoft todavia porque encontre un conflicto en tu identidad academica. "
+        "Revisa los datos y escribe el dato correcto para continuar."
+    )
+
+
+def _identity_persistence_error_message(error_code: str | None) -> str:
+    if error_code == "missing_identity_fields":
+        return (
+            "Antes de conectar Microsoft necesito completar tus datos basicos. "
+            "Voy a pedirte el dato que falta para poder continuar."
+        )
+    return (
+        "No pude preparar tu identidad academica para conectar Microsoft por un problema interno. "
+        "No cambies tus datos todavia; escribe reintentar en unos segundos. Si vuelve a pasar, "
+        "hay que revisar el registro en la base de datos."
+    )
+
+
 def _oauth_state(
     onboarding: dict[str, Any],
     *,
@@ -349,7 +460,8 @@ def _authorization_message(authorization_url: str) -> str:
         "Solo usare estos permisos para apoyarte en tu planificacion academica.\n\n"
         "Toca el link para iniciar sesion en Microsoft y autorizar el acceso:\n"
         f"🔗 {authorization_url}\n\n"
-        "Cuando termines, vuelve aqui y escribe listo. Si el enlace vence, escribe reintentar."
+        "Cuando termines, vuelve aqui y escribe listo ✅. "
+        "Si el enlace vence, escribe reintentar 🔃."
     )
 
 
@@ -359,13 +471,15 @@ def _pending_message(authorization_url: str, *, user_claims_done: bool) -> str:
             "Aun no veo la conexion Microsoft confirmada. "
             "Revisa que hayas completado el inicio de sesion en el navegador.\n\n"
             f"🔗 {authorization_url}\n\n"
-            "Si el enlace vencio o fallo, escribe reintentar."
+            "Si ya te aparecio la pantalla de Listo, escribe listo ✅. "
+            "Si el enlace vencio o fallo, escribe reintentar 🔃."
         )
     return (
         "Sigo esperando la autorizacion de Microsoft. "
         "Usa este enlace para completar el acceso:\n\n"
         f"🔗 {authorization_url}\n\n"
-        "Cuando termines, escribe listo. Si vencio o fallo, escribe reintentar."
+        "Cuando termines, escribe listo ✅. "
+        "Si vencio o fallo, escribe reintentar 🔃."
     )
 
 

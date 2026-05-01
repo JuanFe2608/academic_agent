@@ -117,6 +117,35 @@ def test_whatsapp_channel_service_uploads_local_image_before_sending(tmp_path: P
     ]
 
 
+def test_whatsapp_channel_service_materializes_inline_preview_before_upload() -> None:
+    client = _fake_client()
+    service = WhatsAppChannelService(client)  # type: ignore[arg-type]
+
+    results = service.send_agent_messages(
+        recipient_id="573001112233",
+        messages=[
+            AIMessage(
+                content=[
+                    {"type": "text", "text": "Este es tu horario"},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": "data:image/png;base64,aW1hZ2U="},
+                    },
+                ]
+            )
+        ],
+    )
+
+    assert len(results) == 1
+    assert results[0].provider_message_id == "wamid.image"
+    assert len(client.uploads) == 1
+    uploaded_path, mime_type = client.uploads[0]
+    assert not uploaded_path.startswith("data:image")
+    assert Path(uploaded_path).exists()
+    assert mime_type == "image/png"
+    assert client.images[0]["caption"] == "Este es tu horario"
+
+
 def test_whatsapp_channel_service_uses_public_image_link_without_upload() -> None:
     client = _fake_client()
     service = WhatsAppChannelService(client)  # type: ignore[arg-type]

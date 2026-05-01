@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import hashlib
+import hmac
+import json
 import logging
 import os
 from contextlib import asynccontextmanager
@@ -21,11 +24,37 @@ logger = logging.getLogger(__name__)
 _runner: "AgentRunner | None" = None  # type: ignore[name-defined]
 
 
+def _check_startup_config() -> None:
+    """Registra advertencias tempranas sobre variables de entorno criticas."""
+    redirect_uri = os.getenv("MICROSOFT_REDIRECT_URI", "").strip()
+    if not redirect_uri:
+        logger.warning(
+            "MICROSOFT_REDIRECT_URI no configurado: el flujo OAuth de Microsoft fallara."
+        )
+    elif redirect_uri.startswith("http://localhost") or redirect_uri.startswith("http://127."):
+        logger.warning(
+            "MICROSOFT_REDIRECT_URI apunta a localhost (%s). "
+            "En staging/produccion debe ser https://<dominio>/oauth/callback "
+            "y estar registrado en Microsoft Entra.",
+            redirect_uri,
+        )
+    else:
+        logger.info("MICROSOFT_REDIRECT_URI configurado: %s", redirect_uri)
+
+    if not os.getenv("WHATSAPP_APP_SECRET", "").strip():
+        logger.warning(
+            "WHATSAPP_APP_SECRET no configurado: el webhook POST no valida la firma "
+            "X-Hub-Signature-256. Configurar antes de exponer el endpoint publicamente."
+        )
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Inicializa y limpia recursos compartidos del agente."""
     global _runner
     from api.agent_runner import AgentRunner
+
+    _check_startup_config()
 
     logger.info("Iniciando AgentRunner...")
     try:
@@ -52,6 +81,25 @@ app = FastAPI(
 
 
 # ---------------------------------------------------------------------------
+# Helpers internos
+# ---------------------------------------------------------------------------
+
+
+def _verify_whatsapp_signature(raw_body: bytes, signature_header: str, secret: str) -> bool:
+    """Valida la firma HMAC-SHA256 del webhook de Meta/WhatsApp.
+
+    Meta incluye el header 'X-Hub-Signature-256: sha256=<hex>' calculado como
+    HMAC-SHA256(app_secret, raw_body). Se usa compare_digest para evitar
+    ataques de timing.
+    """
+    if not signature_header.startswith("sha256="):
+        return False
+    expected_hex = signature_header[len("sha256="):]
+    computed_hex = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    return hmac.compare_digest(computed_hex, expected_hex)
+
+
+# ---------------------------------------------------------------------------
 # Health check
 # ---------------------------------------------------------------------------
 
@@ -60,6 +108,36 @@ app = FastAPI(
 def health() -> dict[str, str]:
     """Probe de disponibilidad para Azure y balanceadores."""
     return {"status": "ok", "agent": "ready" if _runner is not None else "initializing"}
+
+
+@app.post("/tasks/reminders/run", tags=["infra"])
+async def run_due_reminders(
+    request: Request,
+    limit: int = Query(50, ge=1, le=500),
+    token: str | None = Query(None),
+) -> dict[str, object]:
+    """Ejecuta un ciclo del worker de recordatorios para Azure Scheduler/Functions."""
+
+    expected_token = os.getenv("ACADEMIC_AGENT_REMINDER_WORKER_TOKEN", "").strip()
+    provided_token = (request.headers.get("x-reminder-worker-token") or token or "").strip()
+    if expected_token and provided_token != expected_token:
+        raise HTTPException(status_code=403, detail="Token de worker invalido.")
+
+    from services.reminders import build_reminder_dispatch_runner
+
+    result = build_reminder_dispatch_runner().run_due_dispatches(limit=limit)
+    if not result.processed:
+        raise HTTPException(
+            status_code=500,
+            detail=result.detail or result.error_code or "No se pudieron procesar recordatorios.",
+        )
+    return {
+        "status": "ok",
+        "leased_count": result.leased_count,
+        "sent_count": result.sent_count,
+        "failed_count": result.failed_count,
+        "retryable_count": result.retryable_count,
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -96,9 +174,20 @@ async def receive_webhook(
     background_tasks: BackgroundTasks,
 ) -> dict[str, str]:
     """Recibe mensajes entrantes de WhatsApp y los despacha al agente."""
+    raw_body = await request.body()
+
+    app_secret = os.getenv("WHATSAPP_APP_SECRET", "").strip()
+    if app_secret:
+        signature = request.headers.get("X-Hub-Signature-256", "")
+        if not _verify_whatsapp_signature(raw_body, signature, app_secret):
+            logger.warning("Webhook POST rechazado: firma X-Hub-Signature-256 invalida.")
+            raise HTTPException(status_code=403, detail="Firma de webhook invalida.")
+    else:
+        logger.warning("WHATSAPP_APP_SECRET no configurado: webhook sin validacion de firma.")
+
     body: dict[str, Any] = {}
     try:
-        body = await request.json()
+        body = json.loads(raw_body)
     except Exception:
         return {"status": "ok"}  # Payload invalido — responder 200 para evitar reintentos
 
@@ -120,6 +209,7 @@ async def receive_webhook(
 
 
 @app.get("/oauth/callback", tags=["microsoft"])
+@app.get("/auth/microsoft/callback", tags=["microsoft"], include_in_schema=False)
 async def microsoft_oauth_callback(request: Request) -> HTMLResponse:
     """Completa el flujo OAuth de Microsoft y notifica al estudiante."""
     params = dict(request.query_params)
@@ -129,7 +219,8 @@ async def microsoft_oauth_callback(request: Request) -> HTMLResponse:
         logger.warning("OAuth callback fallido: %s", result.message)
         html = _oauth_result_page(
             success=False,
-            message="No pude completar la conexion con tu cuenta Microsoft. Intenta de nuevo.",
+            message=result.message
+            or "No pude completar la conexion con tu cuenta Microsoft. Intenta de nuevo.",
         )
         return HTMLResponse(content=html, status_code=400)
 

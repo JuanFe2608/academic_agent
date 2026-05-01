@@ -25,7 +25,7 @@ _OPERATIONAL_WELCOME = (
     "- \"¿Cómo aplico mi técnica para un parcial?\"\n"
     "- \"Agrega grupo de estudio el miércoles de 4 a 6 pm\"\n\n"
     "Cuando falte información, solo te preguntaré lo necesario. "
-    "Antes de hacer cambios, siempre te mostraré lo que entendí para que confirmes. ✅"
+    "Antes de hacer cambios, siempre te mostraré lo que entendí para que confirmes."
 )
 
 

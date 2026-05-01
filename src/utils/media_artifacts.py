@@ -21,7 +21,9 @@ IMAGE_RECEIVED_MARKER = "[imagen recibida]"
 def strip_image_to_marker(content: Any) -> Any:
     """Reemplaza datos de imagen con un marcador de texto. Sin I/O — seguro en async."""
     if isinstance(content, str):
-        return IMAGE_RECEIVED_MARKER if is_data_image_url(content) else content
+        if is_data_image_url(content) and not is_inline_preview_enabled():
+            return IMAGE_RECEIVED_MARKER
+        return content
     if isinstance(content, list):
         return [strip_image_to_marker(item) for item in content]
     if isinstance(content, tuple):
@@ -45,9 +47,13 @@ def _strip_image_dict(item: dict) -> dict:
             url = str(image_url.get("url") or "")
             # Solo strip data URLs (base64 inline) — las rutas locales de WhatsApp
             # se preservan para que el nodo pueda leerlas y enviarlas al LLM.
-            if is_data_image_url(url):
+            if is_data_image_url(url) and not is_inline_preview_enabled():
                 return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
-        elif isinstance(image_url, str) and is_data_image_url(image_url):
+        elif (
+            isinstance(image_url, str)
+            and is_data_image_url(image_url)
+            and not is_inline_preview_enabled()
+        ):
             return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
         return item
 
@@ -113,6 +119,23 @@ def materialize_image_reference(value: str | None) -> str:
         return raw
 
     if is_inline_preview_enabled():
+        return raw
+
+    return materialize_base64_image(
+        match.group("data"),
+        mime_type=match.group("mime"),
+    )
+
+
+def materialize_image_reference_for_transport(value: str | None) -> str:
+    """Convierte data URLs en archivo local para canales que deben subir media."""
+
+    raw = str(value or "").strip()
+    if not raw:
+        return ""
+
+    match = _DATA_IMAGE_RE.match(raw)
+    if match is None:
         return raw
 
     return materialize_base64_image(

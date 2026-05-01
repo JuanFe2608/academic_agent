@@ -146,6 +146,7 @@ def handle_schedule_capture_turn(
         )
 
     if occupation == "ninguna":
+        profile["occupation"] = None
         return _build_schedule_update(
             state,
             profile=profile,
@@ -153,8 +154,8 @@ def handle_schedule_capture_turn(
             schedule_state=update_schedule_flow_state(schedule_state),
             academic_pending_items=academic_pending_items,
             work_pending_items=work_pending_items,
-            phase="end",
-            awaiting_user_input=False,
+            phase="schedules",
+            awaiting_user_input=True,
             current_count=(
                 current_count if has_new_input else state.get("user_message_count", 0)
             ),

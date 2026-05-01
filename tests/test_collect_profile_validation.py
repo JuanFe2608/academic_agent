@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import pytest
 from langchain_core.messages import HumanMessage
 
 from agents.support.dependencies import set_onboarding_service
@@ -12,6 +13,21 @@ from agents.support.onboarding.validators import validate_student_code
 from agents.support.state import AgentState
 from repositories.onboarding.repository import InMemoryOnboardingRepository
 from services.onboarding import InMemoryEmailSender, OnboardingConfig, OnboardingService
+
+
+@pytest.fixture(autouse=True)
+def _isolated_onboarding_service():
+    set_onboarding_service(
+        OnboardingService(
+            config=OnboardingConfig(verification_secret="test-secret"),
+            repository=InMemoryOnboardingRepository(),
+            email_sender=InMemoryEmailSender(),
+        )
+    )
+    try:
+        yield
+    finally:
+        set_onboarding_service(None)
 
 
 def test_collect_profile_accepts_student_code_and_prompts_age() -> None:
@@ -96,6 +112,45 @@ def test_collect_profile_rejects_non_numeric_student_code() -> None:
     assert "codigo estudiantil solo en numeros" in update["messages"][0].content.lower()
 
 
+def test_collect_profile_rejects_duplicate_student_code_immediately() -> None:
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(
+        config=OnboardingConfig(verification_secret="test-secret"),
+        repository=repository,
+    )
+    service.persist_verified_identity(
+        {
+            "full_name": "Ana Maria Perez",
+            "student_code": "67000912",
+            "age": 20,
+            "institutional_email": "ana@outlook.com",
+            "email_verified": False,
+            "academic_program": "Ingenieria de Sistemas y Computacion",
+            "supported_program": True,
+        }
+    )
+    set_onboarding_service(service)
+    state = AgentState(
+        phase="profile",
+        student_profile={
+            "full_name": "Juan Jaramillo",
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="67000912")],
+    )
+
+    update = collect_profile(state)
+
+    assert update["phase"] == "profile"
+    assert update["awaiting_user_input"] is True
+    assert update["student_profile"]["student_code"] is None
+    assert update["onboarding"]["current_field"] == "student_code"
+    assert update["onboarding"]["slot_errors"]["student_code"] == "duplicate_student_code"
+    assert "ya esta registrado" in update["messages"][0].content.lower()
+    assert "escribe un codigo diferente" in update["messages"][0].content.lower()
+
+
 def test_collect_profile_records_slot_errors_by_field() -> None:
     state = AgentState(
         phase="profile",
@@ -116,8 +171,11 @@ def test_collect_profile_records_slot_errors_by_field() -> None:
     assert "necesito tu edad en numero" in update["messages"][0].content.lower()
 
 
-def test_collect_profile_stores_email_unverified_and_continues_to_next_field() -> None:
+def test_collect_profile_stores_email_unverified_and_continues_to_next_field(
+    monkeypatch,
+) -> None:
     """El email queda sin verificar hasta que OAuth completa; el flujo pide los campos restantes."""
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "0")
     state = AgentState(
         phase="profile",
         student_profile={
@@ -137,8 +195,37 @@ def test_collect_profile_stores_email_unverified_and_continues_to_next_field() -
     assert update["awaiting_user_input"] is True  # aun faltan semestre y promedio
 
 
-def test_collect_profile_accepts_email_and_remaining_slots_then_routes_to_confirm() -> None:
+def test_collect_profile_pauses_after_email_when_oauth_is_required(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
+    state = AgentState(
+        phase="profile",
+        student_profile={
+            "full_name": "Ana Maria Perez",
+            "student_code": "67000912",
+            "age": 20,
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="larapru1@outlook.com")],
+    )
+
+    update = collect_profile(state)
+    payload = state.model_dump()
+    payload.update(update)
+    next_state = AgentState(**payload)
+
+    assert update["student_profile"]["institutional_email"] == "larapru1@outlook.com"
+    assert update["student_profile"]["email_verified"] is False
+    assert update["awaiting_user_input"] is False
+    assert "messages" not in update
+    assert _route_collect_profile(next_state) == "request_microsoft_oauth"
+
+
+def test_collect_profile_accepts_email_and_remaining_slots_then_routes_to_confirm(
+    monkeypatch,
+) -> None:
     """Cuando todos los campos quedan llenos en un turno, el router avanza a confirm_profile."""
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "0")
     state = AgentState(
         phase="profile",
         student_profile={
@@ -192,8 +279,53 @@ def test_collect_profile_rejects_invalid_institutional_email() -> None:
     assert update["student_profile"]["institutional_email"] is None
 
 
-def test_collect_profile_accepts_microsoft_personal_email_and_continues_to_next_field() -> None:
+def test_collect_profile_rejects_duplicate_email_before_oauth_link() -> None:
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(
+        config=OnboardingConfig(verification_secret="test-secret"),
+        repository=repository,
+    )
+    service.persist_verified_identity(
+        {
+            "full_name": "Ana Maria Perez",
+            "student_code": "67000912",
+            "age": 20,
+            "institutional_email": "registrado@outlook.com",
+            "email_verified": False,
+            "academic_program": "Ingenieria de Sistemas y Computacion",
+            "supported_program": True,
+        }
+    )
+    set_onboarding_service(service)
+    state = AgentState(
+        phase="profile",
+        student_profile={
+            "full_name": "Juan Jaramillo",
+            "student_code": "67001091",
+            "age": 20,
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="registrado@outlook.com")],
+    )
+
+    update = collect_profile(state)
+
+    assert update["phase"] == "profile"
+    assert update["awaiting_user_input"] is True
+    assert update["student_profile"]["institutional_email"] is None
+    assert update["onboarding"]["current_field"] == "institutional_email"
+    assert update["onboarding"]["slot_errors"]["institutional_email"] == "duplicate_email"
+    assert "ya esta registrado" in update["messages"][0].content.lower()
+    assert "escribe otro correo" in update["messages"][0].content.lower()
+    assert "@ucatolica.edu.co" in update["messages"][0].content.lower()
+
+
+def test_collect_profile_accepts_microsoft_personal_email_and_continues_to_next_field(
+    monkeypatch,
+) -> None:
     """Un correo personal de Microsoft se acepta y el flujo continua pidiendo campos restantes."""
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "0")
     state = AgentState(
         phase="profile",
         student_profile={

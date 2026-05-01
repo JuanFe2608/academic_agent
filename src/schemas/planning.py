@@ -127,6 +127,8 @@ class Constraints(BaseSchemaModel):
     study_session_min: int = 25
     study_session_max: int = 90
     max_study_per_day_min: int = 180
+    preferred_study_start: Optional[str] = None
+    preferred_study_end: Optional[str] = None
 
 
 __all__ = [

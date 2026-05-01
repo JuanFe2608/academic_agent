@@ -21,8 +21,8 @@ tmp/
 prueba1.py
 tests/
 
-# Herramientas de administracion (no necesarias en el contenedor)
-scripts/
+# Scripts de debug y desarrollo (no necesarios en el contenedor)
+scripts/dev/
 migrations/
 
 # Configuracion de desarrollo local

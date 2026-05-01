@@ -55,6 +55,15 @@ def make_tools(state: AgentState) -> list:
     """Crea las 15 herramientas del agente con el estado actual capturado en closure."""
     student_id = _get_student_id(state)
 
+    # Accumulator: tracks in-cycle mutations to academic_activities so that tools
+    # called later in the same ReAct turn see the result of earlier tools.
+    # Example: add_academic_activity → sync_tasks_to_todo must see the new activity.
+    _cycle_updates: dict[str, Any] = {}
+
+    def _current_activities() -> list:
+        raw = _cycle_updates.get("academic_activities")
+        return list(raw) if raw is not None else list(state.academic_activities)
+
     # ------------------------------------------------------------------ RAG --
 
     @tool
@@ -172,11 +181,20 @@ def make_tools(state: AgentState) -> list:
             coerce_academic_activities,
         )
 
+        guard = _validate_academic_activity_tool_input(
+            state,
+            subject=subject,
+            activity_type=activity_type,
+            title=title,
+        )
+        if guard:
+            return guard
+
         # Urgencia interna: si el estudiante la marcó como prioritaria → alta;
         # si no, se calcula automáticamente por cercanía de la fecha.
         priority_level = "alta" if is_priority else _compute_urgency_from_due_date(due_date)
 
-        activities = coerce_academic_activities(list(state.academic_activities))
+        activities = coerce_academic_activities(_current_activities())
         try:
             new_act = build_activity_from_slots(
                 {
@@ -203,6 +221,7 @@ def make_tools(state: AgentState) -> list:
             }
             if result.replan_required:
                 state_update["replan"] = {"trigger": "academic_activity"}
+            _cycle_updates["academic_activities"] = state_update["academic_activities"]
             return json.dumps({"result": msg, "_state_update": state_update})
         except Exception as exc:
             return f"No pude registrar la actividad: {exc}"
@@ -232,7 +251,7 @@ def make_tools(state: AgentState) -> list:
             match_academic_activities,
         )
 
-        activities = coerce_academic_activities(list(state.academic_activities))
+        activities = coerce_academic_activities(_current_activities())
         matches = match_academic_activities(activities, text=activity_reference)
         if not matches:
             return f"No encontré ninguna actividad que coincida con '{activity_reference}'."
@@ -272,6 +291,7 @@ def make_tools(state: AgentState) -> list:
             }
             if result.replan_required:
                 state_update["replan"] = {"trigger": "academic_activity"}
+            _cycle_updates["academic_activities"] = state_update["academic_activities"]
             return json.dumps({"result": result.message or "Actividad actualizada.", "_state_update": state_update})
         except Exception as exc:
             return f"No pude actualizar la actividad: {exc}"
@@ -288,7 +308,7 @@ def make_tools(state: AgentState) -> list:
             match_academic_activities,
         )
 
-        activities = coerce_academic_activities(list(state.academic_activities))
+        activities = coerce_academic_activities(_current_activities())
         matches = match_academic_activities(activities, text=activity_reference)
         if not matches:
             return f"No encontré ninguna actividad que coincida con '{activity_reference}'."
@@ -311,6 +331,7 @@ def make_tools(state: AgentState) -> list:
             }
             if result.replan_required:
                 state_update["replan"] = {"trigger": "academic_activity"}
+            _cycle_updates["academic_activities"] = state_update["academic_activities"]
             return json.dumps({"result": result.message or "Actividad eliminada.", "_state_update": state_update})
         except Exception as exc:
             return f"No pude eliminar la actividad: {exc}"
@@ -322,7 +343,7 @@ def make_tools(state: AgentState) -> list:
         entregas o quiera saber para qué prepararse esta semana."""
         from services.planning.academic_activity_service import active_academic_activities
 
-        activities = active_academic_activities(list(state.academic_activities))
+        activities = active_academic_activities(_current_activities())
         pending = [a for a in activities if a.status == "pending"]
         if not pending:
             return "No tienes actividades académicas pendientes registradas."
@@ -351,7 +372,7 @@ def make_tools(state: AgentState) -> list:
             match_academic_activities,
         )
 
-        activities = coerce_academic_activities(list(state.academic_activities))
+        activities = coerce_academic_activities(_current_activities())
         matches = match_academic_activities(activities, text=activity_reference)
         if not matches:
             return f"No encontré ninguna actividad que coincida con '{activity_reference}'."
@@ -372,6 +393,7 @@ def make_tools(state: AgentState) -> list:
             state_update: dict[str, Any] = {
                 "academic_activities": [a.model_dump() for a in result.activities],
             }
+            _cycle_updates["academic_activities"] = state_update["academic_activities"]
             act_title = target.activity_title or target.activity_type
             return json.dumps({
                 "result": result.message or f"✅ '{act_title}' marcada como completada.",
@@ -409,10 +431,11 @@ def make_tools(state: AgentState) -> list:
 
     @tool
     def update_study_plan(reason: str) -> str:
-        """Genera una nueva propuesta de plan de estudio basada en el motivo indicado.
-        Úsala cuando el estudiante pida reorganizar su semana, actualizar el plan
-        por una actividad nueva, o ajustar el plan por cambio de horario.
-        reason: descripción del motivo del cambio (ej: 'parcial de Cálculo el viernes')."""
+        """Genera o actualiza el plan semanal de sesiones de estudio y lo aplica directamente.
+        Úsala proactivamente: SIEMPRE después de add_academic_activity para reflejar
+        la nueva actividad en el calendario de estudio, cuando el estudiante pida
+        reorganizar su semana, o cuando cambie el horario fijo.
+        reason: motivo del cambio (ej: 'parcial de Filosofía el viernes')."""
         from agents.support.dependencies import get_study_replanning_service
 
         service = get_study_replanning_service()
@@ -422,7 +445,7 @@ def make_tools(state: AgentState) -> list:
                 current_study_plan=state.study_plan,
                 schedule_blocks=list(state.schedule.blocks),
                 subjects=list(state.subjects),
-                academic_activities=list(state.academic_activities),
+                academic_activities=_current_activities(),
                 study_profile=state.study_profile,
                 constraints=state.constraints,
                 timezone=state.timezone,
@@ -430,21 +453,171 @@ def make_tools(state: AgentState) -> list:
                 explicit_request_text=reason,
             )
             if result.proposed:
+                proposal = result.proposal_payload or {}
+                study_plan_update = dict(proposal.get("study_plan") or {})
+                new_plan_events = list(study_plan_update.get("plan_events") or [])
+                new_subjects = list(proposal.get("subjects") or [])
+
+                # Formatear plan para que el LLM lo presente de forma natural
+                by_day: dict[str, list[str]] = {}
+                for ev in new_plan_events[:20]:
+                    if isinstance(ev, dict):
+                        day_key = ev.get("dia", "")
+                        titulo = ev.get("titulo", "Sesión")
+                        inicio = ev.get("inicio", "—")
+                        fin = ev.get("fin", "—")
+                    else:
+                        day_key = getattr(ev, "dia", "")
+                        titulo = getattr(ev, "titulo", "Sesión")
+                        inicio = getattr(ev, "inicio", "—")
+                        fin = getattr(ev, "fin", "—")
+                    day_label = _DAYS_ES.get(day_key, day_key)
+                    by_day.setdefault(day_label, []).append(f"  • {inicio}–{fin}: {titulo}")
+
+                summary = result.summary_text or f"{len(new_plan_events)} sesión(es) planificadas"
+                plan_lines = [f"Plan de estudio generado — {summary}:"]
+                for day_key in _DAYS_ORDER:
+                    day_label = _DAYS_ES[day_key]
+                    if day_label in by_day:
+                        plan_lines.append(f"\n{day_label}:")
+                        plan_lines.extend(by_day[day_label])
+                extra = len(new_plan_events) - 20
+                if extra > 0:
+                    plan_lines.append(f"\n  ... y {extra} sesión(es) más")
+
+                state_update: dict[str, object] = {
+                    "study_plan": study_plan_update,
+                    "replan": {"status": "applied", "trigger": "user_request"},
+                }
+                if new_subjects:
+                    state_update["subjects"] = new_subjects
+
                 return json.dumps({
-                    "result": result.prompt_text or result.summary_text or "Nueva propuesta de plan lista.",
-                    "_state_update": {
-                        "replan": {
-                            "trigger": "user_request",
-                            "status": "proposed",
-                            "request": result.request_payload,
-                            "active_proposal": result.proposal_payload,
-                            "pending_prompt": result.prompt_text,
-                        },
-                    },
+                    "result": "\n".join(plan_lines),
+                    "_state_update": state_update,
                 })
-            return result.summary_text or "No fue necesario cambiar el plan."
+
+            # Sin cambios: el plan actual ya es óptimo — formatearlo para que el LLM lo presente
+            current_events = list(state.study_plan.plan_events or [])
+            if result.no_changes and current_events:
+                by_day_curr: dict[str, list[str]] = {}
+                for ev in current_events[:20]:
+                    day_key = getattr(ev, "dia", "")
+                    day_label = _DAYS_ES.get(day_key, day_key)
+                    titulo = getattr(ev, "titulo", "Sesión")
+                    inicio = getattr(ev, "inicio", "—")
+                    fin = getattr(ev, "fin", "—")
+                    by_day_curr.setdefault(day_label, []).append(f"  • {inicio}–{fin}: {titulo}")
+                plan_lines_curr = ["Plan de estudio actual (ya incorpora todas tus actividades):"]
+                for day_key in _DAYS_ORDER:
+                    day_label = _DAYS_ES[day_key]
+                    if day_label in by_day_curr:
+                        plan_lines_curr.append(f"\n{day_label}:")
+                        plan_lines_curr.extend(by_day_curr[day_label])
+                return "\n".join(plan_lines_curr)
+            return result.prompt_text or result.summary_text or "No fue necesario cambiar el plan."
         except Exception as exc:
             return f"No pude generar la propuesta de replanificación: {exc}"
+
+    # ------------------------------------------------- Restricciones --------
+
+    @tool
+    def update_constraints(
+        study_session_min: int | None = None,
+        study_session_max: int | None = None,
+        max_study_per_day_min: int | None = None,
+        preferred_study_start: str | None = None,
+        preferred_study_end: str | None = None,
+        sleep_start: str | None = None,
+        sleep_end: str | None = None,
+    ) -> str:
+        """Actualiza las restricciones de planificación del estudiante.
+        study_session_min: duración mínima de sesión en minutos (ej: 25).
+        study_session_max: duración máxima de sesión en minutos (ej: 90).
+        max_study_per_day_min: máximo total de minutos de estudio por día (ej: 180).
+        preferred_study_start: hora de inicio preferida para estudiar, formato HH:MM (ej: '08:00').
+        preferred_study_end: hora de fin preferida para estudiar, formato HH:MM (ej: '14:00').
+        sleep_start: hora a la que se acuesta, formato HH:MM (ej: '23:00').
+        sleep_end: hora a la que se levanta, formato HH:MM (ej: '06:00').
+        Úsala cuando el estudiante mencione: cuánto puede concentrarse seguido, cuándo prefiere estudiar,
+        cuánto puede estudiar al día, su hora de dormir/levantarse, o restricciones de horario.
+        Ejemplos: 'solo puedo estudiar de 8am a 2pm', 'máximo 45 minutos seguidos', 'duermo a las 11pm'."""
+        from schemas.planning import Constraints
+
+        current = state.constraints
+        changes: dict[str, Any] = {}
+
+        if study_session_min is not None:
+            if not (10 <= study_session_min <= 120):
+                return f"Sesión mínima inválida: {study_session_min}. Debe estar entre 10 y 120 minutos."
+            changes["study_session_min"] = study_session_min
+        if study_session_max is not None:
+            if not (15 <= study_session_max <= 240):
+                return f"Sesión máxima inválida: {study_session_max}. Debe estar entre 15 y 240 minutos."
+            changes["study_session_max"] = study_session_max
+        if max_study_per_day_min is not None:
+            if not (30 <= max_study_per_day_min <= 720):
+                return f"Máximo diario inválido: {max_study_per_day_min}. Debe estar entre 30 y 720 minutos."
+            changes["max_study_per_day_min"] = max_study_per_day_min
+        if preferred_study_start is not None:
+            try:
+                changes["preferred_study_start"] = _normalize_time(preferred_study_start)
+            except Exception:
+                return f"Hora de inicio inválida: '{preferred_study_start}'. Usa formato HH:MM."
+        if preferred_study_end is not None:
+            try:
+                changes["preferred_study_end"] = _normalize_time(preferred_study_end)
+            except Exception:
+                return f"Hora de fin inválida: '{preferred_study_end}'. Usa formato HH:MM."
+        if sleep_start is not None:
+            try:
+                changes["sleep_start"] = _normalize_time(sleep_start)
+            except Exception:
+                return f"Hora de sueño inválida: '{sleep_start}'. Usa formato HH:MM."
+        if sleep_end is not None:
+            try:
+                changes["sleep_end"] = _normalize_time(sleep_end)
+            except Exception:
+                return f"Hora de despertar inválida: '{sleep_end}'. Usa formato HH:MM."
+
+        if not changes:
+            return "No indicaste ningún límite a actualizar."
+
+        new_min = changes.get("study_session_min", current.study_session_min)
+        new_max = changes.get("study_session_max", current.study_session_max)
+        if new_min > new_max:
+            return f"La sesión mínima ({new_min} min) no puede ser mayor que la máxima ({new_max} min)."
+
+        pref_s = changes.get("preferred_study_start", current.preferred_study_start)
+        pref_e = changes.get("preferred_study_end", current.preferred_study_end)
+        if pref_s and pref_e:
+            try:
+                ps_min = int(pref_s.split(":")[0]) * 60 + int(pref_s.split(":")[1])
+                pe_min = int(pref_e.split(":")[0]) * 60 + int(pref_e.split(":")[1])
+                if ps_min >= pe_min:
+                    return f"El horario preferido de inicio ({pref_s}) debe ser anterior al de fin ({pref_e})."
+            except Exception:
+                pass
+
+        updated = current.model_copy(update=changes)
+        msg_parts: list[str] = []
+        if "study_session_min" in changes or "study_session_max" in changes:
+            msg_parts.append(f"sesiones de {updated.study_session_min}–{updated.study_session_max} min")
+        if "max_study_per_day_min" in changes:
+            msg_parts.append(f"máximo {updated.max_study_per_day_min} min/día")
+        if "preferred_study_start" in changes or "preferred_study_end" in changes:
+            msg_parts.append(
+                f"horario preferido {updated.preferred_study_start or '—'}–{updated.preferred_study_end or '—'}"
+            )
+        if "sleep_start" in changes or "sleep_end" in changes:
+            msg_parts.append(f"sueño {updated.sleep_end}–{updated.sleep_start}")
+
+        msg = "✅ Restricciones de planificación actualizadas: " + ", ".join(msg_parts) + "."
+        state_update: dict[str, Any] = {"constraints": updated.model_dump()}
+        if state.study_plan.plan_events:
+            state_update["replan"] = {"trigger": "user_request"}
+
+        return json.dumps({"result": msg, "_state_update": state_update})
 
     # --------------------------------------------------------- Prioridades ---
 
@@ -723,34 +896,36 @@ def make_tools(state: AgentState) -> list:
 
     @tool
     def sync_tasks_to_todo() -> str:
-        """Sincroniza actividades académicas pendientes con Microsoft To Do.
+        """Sincroniza actividades académicas con Microsoft To Do.
         Las actividades con prioridad alta aparecen con ⭐ en To Do.
+        Actividades completadas se marcan como completadas y eliminadas se retiran de To Do.
         Úsala proactivamente después de registrar o modificar actividades,
         o cuando el estudiante pida ver sus tareas en Microsoft To Do."""
         from agents.support.dependencies import get_microsoft_todo_sync_service
         from services.planning.academic_activity_service import (
-            active_academic_activities,
             coerce_academic_activities,
         )
 
         service = get_microsoft_todo_sync_service()
         task_list_id = state.calendar.todo_task_list_id
-        activities = coerce_academic_activities(list(state.academic_activities))
-        pending = [a for a in active_academic_activities(activities) if a.status == "pending"]
+        activities = coerce_academic_activities(_current_activities())
         try:
             result = service.sync_academic_activities_to_todo(
                 student_id=student_id,
                 task_list_id=task_list_id,
-                activities=pending,
+                activities=activities,
             )
             if result.synced:
                 msg = f"✅ {result.upserted_count} actividad(es) sincronizada(s) en Microsoft To Do."
+                if getattr(result, "deleted_count", 0):
+                    msg += f" {result.deleted_count} tarea(s) eliminada(s)."
                 if result.synced_activities:
                     updated_all = {a.activity_id: a for a in result.synced_activities}
                     merged = [
                         updated_all.get(a.activity_id, a).model_dump()
                         for a in activities
                     ]
+                    _cycle_updates["academic_activities"] = merged
                     return json.dumps({"result": msg, "_state_update": {"academic_activities": merged}})
                 return msg
             return f"No se pudo sincronizar: {result.detail or result.error_code or 'error desconocido'}"
@@ -767,6 +942,7 @@ def make_tools(state: AgentState) -> list:
         get_pending_activities,
         get_weekly_plan,
         update_study_plan,
+        update_constraints,
         get_schedule,
         add_schedule_block,
         update_schedule_block,
@@ -1011,6 +1187,119 @@ def _normalize_time(t: str) -> str:
         return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
     except (ValueError, IndexError):
         return raw
+
+
+def _validate_academic_activity_tool_input(
+    state: AgentState,
+    *,
+    subject: str,
+    activity_type: str,
+    title: str,
+) -> str | None:
+    valid_types = {
+        "parcial",
+        "quiz",
+        "tarea",
+        "taller",
+        "entrega",
+        "exposicion",
+        "proyecto",
+        "estudio_pendiente",
+    }
+    normalized_type = _normalize_text_key(activity_type)
+    if normalized_type not in valid_types:
+        return (
+            f"Tipo de actividad inválido: '{activity_type}'. "
+            "Usa parcial, quiz, tarea, taller, entrega, exposicion o proyecto."
+        )
+
+    if _looks_like_non_academic_activity(state, subject=subject, title=title):
+        return (
+            "Esto parece una actividad laboral o extracurricular, no una actividad académica puntual. "
+            "Para trabajo, hobbies o extracurriculares usa add_schedule_block con block_type='work' "
+            "o block_type='extracurricular'. No la sincronices con Microsoft To Do ni generes sesiones de estudio."
+        )
+    return None
+
+
+def _looks_like_non_academic_activity(
+    state: AgentState,
+    *,
+    subject: str,
+    title: str,
+) -> bool:
+    subject_key = _normalize_text_key(subject)
+    if subject_key and subject_key in _known_academic_subject_keys(state):
+        return False
+
+    combined = _normalize_text_key(f"{subject} {title}")
+    if not combined:
+        return False
+
+    work_markers = {
+        "trabajo",
+        "laboral",
+        "turno",
+        "oficina",
+        "empleo",
+        "empresa",
+        "jornada",
+        "practica laboral",
+    }
+    extracurricular_markers = {
+        "extracurricular",
+        "gimnasio",
+        "gym",
+        "deporte",
+        "entrenamiento",
+        "futbol",
+        "crochet",
+        "hobby",
+        "musica",
+    }
+    academic_markers = {
+        "parcial",
+        "quiz",
+        "tarea",
+        "taller",
+        "entrega",
+        "exposicion",
+        "proyecto",
+        "materia",
+        "clase",
+        "curso",
+        "universidad",
+    }
+
+    has_non_academic_marker = any(marker in combined for marker in work_markers | extracurricular_markers)
+    has_explicit_academic_marker = any(marker in combined for marker in academic_markers)
+    return bool(has_non_academic_marker and not has_explicit_academic_marker)
+
+
+def _known_academic_subject_keys(state: AgentState) -> set[str]:
+    keys = {
+        _normalize_text_key(getattr(subject, "nombre", ""))
+        for subject in list(state.subjects or [])
+        if _normalize_text_key(getattr(subject, "nombre", ""))
+    }
+    for block in list(state.schedule.blocks or []):
+        block_type = getattr(block, "block_type", "")
+        title = getattr(block, "title", "")
+        if block_type == "academic" and str(title or "").strip():
+            keys.add(_normalize_text_key(title))
+    return keys
+
+
+def _normalize_text_key(value: object) -> str:
+    import unicodedata
+
+    text = str(value or "").strip().lower()
+    text = (
+        unicodedata.normalize("NFKD", text)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    return " ".join(text.split())
 
 
 def _json_default(obj: Any) -> Any:

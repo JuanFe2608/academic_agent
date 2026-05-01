@@ -11,24 +11,37 @@ from agents.support.dependencies import (
     set_microsoft_oauth_flow_service,
     set_onboarding_service,
 )
+from agents.support.nodes.collect_profile.node import collect_profile
 from agents.support.nodes.request_microsoft_oauth.node import request_microsoft_oauth
 from agents.support.state import AgentState
 from integrations.microsoft_graph.auth_client import (
     MicrosoftAuthorizationRequest,
     MicrosoftTokenOperationResult,
+    MicrosoftTokenRecord,
 )
-from repositories.microsoft_graph.state_repository import InMemoryMicrosoftGraphStateRepository
+from repositories.microsoft_graph.state_repository import (
+    InMemoryMicrosoftGraphStateRepository,
+    MicrosoftGraphConnectionRecord,
+)
 from repositories.onboarding.repository import InMemoryOnboardingRepository
 from services.onboarding import InMemoryEmailSender, OnboardingConfig, OnboardingService
+from services.onboarding.service import PersistStudentResult
 from services.sync.microsoft_oauth_callback_handler import handle_microsoft_oauth_callback
 from services.sync.microsoft_oauth_flow_service import MicrosoftOAuthFlowService
 
 
 class _FakeOAuthClient:
-    def __init__(self) -> None:
+    def __init__(
+        self,
+        *,
+        email: str = "ana@ucatolica.edu.co",
+        microsoft_user_id: str = "ms-user-test",
+    ) -> None:
         self.connected_student_ids: set[int] = set()
         self.authorization_states: list[str] = []
         self.exchange_calls: list[tuple[int, str, tuple[str, ...]]] = []
+        self.email = email
+        self.microsoft_user_id = microsoft_user_id
 
     def build_authorization_request(
         self,
@@ -62,7 +75,31 @@ class _FakeOAuthClient:
         effective_scopes = tuple(scopes or ())
         self.exchange_calls.append((int(student_id), authorization_code, effective_scopes))
         self.connected_student_ids.add(int(student_id))
-        return MicrosoftTokenOperationResult(ok=True)
+        return MicrosoftTokenOperationResult(
+            ok=True,
+            token=MicrosoftTokenRecord(
+                student_id=int(student_id),
+                access_token="access-token-test-1234567890",
+                refresh_token="refresh-token-test-1234567890",
+                expires_at=datetime(2026, 4, 18, 1, tzinfo=timezone.utc),
+                scopes=effective_scopes,
+                tenant_id="common",
+                microsoft_user_id=self.microsoft_user_id,
+                user_principal_name=self.email,
+                email=self.email,
+                display_name="Ana Test",
+            ),
+        )
+
+
+class _FailingIdentityOnboardingService:
+    def persist_verified_identity(self, profile: dict) -> PersistStudentResult:
+        del profile
+        return PersistStudentResult(
+            persisted=False,
+            error_code="persistence_error",
+            detail="67000912",
+        )
 
 
 def test_collect_profile_routes_to_oauth_only_when_flag_requires_it(monkeypatch) -> None:
@@ -90,10 +127,18 @@ def test_request_microsoft_oauth_creates_identity_and_blocks_with_random_state(
     set_microsoft_oauth_flow_service(service)
 
     try:
-        update = request_microsoft_oauth(_verified_profile_state())
+        update = request_microsoft_oauth(
+            _verified_profile_state(
+                student_profile={
+                    "institutional_email": "ana@outlook.com",
+                    "email_verified": False,
+                }
+            )
+        )
 
         assert update["phase"] == "microsoft_oauth"
         assert update["awaiting_user_input"] is True
+        assert update["student_profile"]["email_verified"] is False
         assert update["student_profile"]["persisted_student_id"] == 1
         oauth_state = update["onboarding"]["microsoft_oauth"]
         assert oauth_state["status"] == "pending"
@@ -105,6 +150,126 @@ def test_request_microsoft_oauth_creates_identity_and_blocks_with_random_state(
     finally:
         set_onboarding_service(None)
         set_microsoft_oauth_flow_service(None)
+
+
+def test_request_microsoft_oauth_persistence_error_has_clear_message(monkeypatch) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
+    set_onboarding_service(_FailingIdentityOnboardingService())
+
+    try:
+        update = request_microsoft_oauth(_verified_profile_state())
+
+        assert update["phase"] == "microsoft_oauth"
+        assert update["awaiting_user_input"] is True
+        message = update["messages"][0].content
+        assert "problema interno" in message
+        assert "reintentar" in message
+        assert "67000912" not in message
+    finally:
+        set_onboarding_service(None)
+
+
+def test_request_microsoft_oauth_duplicate_student_code_returns_to_profile(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(
+        config=OnboardingConfig(verification_secret="test-secret"),
+        repository=repository,
+    )
+    existing = _verified_profile_state(
+        student_profile={
+            "student_code": "67001090",
+            "institutional_email": "registrado@outlook.com",
+            "email_verified": True,
+        }
+    ).student_profile
+    assert service.persist_verified_identity(existing).persisted is True
+    set_onboarding_service(service)
+
+    try:
+        duplicate_state = _verified_profile_state(
+            student_profile={
+                "student_code": "67001090",
+                "institutional_email": "nuevo@outlook.es",
+                "email_verified": False,
+            }
+        )
+        update = request_microsoft_oauth(duplicate_state)
+
+        correction_state = _state_from_update(
+            duplicate_state,
+            update,
+            user_message="67001091",
+        )
+        correction_update = collect_profile(correction_state)
+
+        assert correction_update["student_profile"]["student_code"] == "67001091"
+        assert correction_update["awaiting_user_input"] is False
+        assert _route_collect_profile(
+            AgentState(
+                **{
+                    **correction_state.model_dump(),
+                    **correction_update,
+                }
+            )
+        ) == "request_microsoft_oauth"
+
+        assert update["phase"] == "profile"
+        assert update["awaiting_user_input"] is True
+        assert "student_code" not in update["student_profile"]
+        assert update["student_profile"]["institutional_email"] == "nuevo@outlook.es"
+        assert update["onboarding"]["current_field"] == "student_code"
+        assert update["onboarding"]["persistence_error"] == "duplicate_student_code"
+        assert update["interaction"]["is_waiting_for_oauth"] is False
+        assert "codigo estudiantil" in update["messages"][0].content
+        assert "registrado@outlook.com" not in update["messages"][0].content
+    finally:
+        set_onboarding_service(None)
+
+
+def test_request_microsoft_oauth_duplicate_email_returns_to_profile(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(
+        config=OnboardingConfig(verification_secret="test-secret"),
+        repository=repository,
+    )
+    existing = _verified_profile_state(
+        student_profile={
+            "student_code": "67001090",
+            "institutional_email": "registrado@outlook.com",
+            "email_verified": True,
+        }
+    ).student_profile
+    assert service.persist_verified_identity(existing).persisted is True
+    set_onboarding_service(service)
+
+    try:
+        update = request_microsoft_oauth(
+            _verified_profile_state(
+                student_profile={
+                    "student_code": "67001091",
+                    "institutional_email": "registrado@outlook.com",
+                    "email_verified": False,
+                }
+            )
+        )
+
+        assert update["phase"] == "profile"
+        assert update["awaiting_user_input"] is True
+        assert update["student_profile"]["student_code"] == "67001091"
+        assert "institutional_email" not in update["student_profile"]
+        assert update["student_profile"]["email_verified"] is False
+        assert update["onboarding"]["current_field"] == "institutional_email"
+        assert update["onboarding"]["persistence_error"] == "duplicate_email"
+        assert update["interaction"]["is_waiting_for_oauth"] is False
+        assert "correo Microsoft" in update["messages"][0].content
+    finally:
+        set_onboarding_service(None)
 
 
 def test_microsoft_oauth_flow_callback_persists_connection_and_marks_state() -> None:
@@ -143,6 +308,102 @@ def test_microsoft_oauth_flow_callback_persists_connection_and_marks_state() -> 
     stored_state = repository.get_oauth_pending_state(state_token=first.state_token)
     assert stored_state is not None
     assert stored_state.status == "completed"
+
+
+def test_microsoft_oauth_flow_callback_is_idempotent_when_state_completed() -> None:
+    repository = InMemoryMicrosoftGraphStateRepository()
+    fake_client = _FakeOAuthClient()
+    service = MicrosoftOAuthFlowService(
+        state_repository=repository,
+        auth_client=fake_client,
+        now_factory=lambda: datetime(2026, 4, 18, tzinfo=timezone.utc),
+    )
+    start = service.start_authorization(
+        student_id=7,
+        institutional_email="ana@ucatolica.edu.co",
+    )
+
+    first_callback = handle_microsoft_oauth_callback(
+        {"state": start.state_token, "code": "code-abc"},
+        flow_service=service,
+    )
+    duplicate_callback = handle_microsoft_oauth_callback(
+        {"state": start.state_token, "code": "code-duplicate"},
+        flow_service=service,
+    )
+
+    assert first_callback.ok is True
+    assert duplicate_callback.ok is True
+    assert duplicate_callback.student_id == 7
+    assert duplicate_callback.status_code == 200
+    assert fake_client.exchange_calls == [(7, "code-abc", ("User.Read", "Calendars.ReadWrite"))]
+
+
+def test_microsoft_oauth_flow_callback_rejects_wrong_microsoft_account() -> None:
+    repository = InMemoryMicrosoftGraphStateRepository()
+    fake_client = _FakeOAuthClient(email="otra@outlook.com", microsoft_user_id="ms-other")
+    service = MicrosoftOAuthFlowService(
+        state_repository=repository,
+        auth_client=fake_client,
+        now_factory=lambda: datetime(2026, 4, 18, tzinfo=timezone.utc),
+    )
+    start = service.start_authorization(
+        student_id=7,
+        institutional_email="ana@outlook.com",
+    )
+
+    callback = handle_microsoft_oauth_callback(
+        {"state": start.state_token, "code": "code-abc"},
+        flow_service=service,
+    )
+    stored_state = repository.get_oauth_pending_state(state_token=start.state_token)
+
+    assert callback.ok is False
+    assert callback.status_code == 400
+    assert callback.error_code == "microsoft_account_mismatch"
+    assert stored_state is not None
+    assert stored_state.status == "failed"
+    assert stored_state.last_error == "microsoft_account_mismatch"
+
+
+def test_microsoft_oauth_flow_callback_rejects_already_connected_account() -> None:
+    repository = InMemoryMicrosoftGraphStateRepository()
+    repository.upsert_connection(
+        record=MicrosoftGraphConnectionRecord(
+            student_id=99,
+            tenant_id="common",
+            access_token="existing-access-token-1234567890",
+            refresh_token="existing-refresh-token-1234567890",
+            expires_at=datetime(2026, 4, 18, 1, tzinfo=timezone.utc),
+            scopes=("User.Read",),
+            microsoft_user_id="ms-used",
+            user_principal_name="usado@outlook.com",
+            email="usado@outlook.com",
+        )
+    )
+    fake_client = _FakeOAuthClient(email="usado@outlook.com", microsoft_user_id="ms-used")
+    service = MicrosoftOAuthFlowService(
+        state_repository=repository,
+        auth_client=fake_client,
+        now_factory=lambda: datetime(2026, 4, 18, tzinfo=timezone.utc),
+    )
+    start = service.start_authorization(
+        student_id=7,
+        institutional_email="usado@outlook.com",
+    )
+
+    callback = handle_microsoft_oauth_callback(
+        {"state": start.state_token, "code": "code-abc"},
+        flow_service=service,
+    )
+    stored_state = repository.get_oauth_pending_state(state_token=start.state_token)
+
+    assert callback.ok is False
+    assert callback.status_code == 400
+    assert callback.error_code == "microsoft_account_already_connected"
+    assert stored_state is not None
+    assert stored_state.status == "failed"
+    assert stored_state.last_error == "microsoft_account_already_connected"
 
 
 def test_request_microsoft_oauth_allows_retry_with_new_state(monkeypatch) -> None:

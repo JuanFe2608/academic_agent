@@ -139,6 +139,17 @@ def build_study_plan_summary(
     status = _format_operational_status(study_plan, reminders)
     if status:
         lines += [""] + status
+    elif str(rules.get("external_sync_status") or "") == "not_requested":
+        if pending:
+            lines += [
+                "",
+                "No he creado eventos en Outlook ni tareas en Microsoft To Do todavía; solo lo haré si me confirmas.",
+            ]
+        else:
+            lines += [
+                "",
+                "No he creado eventos en Outlook todavía; solo lo haré si me confirmas.",
+            ]
 
     # Cierre — oferta de sincronización adaptada según contenido disponible
     if pending:
@@ -277,8 +288,8 @@ def _format_rag_tip(rules: dict) -> str | None:
     first = _first_sentence(answer, max_chars=220)
     if not first or len(first) < 20:
         return None
-    context = f" para {subject}" if subject else ""
-    return f"🧠 Consejo de estudio{context}: {first}"
+    context = f" Para {subject}:" if subject else ""
+    return f"🧠 Guía sugerida para la primera sesión:{context} {first}".strip()
 
 
 def _format_applied_method_tip(rules: dict) -> str | None:
@@ -299,10 +310,13 @@ def _format_applied_method_tip(rules: dict) -> str | None:
         label += f" de {subject}"
 
     if summary:
-        return f"📖 Método sugerido para {label}:\n{_compact_text(summary, max_chars=200)}"
+        return (
+            "📖 Método aplicado para una actividad prioritaria:\n"
+            f"Para {label}: {_compact_text(summary, max_chars=200)}"
+        )
     if steps:
         step_lines = "\n".join(f"{i + 1}. {s}" for i, s in enumerate(steps[:3]))
-        return f"📖 Pasos para {label}:\n{step_lines}"
+        return f"📖 Método aplicado para una actividad prioritaria:\nPara {label}:\n{step_lines}"
     return None
 
 

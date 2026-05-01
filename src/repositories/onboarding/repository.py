@@ -310,6 +310,7 @@ class PostgresOnboardingRepository:
         existing_id = _profile_value(profile, "persisted_student_id")
         academic_program = _profile_value(profile, "academic_program")
         supported_program = bool(_profile_value(profile, "supported_program", False))
+        email_verified = bool(_profile_value(profile, "email_verified", False))
 
         with self._connect() as conn:
             program_id = self._program_id(conn, academic_program)
@@ -327,8 +328,12 @@ class PostgresOnboardingRepository:
                         student_code = %s,
                         age = %s,
                         institutional_email = %s,
-                        email_verified = TRUE,
-                        email_verified_at = COALESCE(email_verified_at, NOW()),
+                        email_verified = students.email_verified OR %s,
+                        email_verified_at = CASE
+                            WHEN students.email_verified OR %s
+                            THEN COALESCE(students.email_verified_at, NOW())
+                            ELSE NULL
+                        END,
                         program_id = %s,
                         supported_program = %s,
                         updated_at = NOW()
@@ -340,6 +345,8 @@ class PostgresOnboardingRepository:
                         student_code,
                         _profile_value(profile, "age"),
                         institutional_email,
+                        email_verified,
+                        email_verified,
                         program_id,
                         supported_program,
                         int(existing_id),
@@ -374,13 +381,22 @@ class PostgresOnboardingRepository:
                     supported_program,
                     semester,
                     average_grade
-                ) VALUES (%s, %s, %s, %s, TRUE, NOW(), %s, %s, NULL, NULL)
+                ) VALUES (
+                    %s, %s, %s, %s,
+                    %s,
+                    CASE WHEN %s THEN NOW() ELSE NULL END,
+                    %s, %s, NULL, NULL
+                )
                 ON CONFLICT (student_code) DO UPDATE SET
                     full_name = EXCLUDED.full_name,
                     age = EXCLUDED.age,
                     institutional_email = EXCLUDED.institutional_email,
-                    email_verified = TRUE,
-                    email_verified_at = COALESCE(students.email_verified_at, NOW()),
+                    email_verified = students.email_verified OR EXCLUDED.email_verified,
+                    email_verified_at = CASE
+                        WHEN students.email_verified OR EXCLUDED.email_verified
+                        THEN COALESCE(students.email_verified_at, NOW())
+                        ELSE NULL
+                    END,
                     program_id = EXCLUDED.program_id,
                     supported_program = EXCLUDED.supported_program,
                     updated_at = NOW()
@@ -392,6 +408,8 @@ class PostgresOnboardingRepository:
                     student_code,
                     _profile_value(profile, "age"),
                     institutional_email,
+                    email_verified,
+                    email_verified,
                     program_id,
                     supported_program,
                 ),
@@ -575,6 +593,8 @@ class PostgresOnboardingRepository:
         try:
             with postgres_connection(self.database_url) as conn:
                 yield conn
+        except OnboardingRepositoryError:
+            raise
         except RepositoryConfigurationError:
             raise
         except Exception as exc:  # pragma: no cover - depende del driver real

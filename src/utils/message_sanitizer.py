@@ -12,7 +12,11 @@ from typing import Any
 from langchain_core.messages import BaseMessage
 from langgraph.graph.message import add_messages
 
-from utils.media_artifacts import IMAGE_RECEIVED_MARKER, strip_image_to_marker
+from utils.media_artifacts import (
+    IMAGE_RECEIVED_MARKER,
+    is_inline_preview_enabled,
+    strip_image_to_marker,
+)
 
 
 def add_sanitized_messages(left: Any, right: Any) -> list[BaseMessage]:
@@ -48,7 +52,9 @@ def sanitize_persisted_payload(payload: Any) -> Any:
     if isinstance(payload, tuple):
         return tuple(sanitize_persisted_payload(item) for item in payload)
     if isinstance(payload, str):
-        return IMAGE_RECEIVED_MARKER if _is_data_image_url_fast(payload) else payload
+        if _is_data_image_url_fast(payload) and not is_inline_preview_enabled():
+            return IMAGE_RECEIVED_MARKER
+        return payload
     return payload
 
 

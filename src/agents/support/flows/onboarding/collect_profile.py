@@ -7,6 +7,7 @@ from agents.support.nodes.utils import (
     copy_onboarding_state,
     detect_new_input,
 )
+from agents.support.dependencies import get_onboarding_service
 from agents.support.onboarding.messages import (
     PROFILE_FIELD_ORDER,
     build_field_prompt,
@@ -24,6 +25,7 @@ from agents.support.onboarding.validators import (
 )
 from agents.support.state import AgentState
 from services.onboarding import extract_onboarding_slots, load_onboarding_config
+from services.sync.microsoft_oauth_flow_service import is_microsoft_oauth_required
 
 
 def collect_profile(state: AgentState) -> dict:
@@ -179,6 +181,16 @@ def collect_profile(state: AgentState) -> dict:
             processed_fields.add(field)
             result = validate_profile_field(field, extraction.raw_slots[field], config)
             if result.is_valid:
+                duplicate_error = _identity_duplicate_error(
+                    field,
+                    result.value,
+                    profile,
+                )
+                if duplicate_error:
+                    slot_errors[field] = duplicate_error
+                    if field == target_field:
+                        validation_failed = True
+                    continue
                 if field == "average_grade" and isinstance(result.value, (int, float)) and result.value < 60:
                     onboarding["pending_low_grade_confirmation"] = True
                     onboarding["pending_low_grade_value"] = int(result.value)
@@ -235,7 +247,15 @@ def collect_profile(state: AgentState) -> dict:
     ):
         result = validate_profile_field(target_field, last_text, config)
         if result.is_valid:
-            if target_field == "average_grade" and isinstance(result.value, (int, float)) and result.value < 60:
+            duplicate_error = _identity_duplicate_error(
+                target_field,
+                result.value,
+                profile,
+            )
+            if duplicate_error:
+                slot_errors[target_field] = duplicate_error
+                validation_failed = True
+            elif target_field == "average_grade" and isinstance(result.value, (int, float)) and result.value < 60:
                 onboarding["pending_low_grade_confirmation"] = True
                 onboarding["pending_low_grade_value"] = int(result.value)
                 onboarding["slot_errors"] = slot_errors
@@ -252,8 +272,9 @@ def collect_profile(state: AgentState) -> dict:
                         build_low_grade_confirmation_prompt(int(result.value)),
                     ),
                 }
-            _apply_profile_field(profile, onboarding, target_field, result.value, config)
-            slot_errors.pop(target_field, None)
+            else:
+                _apply_profile_field(profile, onboarding, target_field, result.value, config)
+                slot_errors.pop(target_field, None)
         else:
             slot_errors[target_field] = result.error or "invalid_field"
             if target_field == "student_code" and result.error == "unsupported_student_code":
@@ -283,6 +304,17 @@ def collect_profile(state: AgentState) -> dict:
     next_field = missing_after[0] if missing_after else None
     onboarding["current_field"] = next_field
     onboarding["slot_errors"] = slot_errors
+
+    if _should_pause_for_microsoft_oauth(profile, onboarding):
+        return {
+            "student_profile": profile,
+            "onboarding": onboarding,
+            "user_status": "valid",
+            "phase": "profile",
+            "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+            "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+            "awaiting_user_input": False,
+        }
 
     if next_field or validation_failed:
         prompt_field = target_field if validation_failed and target_field else next_field or "full_name"
@@ -338,3 +370,39 @@ def _apply_profile_field(
     if field == "institutional_email":
         # La verificación real ocurre vía OAuth; aquí solo se registra el campo.
         profile["email_verified"] = False
+
+
+def _identity_duplicate_error(
+    field: str,
+    value: object,
+    profile: dict,
+) -> str | None:
+    if profile.get("persisted_student_id") not in (None, ""):
+        return None
+    try:
+        service = get_onboarding_service()
+        if field == "student_code" and service.student_code_exists(str(value or "")):
+            return "duplicate_student_code"
+        if field == "institutional_email" and service.institutional_email_exists(
+            str(value or "")
+        ):
+            return "duplicate_email"
+    except Exception:
+        return None
+    return None
+
+
+def _should_pause_for_microsoft_oauth(profile: dict, onboarding: dict) -> bool:
+    """Detiene perfil justo despues del correo para que el router lance OAuth."""
+
+    if not is_microsoft_oauth_required():
+        return False
+    oauth_state = dict(onboarding.get("microsoft_oauth", {}))
+    if oauth_state.get("status") == "authorized":
+        return False
+    return bool(
+        profile.get("full_name")
+        and profile.get("student_code")
+        and profile.get("age")
+        and profile.get("institutional_email")
+    )

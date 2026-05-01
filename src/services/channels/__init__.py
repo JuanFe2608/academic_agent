@@ -1,5 +1,6 @@
 """Servicios de canal conversacional."""
 
+from .input_normalization import NormalizedAgentInput, WhatsAppInputNormalizer
 from .message_buffer import MessageBuffer, message_media_types
 from .whatsapp_service import (
     WhatsAppChannelService,
@@ -10,7 +11,9 @@ from .whatsapp_service import (
 
 __all__ = [
     "MessageBuffer",
+    "NormalizedAgentInput",
     "WhatsAppChannelService",
+    "WhatsAppInputNormalizer",
     "agent_message_to_channel_messages",
     "aggregated_input_to_human_message",
     "message_media_types",

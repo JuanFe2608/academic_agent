@@ -27,6 +27,7 @@ COPY --from=builder /app/.venv /app/.venv
 
 # Copia codigo fuente y recursos
 COPY src/ ./src/
+COPY scripts/ ./scripts/
 COPY knowledge_base/ ./knowledge_base/
 COPY assets/ ./assets/
 COPY main.py ./

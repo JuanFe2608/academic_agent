@@ -516,7 +516,7 @@ def test_request_schedules_rejects_incoherent_time_range_in_shared_editor() -> N
     assert "inicio debe quedar antes" in update["messages"][0].content.lower()
 
 
-def test_request_schedules_option_three_closes_with_specialized_message() -> None:
+def test_request_schedules_option_three_redirects_with_friendly_message() -> None:
     state = AgentState(
         phase="schedules",
         awaiting_user_input=True,
@@ -526,8 +526,12 @@ def test_request_schedules_option_three_closes_with_specialized_message() -> Non
 
     update = request_schedules(state)
 
-    assert update["phase"] == "end"
-    assert "soy un agente especializado" in update["messages"][0].content.lower()
+    assert update["phase"] == "schedules"
+    assert update["awaiting_user_input"] is True
+    assert update["student_profile"]["occupation"] is None
+    message_text = update["messages"][0].content.lower()
+    assert "soy un asistente especializado" in message_text
+    assert "elige una opción" in message_text
 
 
 def test_parse_schedules_to_events_rejects_academic_image_only_input() -> None:

@@ -14,6 +14,7 @@ from agents.support.nodes.utils import (
 )
 from agents.support.state import AgentState
 from utils.avatar_assets import AVATAR_HOLA_SALUDO
+from utils.media_artifacts import materialize_image_reference
 
 from .prompt import CONSENT_PROMPT, WELCOME_MESSAGE
 
@@ -129,7 +130,10 @@ def _welcome_sequence() -> list[BaseMessage]:
 
 
 def _welcome_image_block() -> dict[str, object]:
-    return {"type": "image_url", "image_url": {"url": str(AVATAR_HOLA_SALUDO)}}
+    return {
+        "type": "image_url",
+        "image_url": {"url": materialize_image_reference(str(AVATAR_HOLA_SALUDO))},
+    }
 
 
 def _restart_after_out_of_scope(

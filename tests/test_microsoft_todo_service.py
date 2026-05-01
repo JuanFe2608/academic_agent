@@ -23,6 +23,7 @@ from repositories.microsoft_graph.sync_repository import (
 )
 from repositories.planning.instances_repository import InMemoryStudyPlanInstancesRepository
 from repositories.planning.tracking_repository import InMemoryStudySessionTrackingRepository
+from schemas.planning import AcademicActivity
 from schemas.scheduling import Event
 from services.planning import StudyPlanMaterializationService, StudySessionTrackingService
 from services.sync.microsoft_todo_sync_service import MicrosoftTodoSyncService
@@ -391,3 +392,62 @@ def test_microsoft_todo_sync_service_persists_default_task_list_when_missing(
     assert persisted_connection is not None
     assert persisted_connection.todo_task_list_id == "default-list-id"
     assert len(persisted_links) == 1
+
+
+def test_microsoft_todo_activity_sync_updates_completed_and_deletes_removed() -> None:
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    client = _FakeMicrosoftTodoClient()
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+    activities = [
+        AcademicActivity(
+            activity_id="act-pending",
+            activity_type="parcial",
+            subject_name="Calculo",
+            activity_title="Parcial 1",
+            due_date="2026-05-01",
+            priority_level="alta",
+            status="pending",
+        ),
+        AcademicActivity(
+            activity_id="act-completed",
+            activity_type="tarea",
+            subject_name="Fisica",
+            activity_title="Tarea 1",
+            due_date="2026-05-02",
+            status="completed",
+            todo_task_id="todo-existing-completed",
+        ),
+        AcademicActivity(
+            activity_id="act-deleted",
+            activity_type="quiz",
+            subject_name="Programacion",
+            activity_title="Quiz 1",
+            due_date="2026-05-03",
+            status="deleted",
+            todo_task_id="todo-existing-deleted",
+        ),
+    ]
+
+    result = service.sync_academic_activities_to_todo(
+        student_id=7,
+        task_list_id="todo-list-1",
+        activities=activities,
+    )
+
+    assert result.synced is True
+    assert result.upserted_count == 2
+    assert result.deleted_count == 1
+    assert len(client.upserts) == 2
+    assert any(task.is_completed for task in client.upserts)
+    assert any(task.existing_external_task_id == "todo-existing-completed" for task in client.upserts)
+    assert client.deletes == ["todo-existing-deleted"]
+
+    updated_by_id = {activity.activity_id: activity for activity in result.synced_activities}
+    assert updated_by_id["act-pending"].todo_task_id == "todo:act-pending"
+    assert updated_by_id["act-completed"].todo_task_id == "todo:act-completed"
+    assert updated_by_id["act-deleted"].todo_task_id is None

@@ -50,6 +50,7 @@ from .replanning_service import (
     build_study_replanning_service,
     is_replan_request_message,
 )
+from .react_reconciliation_service import reconcile_react_tool_updates
 from .session_tracking_flow_service import (
     StudySessionTrackingFlowResult,
     StudySessionTrackingIntent,
@@ -131,4 +132,5 @@ __all__ = [
     "build_study_plan_enrichment_service",
     "reference_date",
     "reference_datetime",
+    "reconcile_react_tool_updates",
 ]

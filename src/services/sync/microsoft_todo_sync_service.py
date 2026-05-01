@@ -75,6 +75,7 @@ class MicrosoftTodoActivitySyncResult:
 
     synced: bool
     upserted_count: int = 0
+    deleted_count: int = 0
     synced_activities: list = field(default_factory=list)
     error_code: str | None = None
     detail: str | None = None
@@ -381,9 +382,10 @@ class MicrosoftTodoSyncService:
         task_list_id: str | None,
         activities: list,
     ) -> MicrosoftTodoActivitySyncResult:
-        """Sincroniza actividades académicas pendientes con Microsoft To Do.
+        """Sincroniza actividades académicas con Microsoft To Do.
 
-        Cada actividad con priority_level='alta' se marca con importance='high' (⭐).
+        Cada actividad pending/completed se upsertea; deleted se elimina si
+        conserva todo_task_id. priority_level='alta' se marca con importance='high' (⭐).
         Usa activity.todo_task_id como id externo para evitar duplicados.
         Retorna las actividades con todo_task_id actualizado.
         """
@@ -459,14 +461,26 @@ class MicrosoftTodoSyncService:
         if not coerced:
             return MicrosoftTodoActivitySyncResult(synced=True, upserted_count=0, synced_activities=[])
 
-        tasks = [_build_activity_todo_task(act) for act in coerced]
+        upsertable = [act for act in coerced if act.status in {"pending", "completed"}]
+        deleteable = [
+            act
+            for act in coerced
+            if act.status == "deleted" and str(act.todo_task_id or "").strip()
+        ]
+        tasks = [_build_activity_todo_task(act) for act in upsertable]
+        external_task_ids_to_delete = [str(act.todo_task_id) for act in deleteable]
 
         try:
             upserted = self.client.upsert_tasks(
                 access_token=token_result.token.access_token,
                 task_list_id=effective_task_list_id,
                 tasks=tasks,
-            )
+            ) if tasks else []
+            deleted = self.client.delete_tasks(
+                access_token=token_result.token.access_token,
+                task_list_id=effective_task_list_id,
+                external_task_ids=external_task_ids_to_delete,
+            ) if external_task_ids_to_delete else []
         except MicrosoftGraphClientError as exc:
             return MicrosoftTodoActivitySyncResult(
                 synced=False,
@@ -476,14 +490,20 @@ class MicrosoftTodoSyncService:
 
         # Build a map activity_id → task_id and update activities
         task_id_map = {record.external_key: record.external_task_id for record in upserted}
+        deleted_lookup = set(deleted)
         updated_activities = [
             act.model_copy(update={"todo_task_id": task_id_map.get(act.activity_id, act.todo_task_id)})
+            if act.status in {"pending", "completed"}
+            else act.model_copy(update={"todo_task_id": None})
+            if act.status == "deleted" and str(act.todo_task_id or "") in deleted_lookup
+            else act
             for act in coerced
         ]
 
         return MicrosoftTodoActivitySyncResult(
             synced=True,
             upserted_count=len(upserted),
+            deleted_count=len(deleted),
             synced_activities=updated_activities,
         )
 

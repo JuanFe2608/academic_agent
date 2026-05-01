@@ -92,6 +92,14 @@ class MicrosoftGraphStateRepository(Protocol):
         student_id: int,
     ) -> MicrosoftGraphConnectionRecord | None: ...
 
+    def find_connection_by_microsoft_identity(
+        self,
+        *,
+        microsoft_user_id: str | None = None,
+        account_identifiers: tuple[str, ...] = (),
+        exclude_student_id: int | None = None,
+    ) -> MicrosoftGraphConnectionRecord | None: ...
+
     def upsert_connection(
         self,
         *,
@@ -200,6 +208,33 @@ class InMemoryMicrosoftGraphStateRepository:
         student_id: int,
     ) -> MicrosoftGraphConnectionRecord | None:
         return self._connections.get(student_id)
+
+    def find_connection_by_microsoft_identity(
+        self,
+        *,
+        microsoft_user_id: str | None = None,
+        account_identifiers: tuple[str, ...] = (),
+        exclude_student_id: int | None = None,
+    ) -> MicrosoftGraphConnectionRecord | None:
+        normalized_user_id = _normalize_identity_value(microsoft_user_id)
+        normalized_identifiers = {
+            normalized
+            for value in account_identifiers
+            if (normalized := _normalize_identity_value(value))
+        }
+        if normalized_user_id is None and not normalized_identifiers:
+            return None
+
+        for record in self._connections.values():
+            if exclude_student_id is not None and record.student_id == int(exclude_student_id):
+                continue
+            if normalized_user_id and _normalize_identity_value(record.microsoft_user_id) == normalized_user_id:
+                return record
+            if _normalize_identity_value(record.user_principal_name) in normalized_identifiers:
+                return record
+            if _normalize_identity_value(record.email) in normalized_identifiers:
+                return record
+        return None
 
     def upsert_connection(
         self,
@@ -430,6 +465,63 @@ class PostgresMicrosoftGraphStateRepository:
                 WHERE student_id = %s
                 """,
                 (student_id,),
+            ).fetchone()
+        return _connection_from_row(row) if row is not None else None
+
+    def find_connection_by_microsoft_identity(
+        self,
+        *,
+        microsoft_user_id: str | None = None,
+        account_identifiers: tuple[str, ...] = (),
+        exclude_student_id: int | None = None,
+    ) -> MicrosoftGraphConnectionRecord | None:
+        normalized_user_id = _normalize_identity_value(microsoft_user_id)
+        normalized_identifiers = sorted(
+            {
+                normalized
+                for value in account_identifiers
+                if (normalized := _normalize_identity_value(value))
+            }
+        )
+        if normalized_user_id is None and not normalized_identifiers:
+            return None
+
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                SELECT
+                    id,
+                    student_id,
+                    tenant_id,
+                    microsoft_user_id,
+                    user_principal_name,
+                    email,
+                    display_name,
+                    access_token,
+                    refresh_token,
+                    token_type,
+                    scopes_json,
+                    expires_at,
+                    calendar_id,
+                    todo_task_list_id,
+                    auth_metadata
+                FROM microsoft_graph_connections
+                WHERE student_id <> %s
+                  AND (
+                    (%s IS NOT NULL AND lower(microsoft_user_id) = %s)
+                    OR lower(COALESCE(user_principal_name, '')) = ANY(%s::text[])
+                    OR lower(COALESCE(email, '')) = ANY(%s::text[])
+                  )
+                ORDER BY id
+                LIMIT 1
+                """,
+                (
+                    int(exclude_student_id or 0),
+                    normalized_user_id,
+                    normalized_user_id,
+                    normalized_identifiers,
+                    normalized_identifiers,
+                ),
             ).fetchone()
         return _connection_from_row(row) if row is not None else None
 
@@ -1045,6 +1137,11 @@ def _optional_str(value: Any) -> str | None:
     if value is None:
         return None
     return str(value)
+
+
+def _normalize_identity_value(value: Any) -> str | None:
+    normalized = str(value or "").strip().lower()
+    return normalized or None
 
 
 def _row_value(row: Any, key: str, default: Any = None) -> Any:

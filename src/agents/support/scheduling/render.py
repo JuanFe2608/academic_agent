@@ -12,6 +12,7 @@ from agents.support.scheduling.schedule_renderer import (
 from schemas.scheduling import Event
 from services.scheduling.event_projection import blocks_to_schedule_events
 from services.scheduling.models import WeeklyScheduleBlock
+from utils.media_artifacts import materialize_image_reference
 
 
 @dataclass(frozen=True)
@@ -54,7 +55,7 @@ def render_schedule_preview_image(
     image_path = render_recurring_schedule(blocks, timezone_name=timezone_name)
     return RenderedSchedulePreview(
         image_path=image_path,
-        image_ref=image_path,
+        image_ref=materialize_image_reference(image_path),
     )
 
 
