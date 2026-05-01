@@ -16,6 +16,9 @@ wheels/
 .langgraph_media
 knowledge_base/study_recommendations/processed/evals/reports/
 
+# Claude Code local settings (machine-specific, may contain absolute paths and session permissions)
+.claude/settings.local.json
+
 # Local secrets and deployment credentials
 *.env
 .env.*

@@ -1,3 +1,5 @@
+BEGIN;
+
 ALTER TABLE study_priority_profiles
     ADD COLUMN IF NOT EXISTS week_start DATE NULL,
     ADD COLUMN IF NOT EXISTS week_end DATE NULL,
@@ -97,3 +99,5 @@ CREATE INDEX IF NOT EXISTS idx_study_priority_profiles_student_week
 CREATE INDEX IF NOT EXISTS idx_study_priority_subjects_urgency_due_at
     ON study_priority_subjects (urgency_due_at)
     WHERE urgency_due_at IS NOT NULL;
+
+COMMIT;

@@ -1,3 +1,5 @@
+BEGIN;
+
 -- Deduplicación durable de mensajes entrantes de WhatsApp.
 --
 -- Meta puede reintentar un webhook hasta 72 horas después del envío original.
@@ -24,3 +26,5 @@ CREATE INDEX IF NOT EXISTS idx_pwm_processed_at
 -- Comentario: el mantenimiento (DELETE WHERE processed_at < now() - interval '72 hours')
 -- puede ejecutarse desde un Container Apps Job o un script periódico.
 -- No es necesario para la corrección, solo para controlar el tamaño de la tabla.
+
+COMMIT;
