@@ -454,7 +454,7 @@ def _habeas_data_policy_page() -> str:
         </div>
         <div>
           <strong>👤 Responsable</strong>
-          <span>Proyecto academico Lara AI</span>
+          <span>Juan Felipe Jaramillo R.<br>Laura Marcela Gutierrez P.</span>
         </div>
         <div>
           <strong>📩 Contacto</strong>
@@ -466,10 +466,13 @@ def _habeas_data_policy_page() -> str:
     <section>
       <h2>⚖️ Marco normativo</h2>
       <p>
-        En cumplimiento de la Ley 1581 de 2012, el Decreto 1377 de 2013, el
-        Decreto 1074 de 2015 y demas normas concordantes sobre proteccion de
-        datos personales en Colombia, se informa al titular de los datos las
-        condiciones bajo las cuales Lara AI realiza el tratamiento de informacion.
+        Esta autorizacion se presenta conforme al regimen colombiano de proteccion
+        de datos personales, en especial la Ley 1581 de 2012, el Decreto 1377 de
+        2013, el Decreto 1074 de 2015 y las normas que los modifiquen, complementen
+        o sustituyan. En virtud de este marco, el titular recibe informacion clara
+        sobre las finalidades, datos tratados, derechos, canales de atencion y
+        condiciones bajo las cuales Lara AI realiza el tratamiento de informacion
+        personal dentro del proyecto academico.
       </p>
     </section>
 
@@ -491,8 +494,8 @@ def _habeas_data_policy_page() -> str:
           <ul>
             <li>WhatsApp como interfaz conversacional.</li>
             <li>Microsoft Outlook y Microsoft Graph API.</li>
-            <li>Google Calendar o Google APIs si el usuario las autoriza.</li>
-            <li>Sistemas de calendario personal conectados voluntariamente por el estudiante.</li>
+            <li>Microsoft To Do, cuando sea necesario para proyectar tareas o recordatorios academicos.</li>
+            <li>Servicios Microsoft conectados voluntariamente por el estudiante mediante OAuth.</li>
           </ul>
         </div>
         <div class="panel">
@@ -548,7 +551,7 @@ def _habeas_data_policy_page() -> str:
           <ul>
             <li>Registros de uso e identificadores tecnicos.</li>
             <li>Informacion necesaria para autenticacion.</li>
-            <li>Tokens de acceso a servicios autorizados, como Google o Microsoft.</li>
+            <li>Tokens de acceso a servicios Microsoft autorizados voluntariamente por el estudiante.</li>
           </ul>
         </div>
       </div>
@@ -562,8 +565,8 @@ def _habeas_data_policy_page() -> str:
       <h2>☁️ Servicios tecnologicos</h2>
       <p>
         El tratamiento de datos podra realizarse mediante plataformas como Microsoft Azure,
-        OpenAI o Azure OpenAI, WhatsApp Cloud API, Google APIs, Microsoft Graph API y bases
-        de datos PostgreSQL.
+        OpenAI o Azure OpenAI, WhatsApp Cloud API, Microsoft Graph API y bases de datos
+        PostgreSQL.
       </p>
       <p>
         Estas plataformas podran almacenar informacion en servidores ubicados dentro o fuera
@@ -602,10 +605,15 @@ def _habeas_data_policy_page() -> str:
       </p>
       <div class="ok">
         <span class="badge">Medidas aplicadas</span>
-        <p>
-          Autenticacion segura, control de accesos, cifrado de informacion, registro de actividad
-          y buenas practicas de seguridad informatica.
-        </p>
+        <ul>
+          <li>Validacion del webhook de WhatsApp mediante firma HMAC-SHA256 en el header X-Hub-Signature-256, cuando el secreto de aplicacion esta configurado.</li>
+          <li>Verificacion del endpoint GET del webhook mediante token de verificacion.</li>
+          <li>Uso de OAuth de Microsoft con token state aleatorio, vencimiento temporal y validacion del callback antes de persistir la conexion.</li>
+          <li>Proteccion del worker de recordatorios mediante token de acceso configurado por entorno.</li>
+          <li>Deduplicacion durable de mensajes entrantes de WhatsApp en PostgreSQL para evitar reprocesamientos por reintentos del proveedor.</li>
+          <li>Separacion de secretos y credenciales mediante variables de entorno, sin exponerlos en el codigo fuente.</li>
+          <li>Persistencia operativa en PostgreSQL para perfiles, planificacion, recordatorios, conexiones Microsoft y checkpoints del agente.</li>
+        </ul>
       </div>
     </section>
 

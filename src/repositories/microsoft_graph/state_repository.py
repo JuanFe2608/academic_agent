@@ -508,7 +508,7 @@ class PostgresMicrosoftGraphStateRepository:
                 FROM microsoft_graph_connections
                 WHERE student_id <> %s
                   AND (
-                    (%s IS NOT NULL AND lower(microsoft_user_id) = %s)
+                    (%s::text IS NOT NULL AND lower(microsoft_user_id) = %s::text)
                     OR lower(COALESCE(user_principal_name, '')) = ANY(%s::text[])
                     OR lower(COALESCE(email, '')) = ANY(%s::text[])
                   )
