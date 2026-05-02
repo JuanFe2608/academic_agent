@@ -85,6 +85,8 @@ def _resolve_allowed_email_domains(
     raw_domains = os.getenv("ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS", "").strip()
     if raw_domains:
         candidates = [item.strip().lower() for item in raw_domains.split(",")]
+    elif _env_bool("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", False):
+        candidates = ["outlook.com", "hotmail.com", "live.com", "msn.com"]
     elif verification_mode in {"disabled", "fixed"}:
         candidates = [institutional_email_domain, "outlook.com"]
     else:
@@ -110,3 +112,10 @@ def _env_int(name: str, default: int) -> int:
         return int(value)
     except ValueError:
         return default
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name, "").strip().lower()
+    if not value:
+        return default
+    return value in {"1", "true", "yes", "si", "on", "required", "obligatorio"}

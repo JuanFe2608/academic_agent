@@ -8,6 +8,11 @@ from pathlib import Path
 
 from openai import AzureOpenAI
 
+from integrations.ai.azure_config import (
+    validate_azure_resource_endpoint,
+    validate_transcription_deployment_name,
+)
+
 
 _MAX_AUDIO_BYTES = 25 * 1024 * 1024
 
@@ -50,8 +55,14 @@ class AzureOpenAIAudioTranscriptionService:
             raise ValueError("Missing Azure OpenAI transcription environment variables")
         return cls(
             api_key=api_key,
-            endpoint=endpoint,
-            deployment_name=deployment,
+            endpoint=validate_azure_resource_endpoint(
+                endpoint,
+                env_name="AZURE_OPENAI_ENDPOINT_TRANSCRIBE",
+            ),
+            deployment_name=validate_transcription_deployment_name(
+                deployment,
+                env_name="AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE",
+            ),
             api_version=api_version,
         )
 

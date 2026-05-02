@@ -14,6 +14,8 @@ PROFILE_FIELD_ORDER = (
 )
 
 EDITABLE_PROFILE_FIELDS = PROFILE_FIELD_ORDER
+_MICROSOFT_PERSONAL_DOMAIN_ROOTS = frozenset({"outlook", "hotmail", "live", "msn"})
+_MICROSOFT_PERSONAL_EXAMPLES = "@outlook.com, @hotmail.com, @live.com"
 
 FIELD_LABELS = {
     "full_name": "nombre",
@@ -45,14 +47,13 @@ VALIDATION_ERROR_MESSAGES = {
     ),
     "duplicate_email": (
         "Ese correo Microsoft ya esta registrado en otra cuenta de estudiante. "
-        "Escribe otro correo 📧 Puedes usar @ucatolica.edu.co o una cuenta "
-        "Microsoft personal (@outlook.com, @hotmail.com, @live.com). "
+        "Escribe otro correo Microsoft personal 📧 "
+        f"Puedes usar {_MICROSOFT_PERSONAL_EXAMPLES}. "
         "Por ejemplo: usuario@outlook.com"
     ),
     "non_microsoft_personal_email": (
         "Ese dominio no esta permitido 😕 Usa una cuenta Microsoft personal "
-        "(@outlook.com, @hotmail.com, @live.com, etc.) o un dominio habilitado "
-        "para la prueba."
+        f"({_MICROSOFT_PERSONAL_EXAMPLES}, etc.)."
     ),
     "supported_program": "Responde si o no, por favor 😊",
     "semester": "Necesito el semestre en numero 😊 Por ejemplo: 1, 5 u 8",
@@ -90,13 +91,18 @@ def build_field_prompt(
         )
 
     if field == "institutional_email":
-        allowed_domains = ", ".join(
-            f"@{domain}" for domain in config.allowed_email_domains
-        )
+        allowed_domains = _non_personal_allowed_domains(config.allowed_email_domains)
+        if not allowed_domains:
+            return (
+                "Para conectar tu cuenta Microsoft necesito tu correo 📧 "
+                f"Usa una cuenta Microsoft personal ({_MICROSOFT_PERSONAL_EXAMPLES}). "
+                "Por ejemplo: usuario@outlook.com"
+            )
+        allowed_domains_text = ", ".join(f"@{domain}" for domain in allowed_domains)
         return (
             "Para conectar tu cuenta Microsoft necesito tu correo 📧 "
-            f"Puedes usar {allowed_domains} o una cuenta Microsoft personal "
-            "(@outlook.com, @hotmail.com, @live.com). "
+            f"Puedes usar {allowed_domains_text} o una cuenta Microsoft personal "
+            f"({_MICROSOFT_PERSONAL_EXAMPLES}). "
             "Por ejemplo: usuario@outlook.com"
         )
 
@@ -142,6 +148,19 @@ def build_prompt_with_error(
     if extra_note:
         parts.append(extra_note)
     return "\n".join(part for part in parts if part)
+
+
+def _non_personal_allowed_domains(domains: tuple[str, ...]) -> list[str]:
+    normalized: list[str] = []
+    for raw_domain in domains:
+        domain = str(raw_domain or "").strip().lower()
+        if not domain:
+            continue
+        domain_root = domain.split(".")[0]
+        if domain_root in _MICROSOFT_PERSONAL_DOMAIN_ROOTS:
+            continue
+        normalized.append(domain)
+    return normalized
 
 
 def build_program_scope_note(config: OnboardingConfig) -> str:

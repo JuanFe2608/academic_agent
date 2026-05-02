@@ -48,7 +48,8 @@ def test_welcome_consent_resets_state_after_out_of_scope() -> None:
     assert "soy lara, tu asistente académico inteligente" in prompt
     assert not image_url.startswith("data:image")
     assert Path(image_url).exists()
-    assert "autorización para el tratamiento de datos personales" in consent
+    assert "aceptas el tratamiento de tus datos personales" in consent
+    assert "/legal/habeas-data" in consent
 
 
 def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
@@ -63,8 +64,9 @@ def test_welcome_consent_sends_welcome_image_and_consent_separately() -> None:
     image_url = messages[1].content[0]["image_url"]["url"]
     assert not image_url.startswith("data:image")
     assert Path(image_url).exists()
-    assert "Autorización para el tratamiento de datos personales" in messages[2].content
-    assert "Lara AI / Universidad Católica de Colombia" in messages[2].content
+    assert "¿Aceptas el tratamiento de tus datos personales" in messages[2].content
+    assert "Consulta la política completa aquí:" in messages[2].content
+    assert "/legal/habeas-data" in messages[2].content
 
 
 def test_welcome_consent_inlines_welcome_image_for_debugger(monkeypatch) -> None:
@@ -95,7 +97,8 @@ def test_welcome_consent_sends_welcome_first_for_any_initial_user_message() -> N
     assert update["last_user_text"] == "quiero crear mi horario"
     assert "Soy Lara" in messages[0].content
     assert messages[1].content[0]["type"] == "image_url"
-    assert "Autorización para el tratamiento de datos personales" in messages[2].content
+    assert "¿Aceptas el tratamiento de tus datos personales" in messages[2].content
+    assert "/legal/habeas-data" in messages[2].content
 
 
 def test_welcome_consent_does_not_accept_initial_yes_before_welcome() -> None:
@@ -126,6 +129,9 @@ def test_welcome_consent_accepts_consent_after_welcome_was_sent() -> None:
 
     assert update["phase"] == "profile"
     assert update["consent"]["accepted"] is True
+    assert update["consent"]["policy_version"] == "habeas-data-v1"
+    assert update["consent"]["policy_url"].endswith("/legal/habeas-data")
+    assert update["consent"]["channel"] == "whatsapp"
     assert update["awaiting_user_input"] is False
     assert "continuemos con tu perfil" in update["messages"][0].content.lower()
 
@@ -142,5 +148,8 @@ def test_welcome_consent_rejects_consent_after_welcome_was_sent() -> None:
 
     assert update["phase"] == "end"
     assert update["consent"]["accepted"] is False
+    assert update["consent"]["policy_version"] == "habeas-data-v1"
+    assert update["consent"]["policy_url"].endswith("/legal/habeas-data")
+    assert update["consent"]["channel"] == "whatsapp"
     assert update["awaiting_user_input"] is False
     assert "sin consentimiento no puedo continuar" in update["messages"][0].content.lower()

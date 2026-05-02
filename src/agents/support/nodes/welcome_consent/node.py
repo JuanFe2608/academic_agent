@@ -16,7 +16,7 @@ from agents.support.state import AgentState
 from utils.avatar_assets import AVATAR_HOLA_SALUDO
 from utils.media_artifacts import materialize_image_reference
 
-from .prompt import CONSENT_PROMPT, WELCOME_MESSAGE
+from .prompt import HABEAS_DATA_POLICY_VERSION, WELCOME_MESSAGE, consent_prompt, habeas_data_policy_url
 
 _GREETING_KEYWORDS = (
     "hola",
@@ -58,7 +58,7 @@ def welcome_consent(state: AgentState) -> dict:
             updates["messages"] = _welcome_sequence()
             updates["welcome_sent"] = True
         else:
-            updates["messages"] = append_message(messages, "assistant", CONSENT_PROMPT)
+            updates["messages"] = append_message(messages, "assistant", consent_prompt())
         updates["awaiting_user_input"] = True
         return updates
 
@@ -78,6 +78,9 @@ def welcome_consent(state: AgentState) -> dict:
         updates["consent"] = {
             "accepted": True,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "policy_url": habeas_data_policy_url(),
+            "policy_version": HABEAS_DATA_POLICY_VERSION,
+            "channel": "whatsapp",
         }
         updates["phase"] = "profile"
         updates["welcome_sent"] = True
@@ -90,6 +93,9 @@ def welcome_consent(state: AgentState) -> dict:
         updates["consent"] = {
             "accepted": False,
             "timestamp": datetime.now(timezone.utc).isoformat(),
+            "policy_url": habeas_data_policy_url(),
+            "policy_version": HABEAS_DATA_POLICY_VERSION,
+            "channel": "whatsapp",
         }
         updates["phase"] = "end"
         updates["welcome_sent"] = True
@@ -105,11 +111,11 @@ def welcome_consent(state: AgentState) -> dict:
             updates["messages"] = _welcome_sequence()
             updates["welcome_sent"] = True
         else:
-            updates["messages"] = append_message(messages, "assistant", CONSENT_PROMPT)
+            updates["messages"] = append_message(messages, "assistant", consent_prompt())
         updates["awaiting_user_input"] = True
         return updates
 
-    updates["messages"] = append_message(messages, "assistant", CONSENT_PROMPT)
+    updates["messages"] = append_message(messages, "assistant", consent_prompt())
     updates["awaiting_user_input"] = True
     return updates
 
@@ -125,7 +131,7 @@ def _welcome_sequence() -> list[BaseMessage]:
     return [
         AIMessage(content=WELCOME_MESSAGE),
         AIMessage(content=[_welcome_image_block()]),
-        AIMessage(content=CONSENT_PROMPT),
+        AIMessage(content=consent_prompt()),
     ]
 
 

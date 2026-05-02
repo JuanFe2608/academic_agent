@@ -29,6 +29,50 @@ require_var() {
   info "$name=SET"
 }
 
+validate_azure_endpoint_base() {
+  local name="$1"
+  local value="${!name:-}"
+  case "$value" in
+    http://*|https://*)
+      ;;
+    *)
+      fail "$name debe ser una URL absoluta del recurso Azure OpenAI"
+      ;;
+  esac
+  case "$value" in
+    *"/openai/"*|*"/deployments/"*|*"/audio/"*|*"?api-version="*)
+      fail "$name debe ser el endpoint base, por ejemplo https://<recurso>.cognitiveservices.azure.com"
+      ;;
+  esac
+  info "$name=BASE_ENDPOINT_OK"
+}
+
+validate_chat_deployment() {
+  local name="$1"
+  local value="${!name:-}"
+  local normalized="${value,,}"
+  case "$normalized" in
+    *audio*|*transcribe*|*transcription*|*tts*|*whisper*)
+      fail "$name parece ser un deployment de audio; usa aqui el deployment de chat/vision"
+      ;;
+  esac
+  info "$name=CHAT_DEPLOYMENT_OK"
+}
+
+validate_transcription_deployment() {
+  local name="$1"
+  local value="${!name:-}"
+  local normalized="${value,,}"
+  case "$normalized" in
+    *transcribe*|*transcription*|*whisper*)
+      info "$name=TRANSCRIPTION_DEPLOYMENT_OK"
+      ;;
+    *)
+      fail "$name debe apuntar a un deployment de transcripcion de audio"
+      ;;
+  esac
+}
+
 require_file "$DEPLOY_ENV"
 require_file "$APP_ENV"
 
@@ -70,6 +114,10 @@ for var in \
   AZURE_OPENAI_DEPLOYMENT_NAME \
   AZURE_OPENAI_DEPLOYMENT_NAME_EMBEDDINGS \
   OPENAI_API_VERSION \
+  AZURE_OPENAI_API_KEY_TRANSCRIBE \
+  AZURE_OPENAI_ENDPOINT_TRANSCRIBE \
+  AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE \
+  OPENAI_API_VERSION_TRANSCRIBE \
   WHATSAPP_PHONE_NUMBER_ID \
   WHATSAPP_BUSINESS_ACCOUNT_ID \
   WHATSAPP_ACCESS_TOKEN \
@@ -79,10 +127,34 @@ for var in \
   MS_CLIENT_SECRET \
   MS_TENANT_ID \
   MICROSOFT_REDIRECT_URI \
+  ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH \
   ACADEMIC_AGENT_REMINDER_WORKER_TOKEN
 do
   require_var "$var"
 done
+
+validate_azure_endpoint_base AZURE_OPENAI_ENDPOINT
+validate_chat_deployment AZURE_OPENAI_DEPLOYMENT_NAME
+validate_azure_endpoint_base AZURE_OPENAI_ENDPOINT_TRANSCRIBE
+validate_transcription_deployment AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE
+
+case "${ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH,,}" in
+  1|true|yes|on|required|obligatorio)
+    info "ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH=ENABLED"
+    ;;
+  *)
+    fail "ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH debe estar activo para el piloto OAuth"
+    ;;
+esac
+
+case "${ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE:-disabled}" in
+  disabled|fixed|strict)
+    info "ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE=${ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE:-disabled}"
+    ;;
+  *)
+    fail "ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE debe ser disabled, fixed o strict"
+    ;;
+esac
 
 case "$MICROSOFT_REDIRECT_URI" in
   *localhost*|*127.0.0.1*|*TU_DOMINIO*)

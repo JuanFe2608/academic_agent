@@ -14,6 +14,11 @@ from typing import Any
 from langchain_core.messages import HumanMessage
 from langchain_openai import AzureChatOpenAI, ChatOpenAI
 
+from integrations.ai.azure_config import (
+    validate_azure_resource_endpoint,
+    validate_chat_deployment_name,
+)
+
 _LAST_LLM_ERROR: str | None = None
 
 
@@ -26,6 +31,14 @@ def get_azure_llm(temperature: float = 0.0) -> AzureChatOpenAI:
 
     if not endpoint or not api_key or not deployment or not api_version:
         raise ValueError("Missing Azure OpenAI environment variables")
+    endpoint = validate_azure_resource_endpoint(
+        endpoint,
+        env_name="AZURE_OPENAI_ENDPOINT",
+    )
+    deployment = validate_chat_deployment_name(
+        deployment,
+        env_name="AZURE_OPENAI_DEPLOYMENT_NAME",
+    )
 
     return AzureChatOpenAI(
         azure_endpoint=endpoint,
@@ -247,6 +260,11 @@ def llm_extract_schedule_from_image(
         "- extracted_text debe ir en una o varias lineas con formato: "
         "<Dia> <HH:MM>-<HH:MM> <Titulo>.\n"
         "- Usa dias en espanol: Lunes..Domingo y horas en 24h.\n"
+        "- Nunca uses Image, Imagen, Foto, Picture, Captura, Screenshot ni "
+        "palabras similares como titulo.\n"
+        "- Si no puedes leer el nombre de la materia o actividad, deja el "
+        "titulo vacio y conserva solo dia y hora.\n"
+        "- No inventes nombres de materias o actividades.\n"
         "- Si no es horario o no es legible, usa extracted_text vacio.\n"
         "- No incluyas markdown ni texto adicional fuera del JSON.\n"
         f"- Pista de contexto: {hint}.\n"

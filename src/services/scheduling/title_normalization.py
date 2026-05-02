@@ -43,6 +43,42 @@ _STOPWORDS = {
     "fija",
 }
 
+_PLACEHOLDER_TITLE_VALUES = {
+    "adjunto",
+    "archivo",
+    "captura",
+    "foto",
+    "foto recibida",
+    "image",
+    "image received",
+    "imagen",
+    "imagen recibida",
+    "img",
+    "input image",
+    "media",
+    "multimedia",
+    "photo",
+    "picture",
+    "screenshot",
+}
+_PLACEHOLDER_TITLE_TOKENS = {
+    "adjunto",
+    "archivo",
+    "captura",
+    "foto",
+    "image",
+    "imagen",
+    "img",
+    "media",
+    "multimedia",
+    "photo",
+    "picture",
+    "screenshot",
+}
+_PLACEHOLDER_WITH_INDEX_PATTERN = re.compile(
+    r"^(?:image|imagen|img|foto|photo|picture|captura|screenshot)\s*\d+$"
+)
+
 
 def normalize_schedule_title(
     raw_title: str,
@@ -55,9 +91,13 @@ def normalize_schedule_title(
     if schedule_type == "work":
         return original_title or "Trabajo", "Trabajo"
     if schedule_type == "academic":
+        if not original_title or is_placeholder_schedule_title(original_title):
+            return original_title, ""
         normalized_title = _smart_title_case(
-            _strip_leading_connectors(original_title or raw_text or "Clase")
+            _strip_leading_connectors(original_title)
         )
+        if is_placeholder_schedule_title(normalized_title):
+            return original_title, ""
         return original_title or normalized_title, normalized_title
 
     normalized_title = _normalize_extracurricular_title(original_title or raw_text)
@@ -99,6 +139,22 @@ def _clean_title(value: str) -> str:
     return text
 
 
+def is_placeholder_schedule_title(value: str) -> bool:
+    """Detecta etiquetas tecnicas de imagen que no son nombres de actividades."""
+
+    normalized = _normalize_text(_clean_title(value))
+    if not normalized:
+        return False
+    if normalized in _PLACEHOLDER_TITLE_VALUES:
+        return True
+    if _PLACEHOLDER_WITH_INDEX_PATTERN.fullmatch(normalized):
+        return True
+    tokens = normalized.split()
+    return 1 <= len(tokens) <= 3 and all(
+        token in _PLACEHOLDER_TITLE_TOKENS for token in tokens
+    )
+
+
 def _normalize_text(value: str) -> str:
     folded = unicodedata.normalize("NFKD", str(value or "")).encode("ascii", "ignore").decode("ascii")
     return re.sub(r"[^a-z0-9]+", " ", folded.lower()).strip()
@@ -128,4 +184,4 @@ def _strip_leading_connectors(value: str) -> str:
     ).strip()
 
 
-__all__ = ["normalize_schedule_title"]
+__all__ = ["is_placeholder_schedule_title", "normalize_schedule_title"]

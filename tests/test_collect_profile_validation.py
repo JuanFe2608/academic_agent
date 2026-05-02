@@ -318,7 +318,8 @@ def test_collect_profile_rejects_duplicate_email_before_oauth_link() -> None:
     assert update["onboarding"]["slot_errors"]["institutional_email"] == "duplicate_email"
     assert "ya esta registrado" in update["messages"][0].content.lower()
     assert "escribe otro correo" in update["messages"][0].content.lower()
-    assert "@ucatolica.edu.co" in update["messages"][0].content.lower()
+    assert "@outlook.com" in update["messages"][0].content.lower()
+    assert "@ucatolica.edu.co" not in update["messages"][0].content.lower()
 
 
 def test_collect_profile_accepts_microsoft_personal_email_and_continues_to_next_field(

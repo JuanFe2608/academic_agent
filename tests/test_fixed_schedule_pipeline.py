@@ -83,6 +83,80 @@ def test_parse_fixed_schedule_section_marks_missing_title() -> None:
     assert "nombre de la materia o actividad" in result.pending_schedule_items[0].missing_fields
 
 
+def test_parse_fixed_schedule_section_rejects_image_placeholder_as_academic_title() -> None:
+    result = parse_fixed_schedule_section(
+        "Lunes 06:00-07:00 Image",
+        "academic",
+    )
+
+    assert result.needs_clarification is True
+    assert result.blocks == []
+    assert result.pending_schedule_items
+    pending = result.pending_schedule_items[0]
+    assert pending.title == ""
+    assert pending.raw_text == "Lunes 06:00-07:00"
+    assert "nombre de la materia o actividad" in pending.missing_fields
+
+
+def test_parse_fixed_schedule_section_ignores_image_placeholder_subject_line() -> None:
+    result = parse_fixed_schedule_section(
+        "Image\nLunes de 6:00 a 7:00",
+        "academic",
+    )
+
+    assert result.needs_clarification is True
+    assert result.blocks == []
+    assert result.pending_schedule_items
+    assert result.pending_schedule_items[0].title == ""
+    assert "nombre de la materia o actividad" in result.pending_schedule_items[0].missing_fields
+
+
+def test_parse_fixed_schedule_section_preserves_subject_across_image_lines() -> None:
+    result = parse_fixed_schedule_section(
+        "\n".join(
+            [
+                "Código asignatura: CT10068",
+                "",
+                "GERENCIA DE PROYECTOS DE TI",
+                "3.0 créditos, Grupo D-2",
+                "Image",
+                "MAR,VIE 07:00:00-09:00:00, MAR,VIE 07:00:00-09:00:00,",
+                "Image",
+                "03-02-2026- 29-05-2026",
+                "Image",
+                "BOGOTA | Bloque AA | Salón 714AA,",
+                "Código asignatura: CT13009",
+                "",
+                "TRABAJO DE GRADO II",
+                "4.0 créditos, Grupo D-5",
+                "Image",
+                "MIE 07:00:00-11:00:00, MIE 07:00:00-11:00:00,",
+            ]
+        ),
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert result.pending_schedule_items == []
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in result.blocks] == [
+        ("Gerencia De Proyectos De Ti", "tuesday", "07:00", "09:00"),
+        ("Gerencia De Proyectos De Ti", "friday", "07:00", "09:00"),
+        ("Trabajo De Grado Ii", "wednesday", "07:00", "11:00"),
+    ]
+
+
+def test_parse_fixed_schedule_section_does_not_use_image_as_work_title() -> None:
+    result = parse_fixed_schedule_section(
+        "Lunes 06:00-07:00 Image",
+        "work",
+    )
+
+    assert result.needs_clarification is False
+    assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in result.blocks] == [
+        ("Trabajo", "monday", "06:00", "07:00"),
+    ]
+
+
 def test_parse_fixed_schedule_section_marks_missing_time() -> None:
     result = parse_fixed_schedule_section(
         "miércoles 9 matemáticas",

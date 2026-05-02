@@ -264,15 +264,17 @@ def test_request_schedules_section_confirmation_yes_moves_to_work_prompt() -> No
     assert "horario laboral" in update["messages"][0].content.lower()
 
 
-def test_request_schedules_section_edit_revalidates_conflicts_after_change(monkeypatch) -> None:
+def test_request_schedules_section_edit_revalidates_conflicts_after_change(monkeypatch, tmp_path) -> None:
+    rendered_path = tmp_path / "schedule.png"
+    rendered_path.write_bytes(b"fake image")
     monkeypatch.setattr(
         "agents.support.flows.scheduling.section_confirmation_service.build_rendered_schedule_message_content",
         lambda text, _blocks, **_kwargs: (
             [
                 {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+                {"type": "image_url", "image_url": {"url": str(rendered_path)}},
             ],
-            "tmp/schedule.png",
+            str(rendered_path),
         ),
     )
     state = AgentState(
@@ -569,6 +571,35 @@ def test_request_schedules_extracts_academic_schedule_from_student_image(monkeyp
                 ]
             )
         ],
+    )
+
+    update = request_schedules(state)
+
+    image_ref = update["raw_inputs"]["horario_academico_img"]
+    assert update["awaiting_user_input"] is False
+    assert update["raw_inputs"]["horario_academico_text"] == "Lunes 08:00-10:00 Algebra"
+    assert not image_ref.startswith("data:image")
+    assert Path(image_ref).exists()
+    assert update["last_user_images"] == [image_ref]
+
+
+def test_request_schedules_extracts_whatsapp_image_from_state_reference(monkeypatch) -> None:
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.schedule_capture_service.llm_extract_schedule_from_image",
+        lambda image_ref, schedule_hint=None: {
+            "is_schedule": True,
+            "schedule_type": schedule_hint,
+            "extracted_text": "Lunes 08:00-10:00 Algebra",
+        },
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={"capture_target": "academic", "capture_stage": "awaiting_input"},
+        messages=[HumanMessage(content=[{"type": "text", "text": "[imagen recibida]"}])],
+        last_user_images=["data:image/png;base64,abc"],
     )
 
     update = request_schedules(state)

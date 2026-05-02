@@ -1,5 +1,10 @@
 """Mensajes base para bienvenida y consentimiento."""
 
+from __future__ import annotations
+
+import os
+from urllib.parse import urlparse, urlunparse
+
 WELCOME_MESSAGE = (
     "¡Hola! 👋✨\n"
     "Soy Lara, tu Asistente Académico Inteligente 🤖📚\n"
@@ -22,39 +27,42 @@ WELCOME_MESSAGE = (
     "Juntos vamos a construir una planificación académica que se ajuste a ti 🎯"
 )
 
-CONSENT_PROMPT = (
-    "📄 *Autorización para el tratamiento de datos personales – Lara AI*\n"
-    "\n"
-    "Antes de continuar, necesito tu autorización para tratar tus datos personales "
-    "conforme a la normativa colombiana de protección de datos personales.\n"
-    "\n"
-    "✅ Al responder *“Sí”*, autorizas de manera previa, expresa e informada a "
-    "*Lara AI / Universidad Católica de Colombia* para recolectar, almacenar, usar, "
-    "organizar, actualizar y, en general, tratar tus datos personales únicamente "
-    "para las siguientes finalidades:\n"
-    "\n"
-    "• Gestionar tu registro y perfil dentro de Lara AI.\n"
-    "• Recolectar y usar información académica, de contacto y de planificación.\n"
-    "• Apoyarte en la gestión del tiempo, organización de actividades y "
-    "recomendaciones de estudio personalizadas.\n"
-    "• Realizar seguimiento funcional, técnico, estadístico y académico del servicio.\n"
-    "• Enviar información relacionada con el funcionamiento del asistente, "
-    "recordatorios o mensajes asociados al servicio.\n"
-    "• Cumplir obligaciones legales, contractuales y de seguridad de la información.\n"
-    "\n"
-    "🔐 Tus datos serán tratados bajo los principios de legalidad, finalidad, "
-    "libertad, veracidad, transparencia, acceso restringido, seguridad y "
-    "confidencialidad, de acuerdo con la normativa aplicable.\n"
-    "\n"
-    "📩 Como titular de la información, puedes ejercer tus derechos de conocer, "
-    "actualizar, rectificar y suprimir tus datos, así como revocar esta autorización, "
-    "mediante solicitud enviada al correo: *jfjaramillo12@ucatolica.edu.co*.\n"
-    "\n"
-    "La revocatoria procederá siempre que no exista un deber legal o contractual que "
-    "impida eliminar o dejar de tratar la información.\n"
-    "\n"
-    "⚠️ La información que suministres debe ser veraz, completa y actualizada.\n"
-    "\n"
-    "❓ *¿Aceptas el tratamiento de tus datos personales para continuar en Lara AI?*\n"
-    "Responde únicamente: *Sí* o *No*."
-)
+HABEAS_DATA_PATH = "/legal/habeas-data"
+HABEAS_DATA_POLICY_VERSION = "habeas-data-v1"
+
+
+def habeas_data_policy_url() -> str:
+    """Retorna la URL publica del documento de tratamiento de datos."""
+    explicit_url = os.getenv("LARA_HABEAS_DATA_URL", "").strip()
+    if explicit_url:
+        return explicit_url
+
+    public_base_url = os.getenv("ACADEMIC_AGENT_PUBLIC_BASE_URL", "").strip()
+    if public_base_url:
+        return f"{public_base_url.rstrip('/')}{HABEAS_DATA_PATH}"
+
+    redirect_uri = os.getenv("MICROSOFT_REDIRECT_URI", "").strip()
+    inferred_base_url = _origin_from_url(redirect_uri)
+    if inferred_base_url:
+        return f"{inferred_base_url}{HABEAS_DATA_PATH}"
+
+    return f"http://localhost:8000{HABEAS_DATA_PATH}"
+
+
+def consent_prompt() -> str:
+    """Construye el mensaje corto de consentimiento para WhatsApp."""
+    return (
+        "❓ *¿Aceptas el tratamiento de tus datos personales para continuar en Lara AI?*\n"
+        "\n"
+        "Consulta la política completa aquí:\n"
+        f"{habeas_data_policy_url()}\n"
+        "\n"
+        "Responde únicamente: *Sí* o *No*."
+    )
+
+
+def _origin_from_url(value: str) -> str | None:
+    parsed = urlparse(value)
+    if not parsed.scheme or not parsed.netloc:
+        return None
+    return urlunparse((parsed.scheme, parsed.netloc, "", "", "", ""))

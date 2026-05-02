@@ -37,6 +37,13 @@ def parse_fixed_schedule_section(
 
     normalized = normalize_schedule_section(text, schedule_type, timezone=timezone)
     if normalized.needs_clarification:
+        if context_blocks and not pending_items:
+            return SectionPipelineResult(
+                blocks=context_blocks,
+                clarifications=[],
+                needs_clarification=False,
+                parser_used="contextual",
+            )
         blocks = context_blocks if context_blocks else normalized.blocks
         clarifications = context_clarifications or normalized.clarifications
         return SectionPipelineResult(

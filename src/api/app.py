@@ -141,6 +141,17 @@ async def run_due_reminders(
 
 
 # ---------------------------------------------------------------------------
+# Legal
+# ---------------------------------------------------------------------------
+
+
+@app.get("/legal/habeas-data", tags=["legal"])
+def habeas_data_policy() -> HTMLResponse:
+    """Pagina publica de autorizacion para tratamiento de datos personales."""
+    return HTMLResponse(content=_habeas_data_policy_page(), status_code=200)
+
+
+# ---------------------------------------------------------------------------
 # WhatsApp webhook
 # ---------------------------------------------------------------------------
 
@@ -266,6 +277,387 @@ def _oauth_result_page(*, success: bool, message: str) -> str:
     <h2>{"Listo" if success else "Ocurrio un error"}</h2>
     <p>{message}</p>
   </div>
+</body>
+</html>"""
+
+
+def _habeas_data_policy_page() -> str:
+    return """<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Lara AI - Tratamiento de datos personales</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f4f7fb;
+      --paper: #ffffff;
+      --ink: #172033;
+      --muted: #5b6475;
+      --line: #dbe3ef;
+      --accent: #1166cc;
+      --accent-soft: #e8f1ff;
+      --ok-soft: #e9f8ef;
+      --warn-soft: #fff5dc;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      color: var(--ink);
+      background: var(--bg);
+      line-height: 1.62;
+    }
+    main {
+      width: min(960px, calc(100% - 32px));
+      margin: 0 auto;
+      padding: 32px 0 48px;
+    }
+    .hero {
+      padding: 32px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+      box-shadow: 0 16px 36px rgba(23, 32, 51, 0.08);
+    }
+    .eyebrow {
+      margin: 0 0 8px;
+      color: var(--accent);
+      font-weight: 700;
+      letter-spacing: 0;
+      text-transform: uppercase;
+      font-size: 0.78rem;
+    }
+    h1 {
+      margin: 0;
+      font-size: clamp(1.8rem, 4vw, 3rem);
+      line-height: 1.08;
+      letter-spacing: 0;
+    }
+    .subtitle {
+      margin: 14px 0 0;
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 760px;
+    }
+    .meta {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+      margin-top: 24px;
+    }
+    .meta div, section {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: var(--paper);
+    }
+    .meta div {
+      padding: 14px 16px;
+    }
+    .meta strong {
+      display: block;
+      margin-bottom: 4px;
+      color: var(--ink);
+    }
+    .meta span, .meta a {
+      color: var(--muted);
+      overflow-wrap: anywhere;
+    }
+    section {
+      margin-top: 16px;
+      padding: 24px;
+    }
+    h2 {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+      margin: 0 0 14px;
+      font-size: 1.24rem;
+      line-height: 1.25;
+      letter-spacing: 0;
+    }
+    h3 {
+      margin: 18px 0 8px;
+      font-size: 1rem;
+      letter-spacing: 0;
+    }
+    p { margin: 0 0 12px; }
+    ul {
+      margin: 0;
+      padding-left: 1.2rem;
+    }
+    li + li { margin-top: 6px; }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+    }
+    .panel {
+      padding: 16px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fbfdff;
+    }
+    .notice {
+      padding: 16px;
+      border-radius: 8px;
+      background: var(--warn-soft);
+      border: 1px solid #f2d38a;
+    }
+    .ok {
+      padding: 16px;
+      border-radius: 8px;
+      background: var(--ok-soft);
+      border: 1px solid #b8e5c6;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--accent-soft);
+      color: var(--accent);
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+    a {
+      color: var(--accent);
+      font-weight: 700;
+    }
+    footer {
+      color: var(--muted);
+      font-size: 0.92rem;
+      padding: 24px 4px 0;
+      text-align: center;
+    }
+    @media (max-width: 720px) {
+      main { width: min(100% - 24px, 960px); padding-top: 16px; }
+      .hero, section { padding: 20px; }
+      .meta, .grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header class="hero">
+      <p class="eyebrow">Proyecto Lara AI - Agente Academico Inteligente</p>
+      <h1>📄 Autorizacion para el tratamiento de datos personales</h1>
+      <p class="subtitle">
+        Informacion para estudiantes sobre la recoleccion, uso, almacenamiento y proteccion
+        de datos personales dentro del piloto academico Lara AI.
+      </p>
+      <div class="meta" aria-label="Informacion principal">
+        <div>
+          <strong>🏛️ Institucion</strong>
+          <span>Universidad Catolica de Colombia</span>
+        </div>
+        <div>
+          <strong>👤 Responsable</strong>
+          <span>Proyecto academico Lara AI</span>
+        </div>
+        <div>
+          <strong>📩 Contacto</strong>
+          <a href="mailto:jfjaramillo12@ucatolica.edu.co">jfjaramillo12@ucatolica.edu.co</a>
+        </div>
+      </div>
+    </header>
+
+    <section>
+      <h2>⚖️ Marco normativo</h2>
+      <p>
+        En cumplimiento de la Ley 1581 de 2012, el Decreto 1377 de 2013, el
+        Decreto 1074 de 2015 y demas normas concordantes sobre proteccion de
+        datos personales en Colombia, se informa al titular de los datos las
+        condiciones bajo las cuales Lara AI realiza el tratamiento de informacion.
+      </p>
+    </section>
+
+    <section>
+      <h2>🎯 Finalidades del tratamiento</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>Finalidades principales</h3>
+          <ul>
+            <li>Gestionar el registro y perfil del estudiante dentro de Lara AI.</li>
+            <li>Recolectar, almacenar y procesar informacion academica necesaria para el asistente.</li>
+            <li>Apoyar la gestion del tiempo academico, planificacion de actividades y organizacion de tareas.</li>
+            <li>Recomendar metodos de estudio personalizados segun el perfil y los habitos del estudiante.</li>
+            <li>Generar recordatorios y notificaciones sobre actividades, eventos y planificacion diaria o semanal.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Integraciones autorizadas</h3>
+          <ul>
+            <li>WhatsApp como interfaz conversacional.</li>
+            <li>Microsoft Outlook y Microsoft Graph API.</li>
+            <li>Google Calendar o Google APIs si el usuario las autoriza.</li>
+            <li>Sistemas de calendario personal conectados voluntariamente por el estudiante.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Finalidades tecnicas y academicas</h3>
+          <ul>
+            <li>Realizar seguimiento tecnico del funcionamiento del sistema.</li>
+            <li>Registrar logs para diagnostico de errores, rendimiento y seguridad.</li>
+            <li>Realizar analisis estadisticos o investigativos con fines academicos.</li>
+            <li>Evaluar el desempeno del sistema en el contexto del trabajo de grado.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Finalidades legales y administrativas</h3>
+          <ul>
+            <li>Cumplir obligaciones legales y regulatorias aplicables.</li>
+            <li>Garantizar la seguridad de la informacion.</li>
+            <li>Prevenir accesos no autorizados o usos indebidos del sistema.</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2>🗂️ Datos personales recolectados</h2>
+      <div class="grid">
+        <div class="panel">
+          <h3>Datos de identificacion</h3>
+          <ul>
+            <li>Nombre completo.</li>
+            <li>Correo electronico institucional.</li>
+            <li>Programa academico.</li>
+            <li>Semestre academico.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Datos academicos</h3>
+          <ul>
+            <li>Materias cursadas, horarios, tareas, entregas y evaluaciones programadas.</li>
+            <li>Actividades academicas y preferencias de estudio.</li>
+            <li>Metodos de aprendizaje utilizados.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Interaccion con el sistema</h3>
+          <ul>
+            <li>Mensajes enviados al asistente.</li>
+            <li>Historial de planificacion academica.</li>
+            <li>Uso del sistema y configuracion del perfil academico.</li>
+          </ul>
+        </div>
+        <div class="panel">
+          <h3>Datos tecnicos</h3>
+          <ul>
+            <li>Registros de uso e identificadores tecnicos.</li>
+            <li>Informacion necesaria para autenticacion.</li>
+            <li>Tokens de acceso a servicios autorizados, como Google o Microsoft.</li>
+          </ul>
+        </div>
+      </div>
+      <p class="notice">
+        ⚠️ Lara AI no recolecta datos sensibles como informacion medica, datos biometricos,
+        informacion financiera o datos sobre salud mental, salvo autorizacion expresa y especifica.
+      </p>
+    </section>
+
+    <section>
+      <h2>☁️ Servicios tecnologicos</h2>
+      <p>
+        El tratamiento de datos podra realizarse mediante plataformas como Microsoft Azure,
+        OpenAI o Azure OpenAI, WhatsApp Cloud API, Google APIs, Microsoft Graph API y bases
+        de datos PostgreSQL.
+      </p>
+      <p>
+        Estas plataformas podran almacenar informacion en servidores ubicados dentro o fuera
+        del territorio colombiano, cumpliendo estandares de seguridad internacionales.
+      </p>
+    </section>
+
+    <section>
+      <h2>🛡️ Derechos del titular</h2>
+      <ul>
+        <li>Conocer, actualizar y rectificar sus datos personales.</li>
+        <li>Solicitar prueba de la autorizacion otorgada.</li>
+        <li>Ser informado sobre el uso dado a sus datos personales.</li>
+        <li>Presentar consultas y reclamos ante el responsable del tratamiento.</li>
+        <li>Revocar la autorizacion y solicitar la supresion de sus datos personales.</li>
+        <li>Acceder en forma gratuita a sus datos personales.</li>
+        <li>Presentar quejas ante la Superintendencia de Industria y Comercio cuando considere vulnerados sus derechos.</li>
+      </ul>
+    </section>
+
+    <section>
+      <h2>📬 Canal para ejercer derechos</h2>
+      <p>
+        El titular podra ejercer sus derechos mediante solicitud escrita enviada al correo
+        <a href="mailto:jfjaramillo12@ucatolica.edu.co">jfjaramillo12@ucatolica.edu.co</a>.
+      </p>
+      <p>La solicitud debe incluir nombre del titular, identificacion, descripcion clara de la solicitud y datos de contacto.</p>
+    </section>
+
+    <section>
+      <h2>🔐 Seguridad de la informacion</h2>
+      <p>
+        Lara AI implementa medidas tecnicas, administrativas y organizativas para proteger
+        la informacion personal contra perdida, acceso no autorizado, alteracion, uso indebido
+        o divulgacion no autorizada.
+      </p>
+      <div class="ok">
+        <span class="badge">Medidas aplicadas</span>
+        <p>
+          Autenticacion segura, control de accesos, cifrado de informacion, registro de actividad
+          y buenas practicas de seguridad informatica.
+        </p>
+      </div>
+    </section>
+
+    <section>
+      <h2>⏳ Vigencia, transferencia y transmision</h2>
+      <p>
+        Los datos personales seran tratados durante el tiempo necesario para cumplir las finalidades
+        descritas, ejecutar el proyecto academico y realizar analisis posteriores del trabajo de grado.
+      </p>
+      <p>
+        Una vez finalizado el proyecto, los datos podran ser eliminados, anonimizados o conservados
+        unicamente cuando exista obligacion legal.
+      </p>
+      <p>
+        El titular autoriza que sus datos puedan ser transmitidos o transferidos a plataformas
+        tecnologicas autorizadas, servicios necesarios para el funcionamiento del sistema y entidades
+        academicas relacionadas con el proyecto, siempre bajo condiciones de seguridad y confidencialidad.
+      </p>
+    </section>
+
+    <section>
+      <h2>📌 Principios y caracter voluntario</h2>
+      <p>
+        El tratamiento se realizara conforme a los principios de legalidad, finalidad, libertad,
+        veracidad, transparencia, acceso restringido, seguridad y confidencialidad.
+      </p>
+      <p>
+        El suministro de datos personales es voluntario. Sin embargo, algunos datos son necesarios
+        para el funcionamiento de Lara AI y la prestacion del servicio.
+      </p>
+    </section>
+
+    <section>
+      <h2>✅ Autorizacion del titular</h2>
+      <p>
+        Al aceptar desde WhatsApp, el estudiante declara que ha leido y comprendido esta autorizacion
+        para el tratamiento de datos personales.
+      </p>
+      <p>
+        El estudiante autoriza de manera previa, expresa e informada al Proyecto Lara AI - Universidad
+        Catolica de Colombia para tratar sus datos personales conforme a las finalidades descritas.
+      </p>
+      <p>
+        Esta autorizacion se otorga de manera voluntaria y podra ser revocada en cualquier momento,
+        siempre que no exista obligacion legal o contractual que impida la eliminacion de la informacion.
+      </p>
+    </section>
+
+    <footer>
+      Version habeas-data-v1 · Proyecto academico Lara AI · Universidad Catolica de Colombia
+    </footer>
+  </main>
 </body>
 </html>"""
 

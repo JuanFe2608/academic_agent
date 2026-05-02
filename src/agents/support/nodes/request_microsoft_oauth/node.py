@@ -400,8 +400,8 @@ def _identity_conflict_message(error_code: str | None) -> str:
     if error_code == "duplicate_email":
         return (
             "Ese correo Microsoft ya esta registrado en otra cuenta de estudiante. "
-            "Escribe otro correo 📧 Puedes usar @ucatolica.edu.co o una cuenta "
-            "Microsoft personal (@outlook.com, @hotmail.com, @live.com). "
+            "Escribe otro correo Microsoft personal 📧 "
+            "Puedes usar @outlook.com, @hotmail.com o @live.com. "
             "Por ejemplo: usuario@outlook.com"
         )
     return (

@@ -67,7 +67,7 @@ class WhatsAppInputNormalizer:
         if emoji_confirmation:
             return NormalizedAgentInput(human_message=HumanMessage(content=emoji_confirmation))
         if _is_emoji_only(text):
-            return NormalizedAgentInput(direct_response=_emoji_context_message())
+            return NormalizedAgentInput(human_message=HumanMessage(content=text))
 
         if message.media is None:
             if not text:

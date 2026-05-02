@@ -13,6 +13,7 @@ from agents.support.flows.scheduling.schedule_capture_service import (
     handle_schedule_capture_turn,
 )
 from agents.support.state import AgentState
+from utils.media_artifacts import IMAGE_RECEIVED_MARKER
 
 from .prompt import (
     PROMPT_ACADEMICO,
@@ -36,6 +37,16 @@ def request_schedules(state: AgentState) -> dict:
         state.get("last_user_images", []),
     )
     last_images = get_last_user_images(messages)
+    if (
+        not last_images
+        and has_new_input
+        and IMAGE_RECEIVED_MARKER in str(last_text or "")
+    ):
+        last_images = [
+            str(image).strip()
+            for image in state.get("last_user_images", [])
+            if str(image or "").strip()
+        ]
     prompts = ScheduleCapturePrompts(
         occupation=PROMPT_OCCUPATION,
         academic=PROMPT_ACADEMICO,

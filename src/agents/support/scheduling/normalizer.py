@@ -28,7 +28,7 @@ from services.scheduling.models import (
 )
 from services.scheduling.validation import normalize_day, normalize_time
 
-from .titles import normalize_schedule_title
+from .titles import is_placeholder_schedule_title, normalize_schedule_title
 
 _DAY_TOKEN_PATTERN = (
     r"(?:"
@@ -227,8 +227,26 @@ def _normalize_with_json_llm(
         if start_time >= end_time:
             continue
         title = str(item.get("title") or "").strip()
+        if is_placeholder_schedule_title(title):
+            if schedule_type == "work":
+                title = "Trabajo"
+            else:
+                clarifications.append(_missing_title_clarification(schedule_type))
+                continue
         if not title:
-            title = "Trabajo" if schedule_type == "work" else "Clase"
+            if schedule_type == "work":
+                title = "Trabajo"
+            else:
+                clarifications.append(_missing_title_clarification(schedule_type))
+                continue
+        original_title, normalized_title = normalize_schedule_title(
+            title,
+            schedule_type,
+            str(item.get("source_text") or text).strip() or text,
+        )
+        if schedule_type != "work" and not normalized_title.strip():
+            clarifications.append(_missing_title_clarification(schedule_type))
+            continue
         confidence = item.get("confidence")
         try:
             confidence_value = float(confidence) if confidence is not None else 0.7
@@ -237,7 +255,9 @@ def _normalize_with_json_llm(
         blocks.append(
             WeeklyScheduleBlock(
                 block_type=schedule_type,
-                title=title,
+                title=normalized_title,
+                original_title=original_title,
+                normalized_title=normalized_title,
                 day_of_week=day_of_week,
                 start_time=start_time,
                 end_time=end_time,
@@ -253,7 +273,7 @@ def _normalize_with_json_llm(
         )
     return NormalizedScheduleResult(
         blocks=_dedupe_blocks(blocks),
-        needs_clarification=bool(payload.get("needs_clarification")),
+        needs_clarification=bool(payload.get("needs_clarification")) or bool(clarifications),
         clarifications=clarifications,
         parser_used="llm_structured_json",
     )
@@ -275,12 +295,16 @@ def _heuristic_academic_blocks(text: str, timezone: str) -> list[WeeklyScheduleB
         if not effective_days:
             raise ValueError("Falta el día del bloque académico.")
         start_time, end_time = _extract_time_range(segment)
-        title = _infer_title(segment, default_title="Clase")
+        title = _infer_title(segment, default_title="")
+        if not title or is_placeholder_schedule_title(title):
+            raise ValueError("Falta el nombre del bloque académico.")
         original_title, normalized_title = normalize_schedule_title(
             title,
             "academic",
             segment,
         )
+        if not normalized_title:
+            raise ValueError("Falta el nombre del bloque académico.")
         for day in effective_days:
             blocks.append(
                 WeeklyScheduleBlock(
@@ -307,11 +331,19 @@ def _blocks_from_events(
 ) -> list[WeeklyScheduleBlock]:
     blocks: list[WeeklyScheduleBlock] = []
     for event in events:
+        raw_title = str(event.titulo).strip()
+        if is_placeholder_schedule_title(raw_title):
+            if schedule_type == "work":
+                raw_title = "Trabajo"
+            else:
+                continue
         original_title, normalized_title = normalize_schedule_title(
-            str(event.titulo).strip() or ("Trabajo" if schedule_type == "work" else "Clase"),
+            raw_title or ("Trabajo" if schedule_type == "work" else ""),
             schedule_type,
             source_text,
         )
+        if schedule_type != "work" and not normalized_title:
+            continue
         blocks.append(
             WeeklyScheduleBlock(
                 block_type=schedule_type,
@@ -359,6 +391,14 @@ def _blocks_from_extracurricular_items(
                 )
             )
     return _dedupe_blocks(blocks)
+
+
+def _missing_title_clarification(schedule_type: ScheduleBlockType) -> str:
+    if schedule_type == "academic":
+        return "Necesito el nombre de la materia o actividad."
+    if schedule_type == "extracurricular":
+        return "Necesito el nombre de la actividad extracurricular."
+    return "Necesito el nombre de la actividad."
 
 
 def _build_extracurricular_blocks_for_day(

@@ -4,20 +4,36 @@ Fecha: 2026-05-01
 
 ## 0. Estado De Preparacion
 
-Decision actual: el proyecto esta listo para un despliegue piloto controlado en Azure con una sola replica y hasta 3 estudiantes de prueba. Para produccion abierta con estudiantes reales sigue siendo necesario cerrar validacion end-to-end, operacion y deuda de pruebas.
+Actualizacion post despliegue, 2026-05-01: el piloto ya fue desplegado en Azure Container Apps y esta siendo probado por WhatsApp. El backend publico quedo en:
+
+```text
+https://ca-lara-academic-agent-pilot.greenriver-35e70b6b.canadacentral.azurecontainerapps.io
+```
+
+`GET /health` respondio:
+
+```json
+{"status":"ok","agent":"ready"}
+```
+
+El webhook de WhatsApp fue validado por Meta con HTTP 200 y se probo envio directo con WhatsApp Cloud API usando un System User token permanente. El procedimiento real esta documentado en `docs/2026-05-01/informe_despliegue_real_azure_whatsapp_piloto.md`.
+
+Actualizacion RAG/pgvector: despues del despliegue se habilito la extension `vector` en Azure PostgreSQL Flexible Server, se aplico la migracion RAG y se cargo el corpus de recomendaciones. El estado validado fue: `15` documentos, `468` chunks, `355` relaciones y `468` chunks con embedding.
+
+Decision actual: el proyecto esta desplegado como piloto controlado en Azure con una sola replica. Para produccion abierta con estudiantes reales sigue siendo necesario cerrar validacion end-to-end ampliada, operacion y deuda de pruebas.
 
 La arquitectura principal del MVP ya esta implementada: FastAPI, WhatsApp Cloud API, LangGraph/ReAct, PostgreSQL, OAuth Microsoft, Outlook Calendar, Microsoft To Do, recordatorios, replanificacion controlada, manejo defensivo de audio/links/videos/stickers/emojis y persistencia durable de actividades academicas. Las migraciones recientes ya cubren recordatorios por tipo, vinculo durable actividad academica -> Microsoft To Do y deduplicacion durable de webhooks de WhatsApp.
 
-Condiciones minimas para desplegar el piloto de 3 estudiantes:
+Condiciones minimas que se siguieron para desplegar el piloto:
 
 1. Usar una sola replica (`min=1`, `max=1`).
 2. Confirmar variables reales de Azure, Meta y Microsoft, incluido `WHATSAPP_APP_SECRET`.
 3. Usar URL publica estable para WhatsApp y Microsoft, no ngrok.
 4. Tener aplicadas las migraciones hasta `0023_processed_webhook_messages.sql`.
-5. Configurar el job/scheduler que invoque `POST /tasks/reminders/run`.
+5. Dejar identificado el job/scheduler que invocara `POST /tasks/reminders/run`.
 6. Usar `WHATSAPP_ACCESS_TOKEN` permanente o system-user token; no usar token temporal de Meta.
 7. Restringir documentos/media a alcance controlado o aceptar que Blob Storage queda pendiente.
-8. Ejecutar smoke test con una cuenta antes de invitar a los 3 estudiantes.
+8. Ejecutar smoke test inicial con health check, webhook y envio WhatsApp.
 
 Bloqueantes antes de produccion abierta:
 
@@ -337,6 +353,24 @@ Construir la imagen con el `Dockerfile` actual y publicarla en Azure Container R
 
 La imagen debe correr el backend en puerto `8000`.
 
+Plan inicial:
+
+```bash
+az acr build \
+  --registry <ACR_NAME> \
+  --image academic-agent:<tag> \
+  .
+```
+
+Resultado real en Azure for Students: ACR Tasks fue bloqueado por la suscripcion con un error de permisos. Por tanto, la ruta usada para el despliegue piloto fue construir localmente con Docker en WSL Ubuntu y subir la imagen manualmente a ACR:
+
+```bash
+docker build -t laraacademicpilot20260501.azurecr.io/academic-agent:pilot-001 .
+docker push laraacademicpilot20260501.azurecr.io/academic-agent:pilot-001
+```
+
+Esta ruta evita depender de ACR Tasks. Para futuras correcciones del piloto se debe repetir el mismo patron con un tag nuevo, por ejemplo `pilot-002`, y luego actualizar la Container App.
+
 Validaciones:
 
 - la imagen arranca;
@@ -463,6 +497,16 @@ https://<dominio>/webhook
 9. Probar envio de audio e imagen si el flujo lo requiere.
 10. Probar reintento/duplicado de webhook y confirmar que no duplica acciones criticas.
 11. Validar que el token no sea temporal revisando su origen en Meta Business y ejecutando una prueba de envio despues de reiniciar el contenedor.
+
+Resultado real del piloto:
+
+- se configuro un System User en Meta;
+- se asignaron permisos a la app y a la cuenta de WhatsApp;
+- se genero un token permanente;
+- se evito el token temporal de 24 horas;
+- se configuro el numero de prueba;
+- `GET /webhook` respondio HTTP 200;
+- el envio directo por Graph API respondio HTTP 200 y retorno un `messages.id`.
 
 ### Paso 9. Configurar Jobs De Recordatorios
 
@@ -650,8 +694,8 @@ Azure Container Apps - Backend FastAPI/LangGraph
         |        - checkpoints LangGraph
         |        - conexiones Microsoft Graph
         |        - links Calendar/To Do
-        |        - recordatorios
-        |        - RAG con pgvector
+|        - recordatorios
+|        - RAG con pgvector cargado
         |
         +--> Azure OpenAI
         |
@@ -674,23 +718,21 @@ Azure Container Apps Jobs
 
 ## 10. Decision Recomendada
 
-La ruta recomendada es:
+La ruta recomendada para siguientes redeploys del piloto es:
 
-1. Desplegar primero en staging con Azure Container Apps y PostgreSQL Flexible Server.
-2. Confirmar migraciones hasta `0023_processed_webhook_messages.sql`.
-3. Conectar WhatsApp a staging con URL estable.
-4. Configurar OAuth Microsoft para usar `/oauth/callback`.
-5. Validar Calendar y To Do con una cuenta real.
-6. Configurar scheduler de recordatorios con `ACADEMIC_AGENT_REMINDER_WORKER_TOKEN`.
-7. Configurar `WHATSAPP_APP_SECRET` y validar firma del webhook.
-8. Confirmar `WHATSAPP_ACCESS_TOKEN` permanente/system-user.
-9. Ejecutar smoke test completo, incluyendo audio, imagen, actividad academica, To Do, recordatorio y agenda diaria si se activa.
-10. Invitar maximo 3 estudiantes de prueba y monitorear logs/errores diariamente.
-11. Limpiar la suite completa o documentar formalmente los cambios esperados de tests antes de produccion abierta.
-12. Promover a produccion abierta solo despues de cerrar media, plantillas, monitoreo y smoke test real.
-13. Escalar replicas solo despues de validar cola/concurrencia/media.
+1. Hacer cambios en codigo.
+2. Ejecutar pruebas focalizadas.
+3. Construir imagen localmente con Docker en WSL.
+4. Subir imagen a ACR con `docker push`.
+5. Actualizar Azure Container App con el nuevo tag.
+6. Validar `/health`.
+7. Validar webhook y conversacion WhatsApp.
+8. Monitorear logs durante la prueba.
+9. Limpiar la suite completa o documentar formalmente los cambios esperados de tests antes de produccion abierta.
+10. Promover a produccion abierta solo despues de cerrar media, plantillas, monitoreo y smoke test real.
+11. Escalar replicas solo despues de validar cola/concurrencia/media.
 
-Conclusion: para una prueba controlada con 3 estudiantes, si las variables y recursos externos estan configurados, ya se puede desplegar. Debe considerarse un piloto/staging controlado, con una sola replica y monitoreo manual. Los recordatorios y mensajes de buenos dias dependen de que el scheduler externo este configurado; el token de WhatsApp debe ser permanente o system-user para no vencer diariamente. Para produccion abierta todavia faltan suite limpia o reclasificada, smoke test documentado, estrategia final de media/documentos, plantillas WhatsApp y operacion basica de monitoreo/rollback.
+Conclusion: el piloto ya fue desplegado y esta operativo para pruebas por WhatsApp. Debe considerarse un piloto/staging controlado, con una sola replica y monitoreo manual. Los recordatorios y mensajes de buenos dias dependen de que el scheduler externo este configurado; el token de WhatsApp debe ser permanente o system-user para no vencer diariamente. Para produccion abierta todavia faltan suite limpia o reclasificada, smoke test ampliado documentado, estrategia final de media/documentos, plantillas WhatsApp y operacion basica de monitoreo/rollback.
 
 ## 11. Referencias Oficiales
 

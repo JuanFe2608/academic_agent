@@ -20,7 +20,10 @@ from services.scheduling.text_parser import (
 )
 from services.scheduling.text_parser._common import normalize_lines as _normalize_lines
 from services.scheduling.text_parser.academic import is_subject_line as _is_subject_line
-from services.scheduling.title_normalization import normalize_schedule_title
+from services.scheduling.title_normalization import (
+    is_placeholder_schedule_title,
+    normalize_schedule_title,
+)
 from services.scheduling.validation import normalize_day
 
 _TIME_RANGE_PATTERN = re.compile(
@@ -189,6 +192,8 @@ def _iter_academic_chunks(text: str) -> list[tuple[str, str]]:
             chunks.append((line.strip(), current_subject))
             continue
         if _is_subject_line(line):
+            if is_placeholder_schedule_title(line):
+                continue
             current_subject = line.strip()
 
     if chunks:
@@ -214,6 +219,12 @@ def _parse_academic_chunk(
         return [], None
 
     title = _resolve_academic_chunk_title(raw, inherited_title)
+    raw_without_placeholder_title = _strip_placeholder_title_from_schedule_text(
+        raw,
+        title,
+    )
+    if is_placeholder_schedule_title(title):
+        title = ""
     days = extract_days_from_text(raw) or list(inherited_days)
     missing = _describe_missing_schedule_fields(
         raw,
@@ -228,7 +239,10 @@ def _parse_academic_chunk(
             title=title,
             days=_extract_spanish_days(raw) or [_ENGLISH_TO_SPANISH.get(day, day) for day in days],
             missing_fields=missing,
-            raw_text=_build_pending_academic_raw_text(raw, title),
+            raw_text=_build_pending_academic_raw_text(
+                raw_without_placeholder_title,
+                title,
+            ),
         )
 
     start_time, end_time = extract_time_range(raw)
@@ -298,7 +312,9 @@ def _describe_missing_schedule_fields(
         except ValueError:
             missing.append("hora de inicio y fin")
 
-    if schedule_type == "academic" and not title.strip():
+    if schedule_type == "academic" and (
+        not title.strip() or is_placeholder_schedule_title(title)
+    ):
         missing.append("nombre de la materia o actividad")
 
     if missing:
@@ -327,6 +343,26 @@ def _build_pending_academic_raw_text(raw_text: str, title: str) -> str:
     if compact_title.lower() in raw.lower():
         return raw
     return f"{raw} {compact_title}".strip()
+
+
+def _strip_placeholder_title_from_schedule_text(raw_text: str, title: str) -> str:
+    raw = str(raw_text or "").strip()
+    clean_title = str(title or "").strip()
+    if not raw or not clean_title or not is_placeholder_schedule_title(clean_title):
+        return raw
+
+    escaped = re.escape(clean_title)
+    cleaned = re.sub(
+        rf"(?i)^\s*{escaped}\s*[-—–:]?\s*",
+        "",
+        raw,
+    )
+    cleaned = re.sub(
+        rf"(?i)(?:\s*[-—–:]?\s*){escaped}\s*$",
+        "",
+        cleaned,
+    ).strip(" ,.;:-—–")
+    return cleaned or raw
 
 
 def _split_fixed_schedule_chunks(text: str) -> list[str]:

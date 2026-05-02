@@ -274,7 +274,10 @@ class AgentRunner:
         try:
             self._whatsapp_service.send_agent_messages(
                 recipient_id=recipient_id,
-                messages=["Ocurrio un problema procesando tu mensaje. Por favor intentalo de nuevo."],
+                messages=[
+                    "Estoy teniendo un problema temporal con el servicio de IA. "
+                    "Ya recibi tu mensaje, pero no pude procesarlo en este momento."
+                ],
             )
         except Exception:
             logger.exception("Error al enviar mensaje de error a %s", recipient_id)

@@ -14,6 +14,9 @@ class ConsentState(BaseSchemaModel):
 
     accepted: bool = False
     timestamp: Optional[str] = None
+    policy_url: Optional[str] = None
+    policy_version: Optional[str] = None
+    channel: Optional[str] = None
 
 
 class StudentProfile(BaseSchemaModel):

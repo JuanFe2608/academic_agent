@@ -7,7 +7,12 @@ from agents.support.onboarding.validators import (
     validate_institutional_email,
 )
 from repositories.onboarding.repository import InMemoryOnboardingRepository
-from services.onboarding import InMemoryEmailSender, OnboardingConfig, OnboardingService
+from services.onboarding import (
+    InMemoryEmailSender,
+    OnboardingConfig,
+    OnboardingService,
+    load_onboarding_config,
+)
 
 
 def test_validate_institutional_email_normalizes_to_lowercase() -> None:
@@ -28,6 +33,22 @@ def test_validate_institutional_email_accepts_outlook_when_allowed() -> None:
 
     assert result.is_valid is True
     assert result.value == "prueba@outlook.com"
+
+
+def test_load_onboarding_config_defaults_to_personal_microsoft_when_oauth_required(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "true")
+    monkeypatch.delenv("ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS", raising=False)
+
+    config = load_onboarding_config()
+
+    assert config.allowed_email_domains == (
+        "outlook.com",
+        "hotmail.com",
+        "live.com",
+        "msn.com",
+    )
 
 
 def test_validate_average_grade_rejects_comma_separator() -> None:
