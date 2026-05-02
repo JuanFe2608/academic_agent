@@ -95,6 +95,32 @@ def test_microsoft_oauth_client_exchanges_authorization_code_and_persists_profil
     assert transport.profile_calls
 
 
+def test_microsoft_oauth_client_can_exchange_authorization_code_without_persisting() -> None:
+    transport = _FakeOAuthTransport()
+    store = InMemoryMicrosoftTokenStore()
+    client = MicrosoftOAuthClient(
+        config=MicrosoftOAuthConfig(
+            client_id="client-123",
+            tenant_id="tenant-456",
+            client_secret="secret-789",
+            redirect_uri="https://example.com/oauth/callback",
+        ),
+        token_store=store,
+        transport=transport,
+    )
+
+    result = client.exchange_authorization_code_without_persisting(
+        student_id=11,
+        authorization_code="code-abc",
+    )
+
+    assert result.ok is True
+    assert result.token is not None
+    assert result.token.email == "student@example.edu"
+    assert result.token.microsoft_user_id == "ms-user-1"
+    assert client.get_stored_token(student_id=11) is None
+
+
 def test_microsoft_oauth_client_refreshes_expired_token() -> None:
     transport = _FakeOAuthTransport()
     client = MicrosoftOAuthClient(

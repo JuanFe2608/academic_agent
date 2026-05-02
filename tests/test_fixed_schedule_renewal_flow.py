@@ -132,3 +132,57 @@ def test_fixed_schedule_renewal_updates_end_date_and_resyncs(monkeypatch) -> Non
     finally:
         set_outlook_fixed_schedule_sync_service(None)
         set_schedule_service(None)
+
+
+def test_fixed_schedule_renewal_accepts_compact_day_month_short_year(monkeypatch) -> None:
+    monkeypatch.setattr(renewal_module, "is_schedule_expired", lambda *_args, **_kwargs: True)
+    import services.scheduling.end_date_support as end_date_module
+
+    monkeypatch.setattr(
+        end_date_module,
+        "current_local_date",
+        lambda _timezone_name: date(2026, 5, 2),
+    )
+    repository = InMemoryScheduleRepository()
+    service = ScheduleService(repository=repository)
+    persist_result = service.persist_schedule(
+        student_id=15,
+        occupation="solo_estudio",
+        timezone="America/Bogota",
+        summary_text="Horario fijo",
+        blocks=[_block().model_copy(update={"block_id": "block-1"})],
+        conflicts=[],
+        conflicts_accepted=False,
+        schedule_end_date=date(2026, 4, 1),
+    )
+    set_schedule_service(service)
+    set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
+    try:
+        state = AgentState(
+            phase="schedule_renewal",
+            awaiting_user_input=True,
+            student_profile={"persisted_student_id": 15},
+            calendar={"calendar_id": "calendar-1"},
+            schedule={
+                "renewal_stage": "awaiting_end_date",
+                "persisted_profile_id": persist_result.schedule_profile_id,
+            },
+        )
+
+        update = handle_fixed_schedule_renewal_turn(
+            state,
+            has_new_input=True,
+            last_text="30 06 26",
+            current_count=1,
+        )
+
+        lookup = service.get_current_schedule_profile(student_id=15)
+
+        assert lookup.found is True
+        assert lookup.profile is not None
+        assert lookup.profile.schedule_end_date == date(2026, 6, 30)
+        assert update["phase"] == "end"
+        assert update["schedule"]["schedule_end_date"] == "2026-06-30"
+    finally:
+        set_outlook_fixed_schedule_sync_service(None)
+        set_schedule_service(None)

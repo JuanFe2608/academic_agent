@@ -7,7 +7,7 @@ from datetime import date, datetime, timedelta
 from zoneinfo import ZoneInfo
 
 _ISO_DATE_PATTERN = re.compile(r"^\s*(\d{4})-(\d{2})-(\d{2})\s*$")
-_DAY_FIRST_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})[/-](\d{1,2})[/-](\d{4})\s*$")
+_DAY_FIRST_DATE_PATTERN = re.compile(r"^\s*(\d{1,2})[\/\-\s]+(\d{1,2})[\/\-\s]+(\d{2}|\d{4})\s*$")
 
 SCHEDULE_END_DATE_MAX_MONTHS: int = 7
 
@@ -99,10 +99,17 @@ def _parse_known_date(raw: str) -> date | None:
 
     day_first_match = _DAY_FIRST_DATE_PATTERN.match(raw)
     if day_first_match is not None:
-        day, month, year = (int(part) for part in day_first_match.groups())
+        day, month = (int(part) for part in day_first_match.groups()[:2])
+        year = _normalize_year(int(day_first_match.group(3)))
         return _safe_date(year, month, day)
 
     return None
+
+
+def _normalize_year(year: int) -> int:
+    if 0 <= year <= 99:
+        return 2000 + year
+    return year
 
 
 def _safe_date(year: int, month: int, day: int) -> date | None:

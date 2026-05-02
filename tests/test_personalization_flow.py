@@ -10,6 +10,7 @@ from agents.support.dependencies import (
     set_schedule_service,
 )
 from agents.support.agent import _route_collect_schedule
+from agents.support.agent import build_agent
 from agents.support.nodes.collect_study_profile.node import collect_study_profile
 from agents.support.nodes.collect_study_profile_tiebreaker.node import (
     collect_study_profile_tiebreaker,
@@ -115,16 +116,66 @@ def test_personalization_feature_flag_on_routes_after_persist_schedule(monkeypat
         synced_state = _apply_update(next_state, sync_update)
 
         assert _route_collect_schedule(next_state) == "collect_schedule"
-        assert _route_collect_schedule(synced_state) == "collect_study_profile"
-
-        question_update = collect_study_profile(synced_state)
-
-        assert question_update["phase"] == "study_profile"
-        assert "Reto 1/10" in question_update["messages"][0].content
-        assert "Vamos a activar tu Radar de estudio" in question_update["messages"][0].content
+        assert _route_collect_schedule(synced_state) == "end"
+        assert sync_update["phase"] == "study_profile"
+        assert sync_update["awaiting_user_input"] is True
+        assert len(sync_update["messages"]) == 2
+        assert "También guardé tu horario fijo en Outlook" in sync_update["messages"][0].content
+        assert "Pregunta 1/10" in sync_update["messages"][1].content
+        assert "Vamos a activar tu Radar de estudio" in sync_update["messages"][1].content
     finally:
         set_outlook_fixed_schedule_sync_service(None)
         set_schedule_service(None)
+        set_personalization_service(None)
+
+
+def test_graph_sends_outlook_confirmation_and_radar_question_in_same_turn(monkeypatch) -> None:
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
+    set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
+    set_personalization_service(
+        PersonalizationService(
+            config=PersonalizationConfig(enabled=True),
+            repository=InMemoryPersonalizationRepository(),
+        )
+    )
+    try:
+        graph = build_agent(checkpointer=None)
+        result = graph.invoke(
+            AgentState(
+                phase="schedule_sync",
+                awaiting_user_input=False,
+                user_message_count=1,
+                last_user_text="30 06 26",
+                student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+                schedule={
+                    "persisted_profile_id": 9,
+                    "blocks": [_block()],
+                    "summary_text": "resumen",
+                    "conflicts": [],
+                    "schedule_end_date": "2026-06-30",
+                },
+                calendar={"calendar_id": "calendar-1"},
+                messages=[HumanMessage(content="30 06 26")],
+            )
+        )
+
+        assistant_messages = [message.content for message in result["messages"] if message.type == "ai"]
+
+        assert any(
+            "También guardé tu horario fijo en Outlook hasta el 30/06/2026" in content
+            for content in assistant_messages
+        )
+        radar_messages = [
+            content for content in assistant_messages
+            if "Vamos a activar tu Radar de estudio" in content
+        ]
+        assert len(radar_messages) == 1
+        assert "Pregunta 1/10" in radar_messages[0]
+        assert result["phase"] == "study_profile"
+        assert result["awaiting_user_input"] is True
+    finally:
+        set_outlook_fixed_schedule_sync_service(None)
         set_personalization_service(None)
 
 
@@ -177,11 +228,9 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
         state = _apply_update(state, persist_schedule(state))
         assert _route_collect_schedule(state) == "collect_schedule"
         state = _apply_update(state, sync_fixed_schedule(state))
-        assert _route_collect_schedule(state) == "collect_study_profile"
-
-        state = _apply_update(state, collect_study_profile(state))
         assert state.phase == "study_profile"
         assert state.awaiting_user_input is True
+        assert "Vamos a activar tu Radar de estudio" in state.messages[-1].content
 
         for answer in ["3", "3", "2", "2", "1", "1", "0", "2", "1", "1"]:
             state = _add_user_message(state, answer)
@@ -228,6 +277,7 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
 
 def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
@@ -247,7 +297,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
 
         state = _apply_update(state, persist_schedule(state))
         state = _apply_update(state, sync_fixed_schedule(state))
-        state = _apply_update(state, collect_study_profile(state))
+        assert "Vamos a activar tu Radar de estudio" in state.messages[-1].content
 
         for answer in ["3", "3", "2", "2", "1", "1", "0", "3", "1", "1"]:
             state = _add_user_message(state, answer)
@@ -258,7 +308,7 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
         assert state.study_profile.tiebreaker["assessment"]["needs_tiebreaker"] is True
 
         state = _apply_update(state, collect_study_profile_tiebreaker(state))
-        assert "3 retos extra" in state.messages[-1].content
+        assert "3 preguntas adicionales" in state.messages[-1].content
         assert "señales bastante parejas" in state.messages[-1].content
         assert "respuestas fueron bastante uniformes" not in state.messages[-1].content
         assert "Progreso 1/3: 🟩⬜⬜" in state.messages[-1].content

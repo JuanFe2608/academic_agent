@@ -212,7 +212,20 @@ def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -
         user_message_count=0,
         student_profile={"occupation": "ambos"},
         raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
-        schedule={"capture_target": "academic", "capture_stage": "awaiting_more"},
+        schedule={
+            "capture_target": "academic",
+            "capture_stage": "awaiting_more",
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                }
+            ],
+        },
         messages=[HumanMessage(content="seguimos")],
     )
 
@@ -225,6 +238,8 @@ def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -
     prompt = update["messages"][0].content.lower()
     assert "horario académico actual" in prompt
     assert "está bien así" in prompt
+    assert "- algebra" in prompt
+    assert "1. algebra" not in prompt
     assert "1. sí, está correcto" in prompt
     assert "2. no, quiero cambiar algo" in prompt
 
@@ -345,7 +360,8 @@ def test_request_schedules_awaiting_more_accepts_new_academic_content_with_fisic
 
     assert update["phase"] == "schedules"
     assert update["awaiting_user_input"] is False
-    assert "Martes y jueves - Fisica - 10 a 12" in update["raw_inputs"]["horario_academico_text"]
+    assert "Martes 10:00-12:00 Fisica" in update["raw_inputs"]["horario_academico_text"]
+    assert "Jueves 10:00-12:00 Fisica" in update["raw_inputs"]["horario_academico_text"]
     assert "messages" not in update or not update["messages"]
 
 
@@ -369,7 +385,7 @@ def test_request_schedules_awaiting_more_strips_option_text_from_inline_academic
     assert update["awaiting_user_input"] is False
     raw_text = update["raw_inputs"]["horario_academico_text"]
     assert "quiero agregar más materias" not in raw_text.lower()
-    assert raw_text.endswith("Lunes - Calulo - 7am a 9 am")
+    assert "Lunes 07:00-09:00 Calulo" in raw_text
 
 
 def test_request_schedules_numeric_more_then_new_subject_keeps_original_and_adds_new_one() -> None:
@@ -433,6 +449,90 @@ def test_request_schedules_numeric_more_then_new_subject_keeps_original_and_adds
     }
 
 
+def test_request_schedules_more_subject_parses_new_payload_without_inheriting_previous_title() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Lunes 06:00-07:00 Data Science Fundamentals"},
+        schedule={
+            "capture_target": "academic",
+            "capture_stage": "awaiting_more",
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "monday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Lunes 06:00-07:00 Data Science Fundamentals",
+                }
+            ],
+        },
+        messages=[HumanMessage(content="Lunes Android de 2 pm a 6 pm")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["awaiting_user_input"] is False
+    raw_text = update["raw_inputs"]["horario_academico_text"]
+    assert "Lunes 14:00-18:00 Android" in raw_text
+    assert "Lunes 14:00-18:00 Data Science Fundamentals" not in raw_text
+
+    parse_update = parse_node.parse_schedules_to_events(
+        AgentState(
+            phase=update.get("phase", "schedules"),
+            student_profile={"occupation": "solo_estudio"},
+            raw_inputs=update["raw_inputs"],
+            schedule=update["schedule"],
+        )
+    )
+    academic_blocks = {
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in parse_update["schedule"]["blocks"]
+        if block.block_type == "academic"
+    }
+    assert ("Android", "monday", "14:00", "18:00") in academic_blocks
+    assert ("Data Science Fundamentals", "monday", "14:00", "18:00") not in academic_blocks
+
+
+def test_request_schedules_more_subject_with_missing_day_asks_only_for_missing_data() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Lunes 06:00-07:00 Data Science Fundamentals"},
+        schedule={
+            "capture_target": "academic",
+            "capture_stage": "awaiting_more",
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "monday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Lunes 06:00-07:00 Data Science Fundamentals",
+                }
+            ],
+        },
+        messages=[HumanMessage(content="Android de 2 pm a 6 pm")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["awaiting_user_input"] is True
+    assert update["schedule"]["capture_stage"] == "awaiting_input"
+    assert update["academic_pending_items"]
+    assert update["interaction"]["missing_fields_json"] == ["day"]
+    assert "me falta: dia o dias exactos" in update["messages"][0].content.lower()
+    assert update["raw_inputs"]["horario_academico_text"] == (
+        "Lunes 06:00-07:00 Data Science Fundamentals"
+    )
+
+
 def test_request_schedules_awaiting_more_accepts_new_work_content() -> None:
     state = AgentState(
         phase="schedules",
@@ -448,7 +548,7 @@ def test_request_schedules_awaiting_more_accepts_new_work_content() -> None:
 
     assert update["phase"] == "schedules"
     assert update["awaiting_user_input"] is False
-    assert "Sabado - Trabajo - 8 am a 12 pm" in update["raw_inputs"]["horario_laboral_text"]
+    assert "Sabado 08:00-12:00" in update["raw_inputs"]["horario_laboral_text"]
     assert "messages" not in update or not update["messages"]
 
 

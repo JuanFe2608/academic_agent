@@ -170,7 +170,7 @@ class MicrosoftOAuthFlowService:
                 detail="El enlace de autorizacion ya vencio.",
             )
 
-        exchange = self.auth_client.exchange_authorization_code(
+        exchange = self.auth_client.exchange_authorization_code_without_persisting(
             student_id=pending.student_id,
             authorization_code=authorization_code,
             scopes=pending.scopes,
@@ -192,16 +192,22 @@ class MicrosoftOAuthFlowService:
             token=exchange.token,
         )
         if identity_error is not None:
-            self.state_repository.delete_connection(student_id=pending.student_id)
             self.state_repository.mark_oauth_pending_state_failed(
                 state_token=normalized_state,
                 last_error=identity_error.error_code or "microsoft_oauth_identity_error",
             )
             return identity_error
 
-        self.state_repository.mark_oauth_pending_state_completed(
-            state_token=normalized_state
-        )
+        try:
+            if exchange.token is not None:
+                self.auth_client.save_token_record(token=exchange.token)
+            self.state_repository.mark_oauth_pending_state_completed(
+                state_token=normalized_state
+            )
+        except Exception:
+            if exchange.token is not None:
+                self.state_repository.delete_connection(student_id=pending.student_id)
+            raise
         return MicrosoftOAuthCallbackResult(
             ok=True,
             student_id=pending.student_id,

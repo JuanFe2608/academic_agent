@@ -40,6 +40,7 @@ class _FakeOAuthClient:
         self.connected_student_ids: set[int] = set()
         self.authorization_states: list[str] = []
         self.exchange_calls: list[tuple[int, str, tuple[str, ...]]] = []
+        self.saved_tokens: list[MicrosoftTokenRecord] = []
         self.email = email
         self.microsoft_user_id = microsoft_user_id
 
@@ -72,9 +73,24 @@ class _FakeOAuthClient:
         authorization_code: str,
         scopes: tuple[str, ...] | None = None,
     ) -> MicrosoftTokenOperationResult:
+        result = self.exchange_authorization_code_without_persisting(
+            student_id=student_id,
+            authorization_code=authorization_code,
+            scopes=scopes,
+        )
+        if result.ok and result.token is not None:
+            self.save_token_record(token=result.token)
+        return result
+
+    def exchange_authorization_code_without_persisting(
+        self,
+        *,
+        student_id: int,
+        authorization_code: str,
+        scopes: tuple[str, ...] | None = None,
+    ) -> MicrosoftTokenOperationResult:
         effective_scopes = tuple(scopes or ())
         self.exchange_calls.append((int(student_id), authorization_code, effective_scopes))
-        self.connected_student_ids.add(int(student_id))
         return MicrosoftTokenOperationResult(
             ok=True,
             token=MicrosoftTokenRecord(
@@ -90,6 +106,10 @@ class _FakeOAuthClient:
                 display_name="Ana Test",
             ),
         )
+
+    def save_token_record(self, *, token: MicrosoftTokenRecord) -> None:
+        self.saved_tokens.append(token)
+        self.connected_student_ids.add(int(token.student_id))
 
 
 class _FailingIdentityOnboardingService:
@@ -305,6 +325,7 @@ def test_microsoft_oauth_flow_callback_persists_connection_and_marks_state() -> 
     assert callback.status_code == 200
     assert service.has_connection(student_id=7) is True
     assert fake_client.exchange_calls == [(7, "code-abc", ("User.Read", "Calendars.ReadWrite"))]
+    assert [token.student_id for token in fake_client.saved_tokens] == [7]
     stored_state = repository.get_oauth_pending_state(state_token=first.state_token)
     assert stored_state is not None
     assert stored_state.status == "completed"
@@ -361,6 +382,8 @@ def test_microsoft_oauth_flow_callback_rejects_wrong_microsoft_account() -> None
     assert callback.ok is False
     assert callback.status_code == 400
     assert callback.error_code == "microsoft_account_mismatch"
+    assert fake_client.saved_tokens == []
+    assert service.has_connection(student_id=7) is False
     assert stored_state is not None
     assert stored_state.status == "failed"
     assert stored_state.last_error == "microsoft_account_mismatch"
@@ -401,6 +424,8 @@ def test_microsoft_oauth_flow_callback_rejects_already_connected_account() -> No
     assert callback.ok is False
     assert callback.status_code == 400
     assert callback.error_code == "microsoft_account_already_connected"
+    assert fake_client.saved_tokens == []
+    assert service.has_connection(student_id=7) is False
     assert stored_state is not None
     assert stored_state.status == "failed"
     assert stored_state.last_error == "microsoft_account_already_connected"

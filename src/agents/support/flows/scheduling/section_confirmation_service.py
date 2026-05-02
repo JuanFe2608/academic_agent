@@ -1025,7 +1025,7 @@ def _build_section_confirmation_prompt(
         f"✅ Este es tu {_SECTION_LABELS[target]} actual:",
         _OPTION_HINT,
     ]
-    lines.extend(_format_block_lines(blocks, target))
+    lines.extend(_format_block_lines(blocks, target, numbered=False))
     lines.extend(
         [
             "",
@@ -1236,15 +1236,23 @@ def _build_related_conflict_warning(block_id: str, conflicts: list) -> str:
 def _format_block_lines(
     blocks: list[WeeklyScheduleBlock] | list[dict],
     target: ScheduleBlockType,
+    *,
+    numbered: bool = True,
 ) -> list[str]:
     section_blocks = current_section_blocks(blocks, target)
     if not section_blocks:
-        return ["1. Aún no tengo registros en esta sección."]
+        return [
+            "1. Aún no tengo registros en esta sección."
+            if numbered
+            else "- Aún no tengo registros en esta sección."
+        ]
     ordered = sorted(
         section_blocks,
         key=lambda item: (DAY_ORDER.index(item.day_of_week), item.start_time, item.title.lower()),
     )
-    return [_format_block_line(index, block) for index, block in enumerate(ordered, start=1)]
+    if numbered:
+        return [_format_block_line(index, block) for index, block in enumerate(ordered, start=1)]
+    return [_format_bullet_block_line(block) for block in ordered]
 
 
 def _format_block_line(index: int, block: WeeklyScheduleBlock | None) -> str:
@@ -1252,6 +1260,15 @@ def _format_block_line(index: int, block: WeeklyScheduleBlock | None) -> str:
         return f"{index}. Registro no disponible."
     return (
         f"{index}. {block.title} — {DAY_LABELS[block.day_of_week]} "
+        f"de {_format_time_human(block.start_time)} a {_format_time_human(block.end_time)}"
+    )
+
+
+def _format_bullet_block_line(block: WeeklyScheduleBlock | None) -> str:
+    if block is None:
+        return "- Registro no disponible."
+    return (
+        f"- {block.title} — {DAY_LABELS[block.day_of_week]} "
         f"de {_format_time_human(block.start_time)} a {_format_time_human(block.end_time)}"
     )
 

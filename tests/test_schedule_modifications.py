@@ -125,6 +125,29 @@ def test_validate_schedule_schedule_end_date_moves_to_persist(monkeypatch) -> No
     assert update["schedule"]["schedule_end_date"] == "2026-06-30"
 
 
+def test_validate_schedule_accepts_compact_day_month_short_year_date(monkeypatch) -> None:
+    block = _academic_block().model_copy(update={"user_confirmed": True})
+    state = AgentState(
+        phase="validate",
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="30 06 26")],
+        schedule={"blocks": [block], "review_stage": "awaiting_schedule_end_date"},
+    )
+
+    import services.scheduling.end_date_support as end_date_module
+
+    monkeypatch.setattr(
+        end_date_module,
+        "current_local_date",
+        lambda _timezone_name: date(2026, 5, 2),
+    )
+    update = validate_schedule(state)
+
+    assert update["phase"] == "schedule_persist"
+    assert update["schedule"]["schedule_end_date"] == "2026-06-30"
+
+
 def test_validate_schedule_correction_menu_for_solo_estudio_hides_work() -> None:
     state = AgentState(
         phase="validate",

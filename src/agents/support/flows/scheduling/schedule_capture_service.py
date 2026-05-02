@@ -28,6 +28,10 @@ from agents.support.scheduling.state_helpers import (
     update_scheduling_state,
     update_schedule_flow_state,
 )
+from agents.support.scheduling.pipeline import parse_fixed_schedule_section
+from services.scheduling.correction_sync import merge_completed_fixed_section
+from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
+from services.scheduling.pending_slot_state import schedule_pending_interaction_update
 
 from .schedule_pending_resolution_service import (
     coerce_schedule_pending_items,
@@ -308,6 +312,20 @@ def handle_schedule_capture_turn(
             if decision in {"more", None} and _looks_like_schedule_content(
                 schedule_input_text
             ):
+                isolated_update = _apply_isolated_more_schedule_content(
+                    state,
+                    profile=profile,
+                    raw_inputs=raw_inputs,
+                    schedule_state=schedule_state,
+                    academic_pending_items=academic_pending_items,
+                    work_pending_items=work_pending_items,
+                    target=capture_target,
+                    text=content_payload or schedule_input_text,
+                    current_count=current_count,
+                    last_text=last_text,
+                )
+                if isolated_update is not None:
+                    return isolated_update
                 raw_inputs = _append_schedule_text(
                     raw_inputs, capture_target, content_payload or schedule_input_text
                 )
@@ -421,6 +439,119 @@ def _prompt_for_section_input(
 
 def _append_schedule_text(raw_inputs: dict, target: str, text: str) -> dict:
     return append_schedule_input_text(raw_inputs, target, text)  # type: ignore[arg-type]
+
+
+def _apply_isolated_more_schedule_content(
+    state: AgentState,
+    *,
+    profile: dict,
+    raw_inputs: dict,
+    schedule_state: object,
+    academic_pending_items: list[PendingScheduleItem],
+    work_pending_items: list[PendingScheduleItem],
+    target: str,
+    text: str,
+    current_count: int,
+    last_text: str | None,
+) -> dict | None:
+    if target not in {"academic", "work"}:
+        return None
+
+    section_result = parse_fixed_schedule_section(
+        text,
+        target,  # type: ignore[arg-type]
+        timezone=str(state.get("timezone", "America/Bogota")),
+    )
+    if section_result.needs_clarification:
+        pending_items = list(section_result.pending_schedule_items)
+        if not pending_items:
+            return None
+        academic_items = pending_items if target == "academic" else academic_pending_items
+        work_items = pending_items if target == "work" else work_pending_items
+        update = _build_schedule_update(
+            state,
+            profile=profile,
+            raw_inputs=raw_inputs,
+            schedule_state=update_schedule_flow_state(
+                schedule_state,
+                capture_target=target,
+                capture_stage="awaiting_input",
+            ),
+            academic_pending_items=academic_items,
+            work_pending_items=work_items,
+            phase="schedules",
+            awaiting_user_input=True,
+            current_count=current_count,
+            last_text=last_text,
+            prompt=build_schedule_pending_prompt(target, pending_items),  # type: ignore[arg-type]
+        )
+        update.update(
+            schedule_pending_interaction_update(
+                state,
+                academic_pending_items=academic_items,
+                work_pending_items=work_items,
+            )
+        )
+        return update
+
+    if not section_result.blocks:
+        return None
+
+    sync_result = merge_completed_fixed_section(
+        _existing_blocks_for_isolated_add(
+            raw_inputs,
+            schedule_state,
+            target=target,
+            timezone=str(state.get("timezone", "America/Bogota")),
+        ),
+        raw_inputs,
+        target,  # type: ignore[arg-type]
+        list(section_result.blocks),
+    )
+    return _build_schedule_update(
+        state,
+        profile=profile,
+        raw_inputs=sync_result.raw_inputs.model_dump(mode="python"),
+        schedule_state=update_schedule_flow_state(
+            schedule_state,
+            blocks=sync_result.schedule_blocks,
+            capture_target=target,
+            capture_stage="awaiting_input",
+        ),
+        academic_pending_items=academic_pending_items,
+        work_pending_items=work_pending_items,
+        phase="schedules",
+        awaiting_user_input=False,
+        current_count=current_count,
+        last_text=last_text,
+    )
+
+
+def _existing_blocks_for_isolated_add(
+    raw_inputs: dict,
+    schedule_state: object,
+    *,
+    target: str,
+    timezone: str,
+) -> list:
+    schedule_flow_state = ensure_schedule_flow_state(schedule_state)
+    existing_blocks = list(schedule_flow_state.blocks)
+    if has_block_type(existing_blocks, target):
+        return existing_blocks
+
+    field_name = "horario_laboral_text" if target == "work" else "horario_academico_text"
+    existing_text = str(raw_inputs.get(field_name) or "").strip()
+    if not existing_text:
+        return existing_blocks
+
+    parsed = parse_fixed_schedule_section(
+        existing_text,
+        target,  # type: ignore[arg-type]
+        timezone=timezone,
+    )
+    if parsed.needs_clarification or not parsed.blocks:
+        return existing_blocks
+    return existing_blocks + list(parsed.blocks)
 
 
 def _sanitize_image_refs(image_refs: list[str]) -> list[str]:

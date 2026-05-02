@@ -383,6 +383,24 @@ class MicrosoftOAuthClient:
         authorization_code: str,
         scopes: tuple[str, ...] | None = None,
     ) -> MicrosoftTokenOperationResult:
+        result = self.exchange_authorization_code_without_persisting(
+            student_id=student_id,
+            authorization_code=authorization_code,
+            scopes=scopes,
+        )
+        if result.ok and result.token is not None:
+            self.save_token_record(token=result.token)
+        return result
+
+    def exchange_authorization_code_without_persisting(
+        self,
+        *,
+        student_id: int,
+        authorization_code: str,
+        scopes: tuple[str, ...] | None = None,
+    ) -> MicrosoftTokenOperationResult:
+        """Intercambia un code OAuth y construye el token sin persistirlo."""
+
         if not self.config.is_configured:
             return MicrosoftTokenOperationResult(
                 ok=False,
@@ -416,12 +434,17 @@ class MicrosoftOAuthClient:
                 detail=exc.detail,
             )
 
-        return self._store_token_from_payload(
+        return self._token_from_payload(
             student_id=student_id,
             token_payload=token_payload,
             fallback_scopes=effective_scopes,
             include_profile=True,
         )
+
+    def save_token_record(self, *, token: MicrosoftTokenRecord) -> None:
+        """Persiste un token ya validado en el store configurado."""
+
+        self.token_store.save_token(token=token)
 
     def refresh_access_token(
         self,
@@ -467,7 +490,7 @@ class MicrosoftOAuthClient:
                 detail=exc.detail,
             )
 
-        refreshed = self._store_token_from_payload(
+        refreshed = self._token_from_payload(
             student_id=student_id,
             token_payload=token_payload,
             fallback_scopes=stored.scopes or self.config.scopes,
@@ -476,9 +499,10 @@ class MicrosoftOAuthClient:
         )
         if not refreshed.ok or refreshed.token is None:
             return refreshed
+        self.save_token_record(token=refreshed.token)
         return MicrosoftTokenOperationResult(ok=True, token=refreshed.token)
 
-    def _store_token_from_payload(
+    def _token_from_payload(
         self,
         *,
         student_id: int,
@@ -536,7 +560,6 @@ class MicrosoftOAuthClient:
                 existing_metadata=existing_token.auth_metadata if existing_token else None,
             ),
         )
-        self.token_store.save_token(token=token)
         return MicrosoftTokenOperationResult(ok=True, token=token)
 
 

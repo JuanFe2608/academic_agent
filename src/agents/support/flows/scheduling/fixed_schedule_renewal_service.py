@@ -382,9 +382,10 @@ def _build_new_end_date_prompt(timezone_name: str = "America/Bogota") -> str:
         "Envíame la nueva fecha límite para agendarlo en Outlook.\n"
         f"Debe ser una fecha futura y como máximo hasta el {format_schedule_end_date(max_date)} "
         f"(7 meses desde hoy).\n"
-        "Formatos válidos:\n"
-        "  • YYYY-MM-DD  (ej: 2026-06-30)\n"
-        "  • DD/MM/YYYY  (ej: 30/06/2026)"
+        "Escríbela en orden día-mes-año. Puedes usar espacios, / o -:\n"
+        "  • DD MM AA  (ej: 30 06 26)\n"
+        "  • DD/MM/AAAA  (ej: 30/06/2026)\n"
+        "También acepto YYYY-MM-DD si lo prefieres."
     )
 
 

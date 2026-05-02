@@ -809,9 +809,10 @@ def _build_schedule_end_date_prompt(timezone_name: str = "America/Bogota") -> st
         "📅 Antes de guardarlo en Outlook, necesito la fecha límite de este horario fijo.\n"
         f"Debe ser una fecha futura y como máximo hasta el {format_schedule_end_date(max_date)} "
         f"(7 meses desde hoy).\n"
-        "Escríbela en uno de estos formatos:\n"
-        "  • YYYY-MM-DD  (ej: 2026-06-30)\n"
-        "  • DD/MM/YYYY  (ej: 30/06/2026)"
+        "Escríbela en orden día-mes-año. Puedes usar espacios, / o -:\n"
+        "  • DD MM AA  (ej: 30 06 26)\n"
+        "  • DD/MM/AAAA  (ej: 30/06/2026)\n"
+        "También acepto YYYY-MM-DD si lo prefieres."
     )
 
 
