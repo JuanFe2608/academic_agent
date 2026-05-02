@@ -24,6 +24,31 @@ source "$DEPLOY_ENV"
 source "$APP_ENV"
 set +a
 
+# --- Validaciones críticas antes de desplegar ---
+[[ -n "$AZURE_OPENAI_ENDPOINT" ]]              || fail "AZURE_OPENAI_ENDPOINT no está definido"
+[[ -n "$AZURE_OPENAI_API_KEY" ]]               || fail "AZURE_OPENAI_API_KEY no está definido"
+[[ -n "$AZURE_OPENAI_DEPLOYMENT_NAME" ]]        || fail "AZURE_OPENAI_DEPLOYMENT_NAME no está definido"
+[[ -n "$OPENAI_API_VERSION" ]]                  || fail "OPENAI_API_VERSION no está definido"
+[[ -n "$AZURE_OPENAI_API_KEY_TRANSCRIBE" ]]     || fail "AZURE_OPENAI_API_KEY_TRANSCRIBE no está definido"
+[[ -n "$AZURE_OPENAI_ENDPOINT_TRANSCRIBE" ]]    || fail "AZURE_OPENAI_ENDPOINT_TRANSCRIBE no está definido"
+[[ -n "$AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE" ]] || fail "AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE no está definido"
+[[ -n "$OPENAI_API_VERSION_TRANSCRIBE" ]]       || fail "OPENAI_API_VERSION_TRANSCRIBE no está definido"
+
+# El endpoint debe ser la URL base del recurso, sin path ni query
+if [[ "$AZURE_OPENAI_ENDPOINT" == *"/openai"* ]] || [[ "$AZURE_OPENAI_ENDPOINT" == *"?"* ]]; then
+  fail "AZURE_OPENAI_ENDPOINT tiene un path o query string. Debe ser solo: https://resource.openai.azure.com"
+fi
+if [[ "$AZURE_OPENAI_ENDPOINT_TRANSCRIBE" == *"/openai"* ]] || [[ "$AZURE_OPENAI_ENDPOINT_TRANSCRIBE" == *"?"* ]]; then
+  fail "AZURE_OPENAI_ENDPOINT_TRANSCRIBE tiene un path o query string. Debe ser solo: https://resource.openai.azure.com"
+fi
+
+# El deployment de chat NO puede ser un modelo de transcripción
+for blocked in transcribe transcription whisper tts; do
+  if [[ "${AZURE_OPENAI_DEPLOYMENT_NAME,,}" == *"$blocked"* ]]; then
+    fail "AZURE_OPENAI_DEPLOYMENT_NAME='$AZURE_OPENAI_DEPLOYMENT_NAME' parece ser un modelo de audio. Usa el deployment de chat (ej: gpt-4o-mini)."
+  fi
+done
+
 command -v az >/dev/null 2>&1 || fail "Azure CLI no esta instalado o no esta en PATH"
 az account show >/dev/null 2>&1 || fail "Azure CLI no tiene sesion activa. Ejecuta: az login"
 
@@ -128,10 +153,13 @@ if az containerapp show --name "$AZ_CONTAINERAPP_NAME" --resource-group "$AZ_RES
       ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE="${ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE:-disabled}" \
       ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS="${ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS:-outlook.com,hotmail.com,live.com,msn.com}" \
       ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE="${ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE:-1}" \
+      ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE="${ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE:-1}" \
+      ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW="${ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW:-1}" \
       ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION="${ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION:-1}" \
       ACADEMIC_AGENT_ENABLE_STUDY_PLAN_REMINDERS="${ACADEMIC_AGENT_ENABLE_STUDY_PLAN_REMINDERS:-1}" \
       ACADEMIC_AGENT_REMINDER_CHANNELS="${ACADEMIC_AGENT_REMINDER_CHANNELS:-whatsapp}" \
       ACADEMIC_AGENT_REMINDER_WORKER_TOKEN=secretref:reminder-worker-token \
+      RAG_ENABLED="${RAG_ENABLED:-true}" \
       LOG_LEVEL="${LOG_LEVEL:-INFO}" \
       MEDIA_INLINE_PREVIEW="${MEDIA_INLINE_PREVIEW:-false}" \
     >/dev/null
@@ -187,10 +215,13 @@ else
       ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE="${ACADEMIC_AGENT_EMAIL_VERIFICATION_MODE:-disabled}" \
       ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS="${ACADEMIC_AGENT_ALLOWED_EMAIL_DOMAINS:-outlook.com,hotmail.com,live.com,msn.com}" \
       ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE="${ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE:-1}" \
+      ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE="${ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE:-1}" \
+      ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW="${ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW:-1}" \
       ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION="${ACADEMIC_AGENT_ENABLE_STUDY_PLAN_MATERIALIZATION:-1}" \
       ACADEMIC_AGENT_ENABLE_STUDY_PLAN_REMINDERS="${ACADEMIC_AGENT_ENABLE_STUDY_PLAN_REMINDERS:-1}" \
       ACADEMIC_AGENT_REMINDER_CHANNELS="${ACADEMIC_AGENT_REMINDER_CHANNELS:-whatsapp}" \
       ACADEMIC_AGENT_REMINDER_WORKER_TOKEN=secretref:reminder-worker-token \
+      RAG_ENABLED="${RAG_ENABLED:-true}" \
       LOG_LEVEL="${LOG_LEVEL:-INFO}" \
       MEDIA_INLINE_PREVIEW="${MEDIA_INLINE_PREVIEW:-false}" \
     >/dev/null

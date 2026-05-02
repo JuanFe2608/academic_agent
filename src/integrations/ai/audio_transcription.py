@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import os
 from dataclasses import dataclass
 from pathlib import Path
@@ -12,6 +13,8 @@ from integrations.ai.azure_config import (
     validate_azure_resource_endpoint,
     validate_transcription_deployment_name,
 )
+
+logger = logging.getLogger(__name__)
 
 
 _MAX_AUDIO_BYTES = 25 * 1024 * 1024
@@ -125,7 +128,14 @@ def maybe_build_audio_transcription_service() -> AzureOpenAIAudioTranscriptionSe
 
     try:
         return AzureOpenAIAudioTranscriptionService.from_env()
-    except ValueError:
+    except ValueError as exc:
+        logger.warning(
+            "Audio transcription unavailable — check AZURE_OPENAI_ENDPOINT_TRANSCRIBE (no path), "
+            "AZURE_OPENAI_API_KEY_TRANSCRIBE, AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE "
+            "(must contain 'transcribe'/'transcription'/'whisper'), "
+            "OPENAI_API_VERSION_TRANSCRIBE. Error: %s",
+            exc,
+        )
         return None
 
 

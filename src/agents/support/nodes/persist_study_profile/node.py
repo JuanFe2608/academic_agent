@@ -13,7 +13,7 @@ from agents.support.state import AgentState
 
 
 _OPERATIONAL_WELCOME = (
-    "\n\n✨ Ya entiendo mejor cómo estudias y eso me ayudará a acompañarte "
+    "✨ Ya entiendo mejor cómo estudias y eso me ayudará a acompañarte "
     "de una forma más útil y personalizada. 📚\n\n"
     "Desde ahora puedo apoyarte en:\n\n"
     "📅 Organizar tus actividades académicas en el calendario\n"
@@ -51,10 +51,13 @@ def persist_study_profile(state: AgentState) -> dict:
             "study_profile": study_profile,
             "phase": next_phase,
             "awaiting_user_input": next_phase == "running",
-            "messages": append_message(
-                messages,
-                "assistant",
-                _build_personalization_summary_with_rag(study_profile) + _OPERATIONAL_WELCOME,
+            "messages": (
+                append_message(
+                    messages,
+                    "assistant",
+                    _build_personalization_summary_with_rag(study_profile),
+                )
+                + append_message(messages, "assistant", _OPERATIONAL_WELCOME)
             ),
         }
 

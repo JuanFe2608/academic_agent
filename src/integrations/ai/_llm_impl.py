@@ -5,6 +5,7 @@ from __future__ import annotations
 import ast
 import base64
 import json
+import logging
 import mimetypes
 import os
 import re
@@ -18,6 +19,8 @@ from integrations.ai.azure_config import (
     validate_azure_resource_endpoint,
     validate_chat_deployment_name,
 )
+
+logger = logging.getLogger(__name__)
 
 _LAST_LLM_ERROR: str | None = None
 
@@ -72,11 +75,17 @@ def maybe_get_llm(temperature: float = 0.0) -> AzureChatOpenAI | ChatOpenAI | No
     """Retorna cliente Azure/OpenAI o None si falta configuracion."""
     try:
         return get_azure_llm(temperature=temperature)
-    except ValueError:
-        pass
+    except ValueError as exc:
+        logger.warning("Azure LLM config invalid, trying OpenAI fallback: %s", exc)
     try:
         return get_openai_llm(temperature=temperature)
-    except ValueError:
+    except ValueError as exc:
+        logger.error(
+            "LLM unavailable — no valid Azure nor OpenAI config found. "
+            "Check AZURE_OPENAI_ENDPOINT (no path), AZURE_OPENAI_API_KEY, "
+            "AZURE_OPENAI_DEPLOYMENT_NAME, OPENAI_API_VERSION. Error: %s",
+            exc,
+        )
         return None
 
 
