@@ -153,3 +153,28 @@ def test_welcome_consent_rejects_consent_after_welcome_was_sent() -> None:
     assert update["consent"]["channel"] == "whatsapp"
     assert update["awaiting_user_input"] is False
     assert "sin consentimiento no puedo continuar" in update["messages"][0].content.lower()
+
+
+def test_rejected_consent_routes_back_to_consent_on_new_input() -> None:
+    state = AgentState(
+        phase="end",
+        consent={
+            "accepted": False,
+            "timestamp": "2026-05-02T18:13:00+00:00",
+            "policy_url": "https://example.test/legal/habeas-data",
+            "policy_version": "habeas-data-v1",
+            "channel": "whatsapp",
+        },
+        messages=[HumanMessage(content="Hola")],
+        user_message_count=0,
+        awaiting_user_input=False,
+        welcome_sent=True,
+    )
+
+    assert _route_entry(state) == "welcome_consent"
+
+    update = welcome_consent(state)
+
+    assert update["phase"] == "consent"
+    assert update["awaiting_user_input"] is True
+    assert "aceptas el tratamiento de tus datos personales" in update["messages"][0].content.lower()

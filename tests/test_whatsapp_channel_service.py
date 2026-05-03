@@ -213,7 +213,7 @@ def test_whatsapp_inbound_to_human_message_preserves_text_and_image(tmp_path: Pa
 
     assert isinstance(human.content, list)
     assert human.content[0] == {"type": "text", "text": "mi horario"}
-    assert human.content[1]["type"] == "input_image"
+    assert human.content[1]["type"] == "image_url"
     assert human.content[1]["image_url"]["url"] == str(image_path)
 
 
@@ -295,4 +295,4 @@ def test_aggregated_input_to_human_message_preserves_text_and_image(tmp_path: Pa
 
     assert isinstance(human.content, list)
     assert human.content[0] == {"type": "text", "text": "mi horario"}
-    assert human.content[1]["type"] == "input_image"
+    assert human.content[1]["type"] == "image_url"

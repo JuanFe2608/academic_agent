@@ -144,6 +144,19 @@ def test_normalizer_rejects_video_and_sticker() -> None:
     assert "Recibí tu sticker" in sticker.direct_response
 
 
+def test_normalizer_rejects_documents_without_invoking_agent() -> None:
+    normalizer = WhatsAppInputNormalizer(whatsapp_service=_FakeWhatsAppService())  # type: ignore[arg-type]
+
+    result = normalizer.normalize(
+        _message(media_type="document", mime_type="application/pdf")
+    )
+
+    assert result is not None
+    assert result.human_message is None
+    assert result.direct_response is not None
+    assert "no puedo leer documentos adjuntos" in result.direct_response
+
+
 def test_normalizer_maps_confirmation_emojis_to_yes_no_text() -> None:
     normalizer = WhatsAppInputNormalizer(whatsapp_service=_FakeWhatsAppService())  # type: ignore[arg-type]
 

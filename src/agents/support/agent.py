@@ -84,6 +84,13 @@ def _has_new_user_input(state: AgentState) -> bool:
 def _route_entry(state: AgentState) -> str:
     """Resuelve el siguiente nodo desde el punto de entrada del grafo."""
     conversation = state.conversation_state
+    consent = state.onboarding_state.consent
+    if (
+        conversation.phase == "end"
+        and consent.timestamp
+        and not consent.accepted
+    ):
+        return "welcome_consent" if _has_new_user_input(state) else "end"
     if conversation.user_status == "out_of_scope":
         has_new_input, _, _ = detect_new_input(
             conversation.messages,

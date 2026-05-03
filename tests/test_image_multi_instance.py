@@ -14,7 +14,7 @@ from __future__ import annotations
 import base64
 from unittest.mock import MagicMock, patch
 
-from langchain_core.messages import HumanMessage
+from langchain_core.messages import AIMessage, HumanMessage
 
 from agents.support.state import AgentState
 from utils.media_artifacts import IMAGE_RECEIVED_MARKER
@@ -208,3 +208,26 @@ def test_node_return_dicts_clear_last_user_images(monkeypatch) -> None:
     # (no llamamos academic_agent() directamente por sus importaciones dinámicas)
     result_fragment = {"last_user_images": []}
     assert result_fragment["last_user_images"] == []
+
+
+def test_recent_history_strips_old_assistant_images_before_llm() -> None:
+    from agents.support.nodes.academic_agent.node import _build_recent_history
+
+    history = _build_recent_history(
+        [
+            AIMessage(content="Hola, soy Lara."),
+            AIMessage(
+                content=[
+                    {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
+                    {"type": "text", "text": "¿Aceptas el tratamiento de datos?"},
+                ]
+            ),
+            HumanMessage(content="si"),
+            AIMessage(content="Gracias. Continuemos con tu perfil."),
+            HumanMessage(content="Hola"),
+        ]
+    )
+
+    assert all(isinstance(message.content, str) for message in history)
+    assert all("image_url" not in message.content for message in history)
+    assert history[1].content == "¿Aceptas el tratamiento de datos?"

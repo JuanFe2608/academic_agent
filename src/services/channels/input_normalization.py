@@ -77,6 +77,8 @@ class WhatsAppInputNormalizer:
         media_type = str(message.media.media_type or "").strip().lower()
         if media_type == "audio":
             return self._normalize_audio(message)
+        if media_type == "document":
+            return NormalizedAgentInput(direct_response=_documents_not_supported_message())
         if media_type == "video":
             return NormalizedAgentInput(direct_response=_videos_not_supported_message())
         if media_type == "sticker":
@@ -186,6 +188,14 @@ def _videos_not_supported_message() -> str:
         "🎥 Recibí un video, pero por ahora no puedo analizar videos.\n\n"
         "Si el video contiene una actividad, una fecha o instrucciones académicas, "
         "envíame un audio corto, una imagen clara o escríbeme los datos principales. 📚"
+    )
+
+
+def _documents_not_supported_message() -> str:
+    return (
+        "📄 Recibí tu archivo, pero por ahora no puedo leer documentos adjuntos.\n\n"
+        "Para ayudarte bien, envíame una imagen clara del contenido o copia aquí "
+        "las fechas, actividades o instrucciones importantes. 📚"
     )
 
 

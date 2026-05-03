@@ -191,29 +191,39 @@ def _build_recent_history(messages: list, max_pairs: int = 5) -> list:
     conversation: list = []
     for msg in messages:
         if isinstance(msg, HumanMessage):
-            content = msg.content
-            if isinstance(content, list):
-                text = " ".join(
-                    p.get("text", "")
-                    for p in content
-                    if isinstance(p, dict) and p.get("type") == "text"
-                ).strip()
-                if text:
-                    conversation.append(HumanMessage(content=text))
-            elif isinstance(content, str):
-                clean = content.replace(IMAGE_RECEIVED_MARKER, "").strip()
-                if clean:
-                    conversation.append(HumanMessage(content=clean))
-        elif isinstance(msg, AIMessage):
-            text = str(msg.content or "").strip()
+            text = _text_only_message_content(msg.content, image_marker=IMAGE_RECEIVED_MARKER)
             if text:
-                conversation.append(msg)
+                conversation.append(HumanMessage(content=text))
+        elif isinstance(msg, AIMessage):
+            text = _text_only_message_content(msg.content, image_marker=IMAGE_RECEIVED_MARKER)
+            if text:
+                conversation.append(AIMessage(content=text))
 
     # El último HumanMessage es el turno actual — ya se pasa como human_msg.
     if conversation and isinstance(conversation[-1], HumanMessage):
         conversation = conversation[:-1]
 
     return conversation[-(max_pairs * 2):]
+
+
+def _text_only_message_content(content: object, *, image_marker: str) -> str:
+    """Extrae solo texto de contenido multimodal antes de reenviarlo al LLM."""
+
+    if isinstance(content, str):
+        return content.replace(image_marker, "").strip()
+    if isinstance(content, list):
+        parts: list[str] = []
+        for item in content:
+            if isinstance(item, str):
+                clean_item = item.replace(image_marker, "").strip()
+                if clean_item:
+                    parts.append(clean_item)
+            elif isinstance(item, dict) and item.get("type") == "text":
+                clean_item = str(item.get("text") or "").replace(image_marker, "").strip()
+                if clean_item:
+                    parts.append(clean_item)
+        return " ".join(parts).strip()
+    return ""
 
 
 def _build_human_message(text: str, image_paths: list[str]):
