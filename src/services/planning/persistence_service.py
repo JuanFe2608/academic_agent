@@ -14,6 +14,7 @@ from services.planning.state_helpers import ensure_study_plan_state
 from services.priorities.state_helpers import ensure_priorities_state, ensure_subject_items
 
 from repositories.planning.repository import (
+    CurrentStudyPlanningSnapshot,
     InMemoryStudyPlanningRepository,
     PersistedStudyPlanningSnapshot,
     StudyPlanningRepository,
@@ -33,6 +34,22 @@ class PersistStudyPlanningSnapshotResult:
     study_plan_version_number: int | None = None
     subject_count: int = 0
     event_count: int = 0
+    error_code: str | None = None
+    detail: str | None = None
+
+
+@dataclass(frozen=True)
+class LoadStudyPlanningSnapshotResult:
+    """Resultado de cargar el snapshot académico vigente."""
+
+    loaded: bool
+    priorities_state: PrioritiesState | None = None
+    subjects: list[SubjectItem] | None = None
+    study_plan: StudyPlanState | None = None
+    priority_profile_id: int | None = None
+    priority_version_number: int | None = None
+    study_plan_profile_id: int | None = None
+    study_plan_version_number: int | None = None
     error_code: str | None = None
     detail: str | None = None
 
@@ -94,6 +111,31 @@ class StudyPlanningPersistenceService:
 
         return _success_result(record)
 
+    def load_current_snapshot(
+        self,
+        *,
+        student_id: int | None,
+    ) -> LoadStudyPlanningSnapshotResult:
+        if not student_id:
+            return LoadStudyPlanningSnapshotResult(
+                loaded=False,
+                error_code="missing_student_id",
+                detail="No encontré el estudiante persistido para consultar el plan vigente.",
+            )
+        try:
+            record = self.repository.get_current_student_planning_snapshot(
+                student_id=int(student_id)
+            )
+        except (StudyPlanningRepositoryError, RepositoryConfigurationError) as exc:
+            return LoadStudyPlanningSnapshotResult(
+                loaded=False,
+                error_code="study_planning_load_error",
+                detail=str(exc),
+            )
+        if record is None:
+            return LoadStudyPlanningSnapshotResult(loaded=False, error_code="snapshot_not_found")
+        return _load_success_result(record)
+
 
 
 def build_study_planning_persistence_service() -> StudyPlanningPersistenceService:
@@ -118,4 +160,19 @@ def _success_result(
         study_plan_version_number=record.study_plan_version_number,
         subject_count=record.subject_count,
         event_count=record.event_count,
+    )
+
+
+def _load_success_result(
+    record: CurrentStudyPlanningSnapshot,
+) -> LoadStudyPlanningSnapshotResult:
+    return LoadStudyPlanningSnapshotResult(
+        loaded=True,
+        priorities_state=record.priorities_state,
+        subjects=list(record.subjects or []),
+        study_plan=record.study_plan,
+        priority_profile_id=record.priority_profile_id,
+        priority_version_number=record.priority_version_number,
+        study_plan_profile_id=record.study_plan_profile_id,
+        study_plan_version_number=record.study_plan_version_number,
     )

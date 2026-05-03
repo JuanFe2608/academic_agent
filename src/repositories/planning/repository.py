@@ -28,6 +28,19 @@ class PersistedStudyPlanningSnapshot:
     event_count: int
 
 
+@dataclass(frozen=True)
+class CurrentStudyPlanningSnapshot:
+    """Snapshot vigente de prioridades y plan de estudio de un estudiante."""
+
+    priority_profile_id: int | None
+    priority_version_number: int | None
+    study_plan_profile_id: int | None
+    study_plan_version_number: int | None
+    priorities_state: PrioritiesState | None
+    subjects: list[SubjectItem]
+    study_plan: StudyPlanState | None
+
+
 class StudyPlanningRepository(Protocol):
     """Contrato para versionar prioridades, materias y plan semanal."""
 
@@ -42,6 +55,12 @@ class StudyPlanningRepository(Protocol):
         study_plan: StudyPlanState | dict,
         timezone: str,
     ) -> PersistedStudyPlanningSnapshot: ...
+
+    def get_current_student_planning_snapshot(
+        self,
+        *,
+        student_id: int,
+    ) -> CurrentStudyPlanningSnapshot | None: ...
 
 
 class InMemoryStudyPlanningRepository:
@@ -150,6 +169,31 @@ class InMemoryStudyPlanningRepository:
             study_plan_version_number=plan_version,
             subject_count=len(normalized_subjects),
             event_count=len(normalized_plan.plan_events),
+        )
+
+    def get_current_student_planning_snapshot(
+        self,
+        *,
+        student_id: int,
+    ) -> CurrentStudyPlanningSnapshot | None:
+        priority = self._priority_profiles.get(student_id)
+        plan = self._study_plan_profiles.get(student_id)
+        if priority is None and plan is None:
+            return None
+        priorities_state = None
+        subjects: list[SubjectItem] = []
+        if priority is not None:
+            priorities_state = ensure_priorities_state(priority.get("result_payload"))
+            subjects = ensure_subject_items(priority.get("subjects", []))
+        study_plan = ensure_study_plan_state(plan.get("result_payload")) if plan is not None else None
+        return CurrentStudyPlanningSnapshot(
+            priority_profile_id=int(priority["id"]) if priority is not None else None,
+            priority_version_number=int(priority["version_number"]) if priority is not None else None,
+            study_plan_profile_id=int(plan["id"]) if plan is not None else None,
+            study_plan_version_number=int(plan["version_number"]) if plan is not None else None,
+            priorities_state=priorities_state,
+            subjects=subjects,
+            study_plan=study_plan,
         )
 
 
@@ -453,6 +497,110 @@ class PostgresStudyPlanningRepository:
             event_count=len(normalized_plan.plan_events),
         )
 
+    def get_current_student_planning_snapshot(
+        self,
+        *,
+        student_id: int,
+    ) -> CurrentStudyPlanningSnapshot | None:
+        with self._connect() as conn:
+            priority_row = conn.execute(
+                """
+                SELECT id, version_number, result_payload
+                FROM study_priority_profiles
+                WHERE student_id = %s
+                  AND is_current = TRUE
+                ORDER BY version_number DESC, id DESC
+                LIMIT 1
+                """,
+                (student_id,),
+            ).fetchone()
+            plan_row = conn.execute(
+                """
+                SELECT id, version_number, result_payload
+                FROM study_plan_profiles
+                WHERE student_id = %s
+                  AND is_current = TRUE
+                ORDER BY version_number DESC, id DESC
+                LIMIT 1
+                """,
+                (student_id,),
+            ).fetchone()
+            if priority_row is None and plan_row is None:
+                return None
+
+            subjects: list[SubjectItem] = []
+            if priority_row is not None:
+                subject_rows = conn.execute(
+                    """
+                    SELECT
+                        subject_name,
+                        priority,
+                        difficulty,
+                        urgency,
+                        weekly_load_min,
+                        origin,
+                        importance_rank_selected_by_student,
+                        perceived_difficulty,
+                        urgency_type,
+                        urgency_due_at,
+                        computed_priority_score,
+                        priority_source,
+                        is_priority_confirmed,
+                        updated_from_flow_at
+                    FROM study_priority_subjects
+                    WHERE priority_profile_id = %s
+                    ORDER BY position ASC
+                    """,
+                    (_row_get(priority_row, "id", 0),),
+                ).fetchall()
+                subjects = [
+                    SubjectItem(
+                        nombre=str(_row_get(row, "subject_name", 0)),
+                        prioridad=str(_row_get(row, "priority", 1)),
+                        dificultad=int(_row_get(row, "difficulty", 2)),
+                        urgencia=_row_get(row, "urgency", 3),
+                        carga_semanal_min=_row_get(row, "weekly_load_min", 4),
+                        origen=_row_get(row, "origin", 5),
+                        importance_rank_selected_by_student=_row_get(
+                            row,
+                            "importance_rank_selected_by_student",
+                            6,
+                        ),
+                        perceived_difficulty=_row_get(row, "perceived_difficulty", 7),
+                        urgency_type=_row_get(row, "urgency_type", 8),
+                        urgency_due_at=_iso_or_raw(_row_get(row, "urgency_due_at", 9)),
+                        computed_priority_score=(
+                            float(_row_get(row, "computed_priority_score", 10))
+                            if _row_get(row, "computed_priority_score", 10) is not None
+                            else None
+                        ),
+                        priority_source=_row_get(row, "priority_source", 11),
+                        is_priority_confirmed=bool(_row_get(row, "is_priority_confirmed", 12)),
+                        updated_from_flow_at=_iso_or_raw(_row_get(row, "updated_from_flow_at", 13)),
+                    )
+                    for row in subject_rows
+                ]
+
+        priorities_state = (
+            ensure_priorities_state(_row_get(priority_row, "result_payload", 2))
+            if priority_row is not None
+            else None
+        )
+        study_plan = (
+            ensure_study_plan_state(_row_get(plan_row, "result_payload", 2))
+            if plan_row is not None
+            else None
+        )
+        return CurrentStudyPlanningSnapshot(
+            priority_profile_id=int(_row_get(priority_row, "id", 0)) if priority_row is not None else None,
+            priority_version_number=int(_row_get(priority_row, "version_number", 1)) if priority_row is not None else None,
+            study_plan_profile_id=int(_row_get(plan_row, "id", 0)) if plan_row is not None else None,
+            study_plan_version_number=int(_row_get(plan_row, "version_number", 1)) if plan_row is not None else None,
+            priorities_state=priorities_state,
+            subjects=subjects,
+            study_plan=study_plan,
+        )
+
     @contextmanager
     def _connect(self) -> Iterator[Any]:
         try:
@@ -484,6 +632,21 @@ def _row_value(row: Any, key: str, default: Any = None) -> Any:
     if key == "current_version":
         return row[0]
     return default
+
+
+def _row_get(row: Any, key: str, index: int, default: Any = None) -> Any:
+    if row is None:
+        return default
+    if isinstance(row, dict):
+        return row.get(key, default)
+    try:
+        return row[index]
+    except (IndexError, KeyError, TypeError):
+        return default
+
+
+def _iso_or_raw(value: Any) -> Any:
+    return value.isoformat() if hasattr(value, "isoformat") else value
 
 
 def _payload_with_persistence_metadata(

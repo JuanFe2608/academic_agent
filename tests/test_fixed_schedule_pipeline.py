@@ -60,6 +60,58 @@ def test_parse_fixed_schedule_section_splits_multiple_entries_with_distinct_days
     ]
 
 
+def test_parse_fixed_schedule_section_splits_multiple_classes_after_single_day() -> None:
+    result = parse_fixed_schedule_section(
+        (
+            "Martes Gerencia de proyectos 7 a 9, Android de 11am a 1pm, "
+            "solución de problemas con IA 4 pm a 6 pm"
+        ),
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ] == [
+        ("Gerencia Proyectos", "tuesday", "07:00", "09:00"),
+        ("Android", "tuesday", "11:00", "13:00"),
+        ("Solución Problemas Con Ia", "tuesday", "16:00", "18:00"),
+    ]
+
+
+def test_parse_fixed_schedule_section_accepts_natural_class_sentence() -> None:
+    result = parse_fixed_schedule_section(
+        "Tengo clase de Bases de Datos los lunes de 8:00 a.m. a 10:00 a.m.",
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ] == [("Bases Datos", "monday", "08:00", "10:00")]
+
+
+def test_parse_fixed_schedule_section_ignores_equivalent_military_time_explanation() -> None:
+    result = parse_fixed_schedule_section(
+        (
+            "Los lunes tengo Bases de Datos de 8 am a 10 am y los miércoles tengo "
+            "Ingeniería de Software de 2pm a 4pm o en horario militar de 14:00 a 16:00"
+        ),
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ] == [
+        ("Bases Datos", "monday", "08:00", "10:00"),
+        ("Ingeniería Software", "wednesday", "14:00", "16:00"),
+    ]
+
+
 def test_parse_fixed_schedule_section_accepts_compact_day_title_time_order() -> None:
     result = parse_fixed_schedule_section(
         "jueves laboratorio 18-21",
@@ -143,6 +195,56 @@ def test_parse_fixed_schedule_section_preserves_subject_across_image_lines() -> 
         ("Gerencia De Proyectos De Ti", "friday", "07:00", "09:00"),
         ("Trabajo De Grado Ii", "wednesday", "07:00", "11:00"),
     ]
+
+
+def test_parse_fixed_schedule_section_accepts_full_university_email_paste() -> None:
+    result = parse_fixed_schedule_section(
+        "\n".join(
+            [
+                "Hola JUAN FELIPE JARAMILLO RODRIGUEZ:",
+                "¡Tenemos buenas noticias!, tu horario para el periodo académico 2026-1 se ha guardado.",
+                "Te presentamos el detalle de tu horario:",
+                "67000912",
+                "JUAN FELIPE JARAMILLO RODRIGUEZ",
+                "INGENIERÍA DE SISTEMAS Y COMPUTACIÓN",
+                "Total asignaturas inscritas: 5",
+                "Código asignatura: CT10068",
+                "GERENCIA DE PROYECTOS DE TI",
+                "3.0 créditos, Grupo D-2",
+                "Image",
+                "MAR,VIE 07:00:00-09:00:00, MAR,VIE 07:00:00-09:00:00,",
+                "Image",
+                "03-02-2026- 29-05-2026",
+                "Image",
+                "BOGOTA | Bloque AA | Salón 714AA,",
+                "Código asignatura: CT13009",
+                "TRABAJO DE GRADO II",
+                "4.0 créditos, Grupo D-5",
+                "Image",
+                "MIE 07:00:00-11:00:00, MIE 07:00:00-11:00:00,",
+                "Código asignatura: CT10126",
+                "Programación para dispositivos Android",
+                "3.0 créditos, Grupo D-651",
+                "Image",
+                "MAR,JUE 11:00:00-13:00:00, MAR,JUE 11:00:00-13:00:00,",
+                "Código asignatura: CT10159",
+                "PROBLEM DISCOVERY & SOLUTION DESIGN WITH ARTIFICIAL INTELLIGENCE",
+                "3.0 créditos, Grupo D-537",
+                "Image",
+                "MAR 16:00:00-18:00:00, MAR 16:00:00-18:00:00,",
+                "Código asignatura: CT10160",
+                "DATA SCIENCE FUNDAMENTALS",
+                "3.0 créditos, Grupo D-740",
+                "Image",
+                "LUN,MAR,MIE 06:00:00-07:00:00, LUN,MAR,MIE 06:00:00-07:00:00.",
+            ]
+        ),
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert result.pending_schedule_items == []
+    assert len(result.blocks) == 9
 
 
 def test_parse_fixed_schedule_section_does_not_use_image_as_work_title() -> None:

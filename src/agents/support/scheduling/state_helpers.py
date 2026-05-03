@@ -16,7 +16,10 @@ from services.scheduling.models import (
     ensure_schedule_conflict,
     ensure_weekly_block,
 )
-from services.scheduling.event_projection import blocks_to_schedule_events
+from services.scheduling.event_projection import (
+    blocks_to_schedule_events,
+    sync_schedule_block_events,
+)
 from services.scheduling.raw_input_sync import (
     sync_schedule_blocks_to_raw_inputs,
 )
@@ -99,6 +102,7 @@ def scheduling_state_to_update(
         "academic_pending_items": list(normalized.academic_pending_items),
         "work_pending_items": list(normalized.work_pending_items),
         "extracurricular": list(normalized.extracurricular),
+        "events": list(normalized.events),
         "schedule_preview": normalized.schedule_preview.model_dump(mode="python"),
         "schedule": schedule_flow_state_to_update(normalized.schedule),
     }
@@ -127,7 +131,22 @@ def update_scheduling_state(
     payload: dict[str, object] = {}
     for field_name in normalized_changes:
         payload[field_name] = _serialize_scheduling_field(updated, field_name)
+    if "schedule" in normalized_changes and "events" not in normalized_changes:
+        payload["events"] = sync_schedule_block_events(
+            _existing_events(raw_state),
+            list(updated.schedule.blocks),
+        )
     return payload
+
+
+def _existing_events(
+    raw_state: AgentState | Mapping[str, object] | None,
+) -> list:
+    if hasattr(raw_state, "get"):
+        return list(raw_state.get("events", []))  # type: ignore[union-attr]
+    if raw_state is None:
+        return []
+    return []
 
 
 def update_schedule_flow_state(
@@ -302,6 +321,11 @@ def _normalize_scheduling_changes(changes: dict[str, object]) -> dict[str, objec
             ensure_extracurricular_item(item)
             for item in list(normalized["extracurricular"])
         ]
+    if "events" in normalized and normalized["events"] is not None:
+        normalized["events"] = [
+            ensure_event(item)
+            for item in list(normalized["events"])
+        ]
     if "extras_pending_items" in normalized and normalized["extras_pending_items"] is not None:
         normalized["extras_pending_items"] = [
             ensure_pending_extracurricular_item(item)
@@ -330,6 +354,7 @@ def _serialize_scheduling_field(state: Any, field_name: str) -> object:
         return schedule_flow_state_to_update(value)
     if field_name in {
         "extracurricular",
+        "events",
         "extras_pending_items",
         "academic_pending_items",
         "work_pending_items",

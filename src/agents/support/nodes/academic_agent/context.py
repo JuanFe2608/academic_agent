@@ -10,7 +10,8 @@ Separa el prompt en dos partes:
 
 from __future__ import annotations
 
-from datetime import date
+from datetime import datetime
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from agents.support.state import AgentState
 
@@ -25,6 +26,20 @@ _DAYS_ES: dict[str, str] = {
 }
 
 _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_MONTHS_ES = {
+    1: "enero",
+    2: "febrero",
+    3: "marzo",
+    4: "abril",
+    5: "mayo",
+    6: "junio",
+    7: "julio",
+    8: "agosto",
+    9: "septiembre",
+    10: "octubre",
+    11: "noviembre",
+    12: "diciembre",
+}
 
 # Mapa de etiquetas internas del radar → descripción legible para el estudiante.
 # Evita que el LLM cite códigos como "explanation_gap" en sus respuestas.
@@ -66,6 +81,7 @@ _STATIC_INSTRUCTIONS = (
     "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan directamente\n"
     "- Cuando pregunte cómo estudiar algo → usa search_study_methods con sus técnicas top\n"
     "- Cuando pida ver su agenda o plan → usa get_weekly_plan + get_schedule\n"
+    "- Cuando pregunte qué día/fecha/hora es hoy → usa get_current_datetime y responde con hora de Bogotá/Colombia\n"
     "- Actúa proactivamente: si registras una actividad urgente, sugiere una técnica inmediatamente\n"
     "- Si recibes una imagen: interpreta su contenido académico (enunciado, rúbrica, fecha de entrega, etc.) "
     "y ofrece ayuda concreta — registra actividades, sugiere técnicas o ajusta el plan según corresponda\n"
@@ -135,7 +151,10 @@ def build_dynamic_context(state: AgentState) -> str:
     """Parte dinámica: datos del estudiante que varían con el estado (perfil, horario, actividades, plan)."""
     profile = state.student_profile
     study_profile = state.study_profile
-    today = date.today().isoformat()
+    timezone_name = str(state.timezone or "America/Bogota")
+    now = current_datetime(timezone_name)
+    today = now.date().isoformat()
+    today_label = format_current_datetime_for_student(now)
 
     techniques = list(study_profile.top_techniques or [])
     tech_lines = "\n".join(f"  - {t}" for t in techniques[:3]) or "  - No configuradas"
@@ -201,13 +220,39 @@ def build_dynamic_context(state: AgentState) -> str:
         "PLAN DE ESTUDIO ACTUAL:\n"
         f"{format_study_plan(state.study_plan)}\n"
         "\n"
-        f"Fecha actual: {today} | Zona horaria: {state.timezone}"
+        "TIEMPO ACTUAL OFICIAL PARA RESPONDER Y AGENDAR:\n"
+        f"- Hoy en Bogotá/Colombia es: {today_label}\n"
+        f"- Fecha ISO actual: {today}\n"
+        f"- Zona horaria: {timezone_name}\n"
+        "- Si el estudiante pregunta qué día es hoy, responde usando estos datos, no tu conocimiento interno.\n"
+        "- Para expresiones relativas como hoy, mañana, esta semana o próximos días, usa esta fecha local."
     )
 
 
 def build_agent_context(state: AgentState) -> str:
     """Deprecated: retorna el contexto completo como string único (usado solo en tests legacy)."""
     return _STATIC_INSTRUCTIONS + "\n\n" + build_dynamic_context(state)
+
+
+def current_datetime(timezone_name: str = "America/Bogota") -> datetime:
+    """Retorna el momento actual en la zona horaria operativa del agente."""
+
+    try:
+        zone = ZoneInfo(str(timezone_name or "America/Bogota"))
+    except ZoneInfoNotFoundError:
+        zone = ZoneInfo("America/Bogota")
+    return datetime.now(zone)
+
+
+def format_current_datetime_for_student(value: datetime) -> str:
+    """Formato explícito para evitar ambigüedad de día/mes en el LLM."""
+
+    day_label = _DAYS_ES.get(value.strftime("%A").lower(), value.strftime("%A"))
+    month_label = _MONTHS_ES.get(value.month, str(value.month))
+    return (
+        f"{day_label} {value.day} de {month_label} de {value.year}, "
+        f"{value.strftime('%H:%M')}"
+    )
 
 
 def format_schedule_blocks(blocks: list) -> str:
@@ -293,6 +338,8 @@ __all__ = [
     "_STATIC_INSTRUCTIONS",
     "build_dynamic_context",
     "build_agent_context",
+    "current_datetime",
+    "format_current_datetime_for_student",
     "format_schedule_blocks",
     "format_subjects",
     "format_activities",

@@ -65,6 +65,49 @@ def test_merge_completed_fixed_section_syncs_schedule_and_raw_inputs() -> None:
     assert "Martes 08:00-10:00 Programacion" in str(result.raw_inputs.horario_academico_text)
 
 
+def test_merge_completed_fixed_section_prefers_more_specific_alias_title() -> None:
+    existing = _academic_block("Programación para dispositivos Android", "thursday")
+    completed = [_academic_block("Android", "thursday")]
+
+    result = merge_completed_fixed_section(
+        [existing],
+        {"horario_academico_text": "Jueves 08:00-10:00 Programación para dispositivos Android"},
+        "academic",
+        completed,
+    )
+
+    assert len(result.target_blocks) == 1
+    assert result.target_blocks[0].title == "Programación para dispositivos Android"
+    assert str(result.raw_inputs.horario_academico_text).splitlines() == [
+        "Jueves 08:00-10:00 Programación para dispositivos Android"
+    ]
+
+
+def test_merge_completed_fixed_section_dedupes_spanish_english_ai_alias() -> None:
+    existing = _academic_block(
+        "Problem Discovery & Solution Design With Artificial Intelligence",
+        "tuesday",
+    )
+    existing = existing.model_copy(update={"start_time": "16:00", "end_time": "18:00"})
+    completed = [
+        _academic_block("Solución Problemas Con Ia", "tuesday").model_copy(
+            update={"start_time": "16:00", "end_time": "18:00"}
+        )
+    ]
+
+    result = merge_completed_fixed_section(
+        [existing],
+        {},
+        "academic",
+        completed,
+    )
+
+    assert len(result.target_blocks) == 1
+    assert result.target_blocks[0].title == (
+        "Problem Discovery & Solution Design With Artificial Intelligence"
+    )
+
+
 def test_sync_fixed_section_result_replaces_only_target_section() -> None:
     result = sync_fixed_section_result(
         [_academic_block("Calculo"), _work_block()],

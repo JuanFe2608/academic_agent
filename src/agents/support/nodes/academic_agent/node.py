@@ -3,7 +3,7 @@
 Arquitectura:
   - Fases de mantenimiento (schedule_renewal, schedule_repair): handlers
     deterministas de renovación/reparación de horario (multi-turno estructurado).
-  - Fase running: create_react_agent con 15 tools. El LLM decide qué hacer,
+  - Fase running: create_react_agent con tools especializadas. El LLM decide qué hacer,
     en qué orden y qué combinar — incluyendo gestión directa del horario fijo
     (add_schedule_block / update_schedule_block / delete_schedule_block).
 
@@ -32,6 +32,7 @@ _MAX_PERSISTED_MESSAGES: int = 20  # ~10 Human+AI pairs; older messages are trim
 
 def academic_agent(state: AgentState) -> dict:
     """Despacha el turno: mantenimiento determinista o agente ReAct en modo running."""
+    state, hydration_update = _hydrate_react_runtime_state(state)
     conversation = state.conversation_state
     phase = conversation.phase
 
@@ -137,7 +138,11 @@ def academic_agent(state: AgentState) -> dict:
     if tool_updates:
         from services.planning import reconcile_react_tool_updates
         tool_updates = reconcile_react_tool_updates(state, tool_updates)
-    final_message = result["messages"][-1].content
+    final_message = _final_message_content_with_schedule_preview(
+        state,
+        result["messages"][-1].content,
+        tool_updates,
+    )
 
     return_dict: dict = {
         "messages": _capped_messages_update(list(state.messages or []), final_message),
@@ -146,6 +151,7 @@ def academic_agent(state: AgentState) -> dict:
         "last_user_text": last_text,
         "awaiting_user_input": True,
         "phase": "running",
+        **hydration_update,
         **tool_updates,
     }
 
@@ -155,9 +161,24 @@ def academic_agent(state: AgentState) -> dict:
 
     if "academic_activities" in tool_updates:
         _persist_activities_after_tool_update(state, return_dict)
+        todo_update = _sync_academic_activities_to_todo_after_tool_update(state, return_dict)
+        if todo_update:
+            if "operational_note" in todo_update:
+                _append_operational_note(return_dict, str(todo_update["operational_note"]))
+            if "academic_activities" in todo_update:
+                return_dict["academic_activities"] = todo_update["academic_activities"]
+                _persist_activities_after_tool_update(state, return_dict)
         reminder_update = _sync_activity_reminders_after_tool_update(state, return_dict)
         if reminder_update:
             return_dict["reminders"] = reminder_update
+
+    if "study_plan" in tool_updates or "subjects" in tool_updates:
+        study_sync_update = _materialize_and_sync_study_plan_after_tool_update(state, return_dict)
+        if study_sync_update:
+            operational_note = study_sync_update.pop("operational_note", None)
+            return_dict.update(study_sync_update)
+            if operational_note:
+                _append_operational_note(return_dict, str(operational_note))
 
     return return_dict
 
@@ -165,6 +186,184 @@ def academic_agent(state: AgentState) -> dict:
 # ---------------------------------------------------------------------------
 # Helpers internos
 # ---------------------------------------------------------------------------
+
+def _hydrate_react_runtime_state(state: AgentState) -> tuple[AgentState, dict]:
+    """Carga datos durables críticos antes de construir contexto/tools ReAct."""
+
+    student_id = getattr(state.student_profile, "persisted_student_id", None)
+    if not student_id:
+        return state, {}
+
+    update: dict[str, object] = {}
+
+    try:
+        from agents.support.dependencies import get_academic_activity_persistence_service
+        from services.planning.academic_activity_service import coerce_academic_activities
+
+        result = get_academic_activity_persistence_service().list_activities(
+            student_id=int(student_id),
+            include_deleted=False,
+        )
+        if result.loaded and result.activities:
+            merged_activities = _merge_academic_activities(
+                durable=result.activities,
+                local=coerce_academic_activities(list(state.academic_activities or [])),
+            )
+            update["academic_activities"] = [
+                activity.model_dump(mode="python") for activity in merged_activities
+            ]
+    except Exception:
+        pass
+
+    needs_planning = (
+        not list(state.subjects or [])
+        or not list(state.study_plan.plan_events or [])
+        or not getattr(state.study_plan, "persisted_profile_id", None)
+    )
+    if needs_planning:
+        try:
+            from agents.support.dependencies import get_study_planning_persistence_service
+
+            result = get_study_planning_persistence_service().load_current_snapshot(
+                student_id=int(student_id)
+            )
+            if result.loaded:
+                if result.subjects and (
+                    not list(state.subjects or [])
+                    or _should_replace_versioned_payload(
+                        local_id=getattr(state.priorities, "persisted_profile_id", None),
+                        local_version=getattr(state.priorities, "version_number", None),
+                        durable_id=result.priority_profile_id,
+                        durable_version=result.priority_version_number,
+                    )
+                ):
+                    update["subjects"] = [
+                        subject.model_dump(mode="python") for subject in result.subjects
+                    ]
+                if result.study_plan is not None and (
+                    _should_replace_versioned_payload(
+                        local_id=getattr(state.study_plan, "persisted_profile_id", None),
+                        local_version=getattr(state.study_plan, "version_number", None),
+                        durable_id=result.study_plan_profile_id,
+                        durable_version=result.study_plan_version_number,
+                    )
+                ):
+                    update["study_plan"] = result.study_plan.model_dump(mode="python")
+                if result.priorities_state is not None and not getattr(
+                    state.priorities,
+                    "persisted_profile_id",
+                    None,
+                ):
+                    update["priorities"] = result.priorities_state.model_dump(mode="python")
+        except Exception:
+            pass
+
+    if not update:
+        return state, {}
+    try:
+        hydrated = AgentState(**{**state.model_dump(mode="python"), **update})
+    except Exception:
+        return state, {}
+    return hydrated, update
+
+
+def _merge_academic_activities(*, durable: list, local: list) -> list:
+    """Une actividades persistidas y locales; BD gana si ya conoce la actividad."""
+
+    merged = {}
+    for activity in local:
+        activity_id = getattr(activity, "activity_id", None)
+        if activity_id:
+            merged.setdefault(activity_id, activity)
+    for activity in durable:
+        activity_id = getattr(activity, "activity_id", None)
+        if activity_id:
+            merged[activity_id] = activity
+    return list(merged.values())
+
+
+def _should_replace_versioned_payload(
+    *,
+    local_id: int | None,
+    local_version: int | None,
+    durable_id: int | None,
+    durable_version: int | None,
+) -> bool:
+    if durable_id is None:
+        return False
+    if local_id is None:
+        return True
+    if int(local_id) != int(durable_id):
+        return True
+    if durable_version is not None and local_version is not None:
+        return int(durable_version) > int(local_version)
+    return False
+
+
+def _final_message_content_with_schedule_preview(
+    state: AgentState,
+    final_message: object,
+    tool_updates: dict,
+) -> object:
+    """Adjunta imagen renderizada cuando el ReAct modificó el horario fijo."""
+
+    if "schedule" not in tool_updates:
+        return final_message
+    try:
+        from agents.support.scheduling.render import build_rendered_schedule_message_content
+        from services.scheduling.models import ensure_weekly_block
+
+        schedule = tool_updates.get("schedule") or {}
+        raw_blocks = schedule.get("blocks", []) if isinstance(schedule, dict) else []
+        blocks = []
+        for raw_block in raw_blocks:
+            block = ensure_weekly_block(raw_block)
+            if getattr(block, "is_active", True):
+                blocks.append(block)
+        if not blocks:
+            return final_message
+        content, _ = build_rendered_schedule_message_content(
+            str(final_message or ""),
+            blocks,
+            timezone_name=str(state.timezone or "America/Bogota"),
+        )
+        return content
+    except Exception:
+        return final_message
+
+
+def _append_operational_note(update: dict, note: str) -> None:
+    """Agrega una nota breve al último mensaje del turno sin rehacer el ReAct."""
+
+    if not note.strip():
+        return
+    from langchain_core.messages import AIMessage
+    from utils.message_sanitizer import sanitize_message_content
+
+    messages = list(update.get("messages") or [])
+    for index in range(len(messages) - 1, -1, -1):
+        message = messages[index]
+        if not isinstance(message, AIMessage):
+            continue
+        content = message.content
+        if isinstance(content, str):
+            new_content = f"{content}\n\n{note}"
+        elif isinstance(content, list):
+            new_content = list(content)
+            for block in new_content:
+                if isinstance(block, dict) and block.get("type") == "text":
+                    block["text"] = f"{block.get('text') or ''}\n\n{note}".strip()
+                    break
+            else:
+                new_content.insert(0, {"type": "text", "text": note})
+        else:
+            new_content = note
+        messages[index] = message.model_copy(update={"content": sanitize_message_content(new_content)})
+        update["messages"] = messages
+        return
+    messages.append(AIMessage(content=sanitize_message_content(note)))
+    update["messages"] = messages
+
 
 def _should_wait(state: AgentState) -> bool:
     """True cuando el grafo debe detenerse esperando nuevo input del usuario."""
@@ -411,6 +610,147 @@ def _sync_activity_reminders_after_tool_update(
         last_dispatch_error=None,
         last_sync_at=result.synced_at,
     )
+
+
+def _sync_academic_activities_to_todo_after_tool_update(
+    state: AgentState,
+    update: dict,
+) -> dict[str, object] | None:
+    """Sincroniza To Do después de cambios ReAct en actividades académicas."""
+
+    student_id = getattr(state.student_profile, "persisted_student_id", None)
+    raw_activities = update.get("academic_activities")
+    if not student_id or not raw_activities:
+        return None
+
+    try:
+        from agents.support.dependencies import get_microsoft_todo_sync_service
+        from services.planning.academic_activity_service import coerce_academic_activities
+
+        service = get_microsoft_todo_sync_service()
+        calendar_state = update.get("calendar", state.calendar)
+        task_list_id = (
+            calendar_state.get("todo_task_list_id")
+            if isinstance(calendar_state, dict)
+            else getattr(calendar_state, "todo_task_list_id", None)
+        )
+        activities = coerce_academic_activities(list(raw_activities))
+        result = service.sync_academic_activities_to_todo(
+            student_id=int(student_id),
+            task_list_id=task_list_id,
+            activities=activities,
+        )
+    except Exception:
+        return None
+
+    if not getattr(result, "synced", False):
+        detail = getattr(result, "detail", None) or getattr(result, "error_code", None) or "error desconocido"
+        return {
+            "operational_note": (
+                "Nota operativa: guardé la actividad localmente, "
+                f"pero no pude sincronizar Microsoft To Do ({detail})."
+            )
+        }
+    if not getattr(result, "synced_activities", None):
+        return None
+
+    return {
+        "academic_activities": [
+            activity.model_dump(mode="python")
+            for activity in result.synced_activities
+        ]
+    }
+
+
+def _materialize_and_sync_study_plan_after_tool_update(
+    state: AgentState,
+    update: dict,
+) -> dict[str, object] | None:
+    """Materializa sesiones y sincroniza Outlook si el estudiante tiene Microsoft activo."""
+
+    student_id = getattr(state.student_profile, "persisted_student_id", None)
+    if not student_id:
+        return None
+
+    calendar_state = update.get("calendar", state.calendar)
+    calendar_data = (
+        dict(calendar_state)
+        if isinstance(calendar_state, dict)
+        else calendar_state.model_dump(mode="python")
+        if hasattr(calendar_state, "model_dump")
+        else {}
+    )
+    microsoft_likely_connected = bool(
+        calendar_data.get("authorized")
+        or calendar_data.get("provider") == "outlook"
+        or calendar_data.get("calendar_id")
+    )
+    if not microsoft_likely_connected:
+        return None
+
+    try:
+        from agents.support.dependencies import (
+            get_outlook_calendar_sync_service,
+            get_study_plan_materialization_service,
+        )
+        from services.planning import ensure_study_plan_state, update_study_plan_state
+
+        study_plan = ensure_study_plan_state(update.get("study_plan", state.study_plan))
+        if not study_plan.plan_events or not study_plan.persisted_profile_id:
+            return None
+
+        materialization = get_study_plan_materialization_service().materialize_plan_instances(
+            student_id=int(student_id),
+            study_plan_profile_id=study_plan.persisted_profile_id,
+            study_plan=study_plan,
+            timezone=str(update.get("timezone") or state.timezone or "America/Bogota"),
+        )
+        merged: dict[str, object] = {}
+        if materialization.materialized:
+            merged["study_plan"] = update_study_plan_state(
+                study_plan,
+                materialized_instance_count=materialization.materialized_instance_count,
+                superseded_instance_count=materialization.superseded_instance_count,
+                materialized_horizon_days=materialization.horizon_days,
+                materialized_through_date=materialization.materialized_through_date,
+                materialization_error=None,
+            )
+        else:
+            merged["study_plan"] = update_study_plan_state(
+                study_plan,
+                materialization_error=materialization.error_code or "study_plan_materialization_error",
+                materialized_horizon_days=materialization.horizon_days,
+                materialized_through_date=materialization.materialized_through_date,
+            )
+            merged["operational_note"] = (
+                "Nota operativa: guardé el plan localmente, "
+                "pero no pude preparar las sesiones fechadas para Outlook "
+                f"({materialization.detail or materialization.error_code or 'error desconocido'})."
+            )
+            return merged
+
+        sync = get_outlook_calendar_sync_service().sync_student_calendar(
+            student_id=int(student_id),
+            calendar_state=calendar_data,
+            calendar_id=calendar_data.get("calendar_id"),
+            study_plan_profile_id=study_plan.persisted_profile_id,
+        )
+        if sync.synced:
+            merged["calendar"] = {
+                **calendar_data,
+                "provider": "outlook",
+                "authorized": True,
+                "synced_event_map": dict(sync.synced_event_map),
+            }
+        else:
+            merged["operational_note"] = (
+                "Nota operativa: guardé el plan localmente, "
+                "pero no pude sincronizar las sesiones en Outlook Calendar "
+                f"({sync.detail or sync.error_code or 'error desconocido'})."
+            )
+        return merged
+    except Exception:
+        return None
 
 
 __all__ = ["academic_agent"]

@@ -17,12 +17,12 @@ def test_render_schedule_preview_shows_summary_and_confirmation(monkeypatch, tmp
     monkeypatch.setattr(
         "agents.support.nodes.render_schedule_preview.node.build_rendered_schedule_message_content",
         lambda text, _blocks, **_kwargs: (
-            [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
-            ],
-            str(image_path),
-        ),
+                [
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": {"url": str(image_path)}},
+                ],
+                str(image_path),
+            ),
     )
 
     blocks = [
@@ -73,12 +73,12 @@ def test_render_schedule_preview_prioritizes_conflict_message(monkeypatch, tmp_p
     monkeypatch.setattr(
         "agents.support.nodes.render_schedule_preview.node.build_rendered_schedule_message_content",
         lambda text, _blocks, **_kwargs: (
-            [
-                {"type": "text", "text": text},
-                {"type": "image_url", "image_url": {"url": "data:image/png;base64,abc"}},
-            ],
-            str(image_path),
-        ),
+                [
+                    {"type": "text", "text": text},
+                    {"type": "image_url", "image_url": {"url": str(image_path)}},
+                ],
+                str(image_path),
+            ),
     )
 
     blocks = [

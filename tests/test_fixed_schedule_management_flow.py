@@ -66,6 +66,19 @@ def _follow_up_state(previous_state: AgentState, update: dict, user_text: str) -
     return AgentState(**payload)
 
 
+def _assistant_text(update: dict) -> str:
+    content = update["messages"][0].content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            str(block.get("text") or "")
+            for block in content
+            if isinstance(block, dict) and block.get("type") == "text"
+        )
+    return str(content)
+
+
 class _FixedScheduleSyncServiceStub:
     def __init__(self, *, synced: bool = True) -> None:
         self.synced = synced
@@ -132,7 +145,7 @@ def test_fixed_schedule_management_view_summarizes_current_blocks() -> None:
 
     assert update["phase"] == "end"
     assert update["awaiting_user_input"] is False
-    assert "Calculo" in update["messages"][0].content
+    assert "Calculo" in _assistant_text(update)
     assert update["interaction"]["active_intent"] == "view_fixed_schedule"
     assert update["interaction"]["confirmation_pending"] is False
 
@@ -163,7 +176,7 @@ def test_fixed_schedule_management_updates_block_after_confirmation() -> None:
         assert first_update["awaiting_user_input"] is True
         assert first_update["interaction"]["confirmation_pending"] is True
         assert first_update["interaction"]["last_confirmation_payload"]["operation"] == "update"
-        assert "Confirmas el cambio" in first_update["messages"][0].content
+        assert "Confirmas el cambio" in _assistant_text(first_update)
 
         confirmation_state = _follow_up_state(state, first_update, "si")
         final_update = handle_fixed_schedule_management_turn(confirmation_state)
@@ -219,7 +232,7 @@ def test_fixed_schedule_management_deletes_block_after_confirmation() -> None:
 
         assert first_update["interaction"]["confirmation_pending"] is True
         assert first_update["interaction"]["last_confirmation_payload"]["operation"] == "delete"
-        assert "Trabajo" in first_update["messages"][0].content
+        assert "Trabajo" in _assistant_text(first_update)
 
         confirmation_state = _follow_up_state(state, first_update, "si")
         final_update = handle_fixed_schedule_management_turn(confirmation_state)
@@ -227,7 +240,7 @@ def test_fixed_schedule_management_deletes_block_after_confirmation() -> None:
         updated_blocks = final_update["schedule"]["blocks"]
         assert [block.title for block in updated_blocks] == ["Calculo"]
         assert final_update["raw_inputs"]["horario_laboral_text"] is None
-        assert "No pude reconciliar Outlook" in final_update["messages"][0].content
+        assert "No pude reconciliar Outlook" in _assistant_text(final_update)
         assert sync_service.calls
     finally:
         set_schedule_service(None)

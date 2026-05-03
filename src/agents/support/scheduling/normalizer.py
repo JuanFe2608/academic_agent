@@ -518,13 +518,14 @@ def _extract_time_range(text: str) -> tuple[str, str]:
 
 def _infer_title(text: str, default_title: str) -> str:
     cleaned = str(text or "")
+    cleaned = _strip_equivalent_time_expression(cleaned)
     cleaned = _DAY_RANGE_PATTERN.sub(" ", cleaned)
     cleaned = _ALL_DAYS_EXCEPT_PATTERN.sub(" ", cleaned)
     cleaned = _ALL_DAYS_PATTERN.sub(" ", cleaned)
     cleaned = _DAY_LIST_PATTERN.sub(" ", cleaned)
     cleaned = _TIME_RANGE_PATTERN.sub(" ", cleaned)
     cleaned = re.sub(
-        r"\b(de|desde|hasta|las|los|el|la|en|por|para|todos|dias|días|actualmente|voy|tengo|hago|y|e)\b",
+        r"\b(de|desde|hasta|las|los|el|la|en|por|para|todos|dias|días|actualmente|voy|tengo|hago|y|e|clase|clases)\b",
         " ",
         cleaned,
         flags=re.IGNORECASE,
@@ -534,6 +535,17 @@ def _infer_title(text: str, default_title: str) -> str:
         return default_title
     compact = " ".join(cleaned.split()[:6]).strip()
     return compact.title()
+
+
+def _strip_equivalent_time_expression(text: str) -> str:
+    """Elimina aclaraciones que repiten el mismo rango en otro formato."""
+
+    return re.sub(
+        rf"\s+(?:o|ó)\s+(?:en\s+)?(?:horario\s+)?(?:militar|24\s*h(?:oras?)?)\s+{_TIME_RANGE_PATTERN.pattern}",
+        " ",
+        str(text or ""),
+        flags=re.IGNORECASE,
+    )
 
 
 def _normalize_day_token(token: str) -> str:

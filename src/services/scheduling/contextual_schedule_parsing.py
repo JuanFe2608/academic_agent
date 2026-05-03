@@ -18,7 +18,11 @@ from services.scheduling.text_parser import (
     is_ambiguous_time_range,
     parse_work_schedule_text,
 )
-from services.scheduling.text_parser._common import normalize_lines as _normalize_lines
+from services.scheduling.text_parser._common import (
+    ACADEMIC_DAYS_PATTERN,
+    normalize_lines as _normalize_lines,
+    strip_accents as _strip_accents,
+)
 from services.scheduling.text_parser.academic import is_subject_line as _is_subject_line
 from services.scheduling.title_normalization import (
     is_placeholder_schedule_title,
@@ -187,9 +191,27 @@ def _iter_academic_chunks(text: str) -> list[tuple[str, str]]:
 
     chunks: list[tuple[str, str]] = []
     current_subject = ""
+    university_format = _looks_like_university_schedule(text)
+    waits_for_university_marker = university_format and _has_university_course_markers(text)
+    inside_university_course = not waits_for_university_marker
     for line in lines:
+        if waits_for_university_marker and _is_university_course_marker(line):
+            inside_university_course = True
+            current_subject = ""
+            continue
+        if waits_for_university_marker and not inside_university_course:
+            continue
+        if _is_ignored_academic_line(line):
+            continue
         if _looks_like_schedule_fragment(line):
-            chunks.append((line.strip(), current_subject))
+            if university_format and ACADEMIC_DAYS_PATTERN.search(line):
+                chunks.append((line.strip(), current_subject))
+                continue
+            chunks.extend(
+                (chunk, current_subject)
+                for chunk in _split_fixed_schedule_chunks(line)
+                if chunk
+            )
             continue
         if _is_subject_line(line):
             if is_placeholder_schedule_title(line):
@@ -205,6 +227,48 @@ def _looks_like_schedule_fragment(text: str) -> bool:
     if _DATE_RANGE_LINE_PATTERN.fullmatch(str(text or "").strip()):
         return False
     return bool(_TIME_RANGE_PATTERN.search(text) or _DAY_TOKEN_PATTERN.search(text))
+
+
+def _looks_like_university_schedule(text: str) -> bool:
+    normalized = str(text or "").lower()
+    return (
+        "código asignatura" in normalized
+        or "codigo asignatura" in normalized
+        or "total asignaturas inscritas" in normalized
+        or bool(re.search(r"\b(?:lun|mar|mie|jue|vie|sab|dom)(?:\s*,\s*(?:lun|mar|mie|jue|vie|sab|dom))*\s+\d{1,2}:\d{2}", normalized))
+    )
+
+
+def _is_university_course_marker(line: str) -> bool:
+    normalized = str(line or "").lower()
+    return "código asignatura" in normalized or "codigo asignatura" in normalized
+
+
+def _has_university_course_markers(text: str) -> bool:
+    normalized = str(text or "").lower()
+    return "código asignatura" in normalized or "codigo asignatura" in normalized
+
+
+def _is_ignored_academic_line(line: str) -> bool:
+    normalized = str(line or "").strip().lower()
+    folded = _strip_accents(normalized)
+    if not folded:
+        return True
+    if folded.isdigit():
+        return True
+    if folded in {"image", "imagen"}:
+        return True
+    return any(
+        token in folded
+        for token in (
+            "hola ",
+            "tenemos buenas noticias",
+            "tu horario para el periodo",
+            "te presentamos el detalle",
+            "total asignaturas inscritas",
+            "ingenieria de sistemas",
+        )
+    )
 
 
 def _parse_academic_chunk(

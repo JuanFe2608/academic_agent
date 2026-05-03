@@ -15,10 +15,15 @@ from __future__ import annotations
 
 import json
 from datetime import date, timedelta
+from zoneinfo import ZoneInfoNotFoundError
 from typing import Any
 
 from langchain_core.tools import tool
 
+from agents.support.nodes.academic_agent.context import (
+    current_datetime,
+    format_current_datetime_for_student,
+)
 from agents.support.state import AgentState
 
 _DAYS_ES: dict[str, str] = {
@@ -36,12 +41,24 @@ _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday
 _VALID_PRIORIDAD: frozenset[str] = frozenset({"alta", "media", "baja"})
 
 
-def _compute_urgency_from_due_date(due_date: str | None) -> str:
+def _local_today(timezone_name: str = "America/Bogota") -> date:
+    try:
+        return current_datetime(str(timezone_name or "America/Bogota")).date()
+    except ZoneInfoNotFoundError:
+        return current_datetime("America/Bogota").date()
+
+
+def _compute_urgency_from_due_date(
+    due_date: str | None,
+    *,
+    reference_date: date | None = None,
+) -> str:
     """Calcula prioridad interna desde la fecha límite. No exponer al LLM."""
     if not due_date:
         return "baja"
     try:
-        delta = (date.fromisoformat(due_date) - date.today()).days
+        today = reference_date or _local_today()
+        delta = (date.fromisoformat(due_date) - today).days
         if delta <= 2:
             return "alta"
         if delta <= 7:
@@ -52,8 +69,12 @@ def _compute_urgency_from_due_date(due_date: str | None) -> str:
 
 
 def make_tools(state: AgentState) -> list:
-    """Crea las 15 herramientas del agente con el estado actual capturado en closure."""
+    """Crea las herramientas del agente con el estado actual capturado en closure."""
     student_id = _get_student_id(state)
+    timezone_name = str(state.timezone or "America/Bogota")
+
+    def _today() -> date:
+        return _local_today(timezone_name)
 
     # Accumulator: tracks in-cycle mutations to academic_activities so that tools
     # called later in the same ReAct turn see the result of earlier tools.
@@ -62,9 +83,39 @@ def make_tools(state: AgentState) -> list:
 
     def _current_activities() -> list:
         raw = _cycle_updates.get("academic_activities")
-        return list(raw) if raw is not None else list(state.academic_activities)
+        if raw is not None:
+            return list(raw)
+        local = list(state.academic_activities)
+        if local:
+            return local
+        if not student_id:
+            return local
+        try:
+            from agents.support.dependencies import get_academic_activity_persistence_service
+
+            result = get_academic_activity_persistence_service().list_activities(
+                student_id=int(student_id),
+                include_deleted=False,
+            )
+            if result.loaded:
+                return list(result.activities)
+        except Exception:
+            pass
+        return local
 
     # ------------------------------------------------------------------ RAG --
+
+    @tool
+    def get_current_datetime() -> str:
+        """Devuelve la fecha y hora actual oficial del agente en Bogotá/Colombia.
+        Úsala cuando el estudiante pregunte qué día es hoy, la fecha actual,
+        la hora actual, o cuando necesites resolver fechas relativas antes de agendar."""
+
+        now = current_datetime(timezone_name)
+        return (
+            f"Hoy en Bogotá/Colombia es {format_current_datetime_for_student(now)}. "
+            f"Fecha ISO: {now.date().isoformat()}. Zona horaria: {timezone_name}."
+        )
 
     @tool
     def search_study_methods(
@@ -192,7 +243,12 @@ def make_tools(state: AgentState) -> list:
 
         # Urgencia interna: si el estudiante la marcó como prioritaria → alta;
         # si no, se calcula automáticamente por cercanía de la fecha.
-        priority_level = "alta" if is_priority else _compute_urgency_from_due_date(due_date)
+        today = _today()
+        priority_level = (
+            "alta"
+            if is_priority
+            else _compute_urgency_from_due_date(due_date, reference_date=today)
+        )
 
         activities = coerce_academic_activities(_current_activities())
         try:
@@ -212,7 +268,7 @@ def make_tools(state: AgentState) -> list:
                 activities,
                 {"operation": "create", "activity": new_act.model_dump()},
                 timezone=state.timezone,
-                reference_date=date.today(),
+                reference_date=today,
             )
             star_note = " ⭐ Marcada como prioritaria." if is_priority else ""
             msg = (result.message or f"Actividad '{title}' registrada para el {due_date}.") + star_note
@@ -274,7 +330,14 @@ def make_tools(state: AgentState) -> list:
         if is_priority is not None:
             # Recompute priority_level: starred → alta; unstarred → recalculate from due_date
             effective_due = due_date or getattr(target, "due_date", None)
-            changes["priority_level"] = "alta" if is_priority else _compute_urgency_from_due_date(effective_due)
+            changes["priority_level"] = (
+                "alta"
+                if is_priority
+                else _compute_urgency_from_due_date(
+                    effective_due,
+                    reference_date=_today(),
+                )
+            )
         if difficulty is not None:
             changes["difficulty_level"] = difficulty
         if not changes:
@@ -284,7 +347,7 @@ def make_tools(state: AgentState) -> list:
                 activities,
                 {"operation": "update", "activity_id": target.activity_id, "changes": changes},
                 timezone=state.timezone,
-                reference_date=date.today(),
+                reference_date=_today(),
             )
             state_update: dict[str, Any] = {
                 "academic_activities": [a.model_dump() for a in result.activities],
@@ -324,7 +387,7 @@ def make_tools(state: AgentState) -> list:
                 activities,
                 {"operation": "delete", "activity_id": target.activity_id},
                 timezone=state.timezone,
-                reference_date=date.today(),
+                reference_date=_today(),
             )
             state_update: dict[str, Any] = {
                 "academic_activities": [a.model_dump() for a in result.activities],
@@ -338,27 +401,39 @@ def make_tools(state: AgentState) -> list:
 
     @tool
     def get_pending_activities(days_ahead: int = 7) -> str:
-        """Lista actividades académicas pendientes del estudiante en los próximos N días.
+        """Lista actividades académicas pendientes del estudiante.
         Úsala cuando el estudiante pregunte qué tiene pendiente, cuáles son sus próximas
-        entregas o quiera saber para qué prepararse esta semana."""
+        entregas o quiera saber para qué prepararse. Siempre muestra también pendientes
+        más lejanos; days_ahead solo separa próximos vs. más adelante."""
         from services.planning.academic_activity_service import active_academic_activities
 
         activities = active_academic_activities(_current_activities())
         pending = [a for a in activities if a.status == "pending"]
         if not pending:
             return "No tienes actividades académicas pendientes registradas."
-        cutoff = date.today() + timedelta(days=days_ahead)
-        upcoming = [
-            a for a in pending
-            if not a.due_date or date.fromisoformat(a.due_date) <= cutoff
-        ]
-        if not upcoming:
-            return f"No tienes actividades con fecha límite en los próximos {days_ahead} días."
-        lines = [f"Tienes {len(upcoming)} actividades pendientes:"]
-        for a in sorted(upcoming, key=lambda x: x.due_date or "9999"):
-            due_str = f" — vence {a.due_date}" if a.due_date else ""
-            pri_str = f" [{a.priority_level}]" if a.priority_level else ""
-            lines.append(f"  • [{a.activity_type}] {a.subject_name}: {a.activity_title}{due_str}{pri_str}")
+        today = _today()
+        cutoff = today + timedelta(days=max(0, int(days_ahead or 7)))
+
+        def _due_date(activity) -> date | None:
+            if not activity.due_date:
+                return None
+            try:
+                return date.fromisoformat(activity.due_date)
+            except ValueError:
+                return None
+
+        dated = [(a, _due_date(a)) for a in pending]
+        upcoming = [(a, d) for a, d in dated if d is None or d <= cutoff]
+        later = [(a, d) for a, d in dated if d is not None and d > cutoff]
+        lines = [f"Tienes {len(pending)} actividad(es) académica(s) pendiente(s):"]
+        if upcoming:
+            lines.append(f"\nPróximos {days_ahead} días:")
+            for a, d in sorted(upcoming, key=lambda item: item[1] or date.max):
+                lines.append(_format_pending_activity_line(a, today=today, due=d))
+        if later:
+            lines.append("\nMás adelante:")
+            for a, d in sorted(later, key=lambda item: item[1] or date.max):
+                lines.append(_format_pending_activity_line(a, today=today, due=d))
         return "\n".join(lines)
 
     @tool
@@ -388,7 +463,7 @@ def make_tools(state: AgentState) -> list:
                 activities,
                 {"operation": "update", "activity_id": target.activity_id, "changes": {"status": "completed"}},
                 timezone=state.timezone,
-                reference_date=date.today(),
+                reference_date=_today(),
             )
             state_update: dict[str, Any] = {
                 "academic_activities": [a.model_dump() for a in result.activities],
@@ -876,14 +951,32 @@ def make_tools(state: AgentState) -> list:
         """Sincroniza el plan de estudio con Outlook Calendar del estudiante.
         Úsala cuando el estudiante pida sincronizar su plan de estudio con su
         calendario de Outlook o agregar sesiones de estudio al calendario."""
-        from agents.support.dependencies import get_outlook_calendar_sync_service
+        from agents.support.dependencies import (
+            get_outlook_calendar_sync_service,
+            get_study_plan_materialization_service,
+        )
 
         service = get_outlook_calendar_sync_service()
         calendar_id = state.calendar.calendar_id
         try:
+            plan = state.study_plan
+            if plan.plan_events and plan.persisted_profile_id:
+                materialized = get_study_plan_materialization_service().materialize_plan_instances(
+                    student_id=student_id,
+                    study_plan_profile_id=plan.persisted_profile_id,
+                    study_plan=plan,
+                    timezone=str(state.timezone or "America/Bogota"),
+                )
+                if not materialized.materialized:
+                    return (
+                        "No pude dejar listas las sesiones fechadas para Outlook: "
+                        f"{materialized.detail or materialized.error_code or 'error desconocido'}"
+                    )
             result = service.sync_student_calendar(
                 student_id=student_id,
+                calendar_state=state.calendar,
                 calendar_id=calendar_id,
+                study_plan_profile_id=state.study_plan.persisted_profile_id,
             )
             if result.synced:
                 return (
@@ -933,6 +1026,7 @@ def make_tools(state: AgentState) -> list:
             return f"Error al sincronizar con To Do: {exc}"
 
     return [
+        get_current_datetime,
         search_study_methods,
         get_technique_guide,
         add_academic_activity,
@@ -1187,6 +1281,25 @@ def _normalize_time(t: str) -> str:
         return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
     except (ValueError, IndexError):
         return raw
+
+
+def _format_pending_activity_line(activity: Any, *, today: date, due: date | None) -> str:
+    due_str = ""
+    if due is not None:
+        delta = (due - today).days
+        if delta < 0:
+            due_str = f" — venció hace {abs(delta)} día(s), el {due.isoformat()}"
+        elif delta == 0:
+            due_str = f" — vence hoy, {due.isoformat()}"
+        elif delta == 1:
+            due_str = f" — vence mañana, {due.isoformat()}"
+        else:
+            due_str = f" — vence {due.isoformat()} (faltan {delta} días)"
+    elif getattr(activity, "due_date", None):
+        due_str = f" — vence {activity.due_date}"
+    pri_str = f" [{activity.priority_level}]" if getattr(activity, "priority_level", None) else ""
+    title = getattr(activity, "activity_title", None) or getattr(activity, "activity_type", "actividad")
+    return f"  • [{activity.activity_type}] {activity.subject_name}: {title}{due_str}{pri_str}"
 
 
 def _validate_academic_activity_tool_input(

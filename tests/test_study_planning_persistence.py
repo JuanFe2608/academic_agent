@@ -405,6 +405,119 @@ def test_build_study_plan_persists_recalculated_snapshot() -> None:
         set_study_planning_persistence_service(None)
 
 
+def test_study_planning_persistence_loads_current_snapshot() -> None:
+    planning_repository = InMemoryStudyPlanningRepository()
+    planning_service = StudyPlanningPersistenceService(repository=planning_repository)
+    subject = SubjectItem(
+        nombre="Calculo",
+        prioridad="alta",
+        dificultad=4,
+        urgencia="alta",
+        carga_semanal_min=180,
+        origen="manual",
+    )
+
+    persisted = planning_service.persist_snapshot(
+        student_id=15,
+        schedule_profile_id=9,
+        personalization_profile_id=7,
+        priorities_state={"status": "completed", "source": "manual"},
+        subjects=[subject],
+        study_plan={
+            "plan_events": [_study_event("Estudio Calculo")],
+            "rules": {"planner_version": "study_planner_v1", "status": "generated"},
+        },
+        timezone="America/Bogota",
+    )
+
+    loaded = planning_service.load_current_snapshot(student_id=15)
+
+    assert persisted.persisted
+    assert loaded.loaded
+    assert loaded.study_plan is not None
+    assert loaded.study_plan.persisted_profile_id == persisted.study_plan_profile_id
+    assert loaded.subjects and loaded.subjects[0].nombre == "Calculo"
+
+
+def test_postgres_planning_snapshot_loader_accepts_dict_rows() -> None:
+    event = _study_event("Estudio Calculo")
+    repository = PostgresStudyPlanningRepository("postgresql://test")
+
+    class _FakeConn:
+        def execute(self, query: str, _params: tuple):
+            if "FROM study_priority_profiles" in query:
+                return _Rows([
+                    {
+                        "id": 3,
+                        "version_number": 2,
+                        "result_payload": {
+                            "status": "completed",
+                            "source": "manual",
+                            "persisted_profile_id": 3,
+                            "version_number": 2,
+                        },
+                    }
+                ])
+            if "FROM study_plan_profiles" in query:
+                return _Rows([
+                    {
+                        "id": 9,
+                        "version_number": 4,
+                        "result_payload": {
+                            "plan_events": [event.model_dump(mode="python")],
+                            "rules": {"status": "generated"},
+                            "persisted_profile_id": 9,
+                            "version_number": 4,
+                        },
+                    }
+                ])
+            if "FROM study_priority_subjects" in query:
+                return _Rows([
+                    {
+                        "subject_name": "Calculo",
+                        "priority": "alta",
+                        "difficulty": 4,
+                        "urgency": "alta",
+                        "weekly_load_min": 180,
+                        "origin": "manual",
+                        "importance_rank_selected_by_student": None,
+                        "perceived_difficulty": None,
+                        "urgency_type": None,
+                        "urgency_due_at": None,
+                        "computed_priority_score": None,
+                        "priority_source": None,
+                        "is_priority_confirmed": True,
+                        "updated_from_flow_at": None,
+                    }
+                ])
+            raise AssertionError(query)
+
+    class _Rows:
+        def __init__(self, rows: list[dict]):
+            self._rows = rows
+
+        def fetchone(self):
+            return self._rows[0] if self._rows else None
+
+        def fetchall(self):
+            return list(self._rows)
+
+    @contextmanager
+    def _fake_connect():
+        yield _FakeConn()
+
+    repository._connect = _fake_connect  # type: ignore[method-assign]
+
+    snapshot = repository.get_current_student_planning_snapshot(student_id=15)
+
+    assert snapshot is not None
+    assert snapshot.priority_profile_id == 3
+    assert snapshot.study_plan_profile_id == 9
+    assert snapshot.subjects[0].nombre == "Calculo"
+    assert snapshot.study_plan is not None
+    assert snapshot.study_plan.persisted_profile_id == 9
+
+
 def test_phase_11_persists_only_generated_plan_after_priorities_completion(
     monkeypatch,
 ) -> None:

@@ -20,6 +20,7 @@ from agents.support.scheduling.state_helpers import (
     update_schedule_flow_state,
 )
 from agents.support.state import AgentState
+from services.scheduling.event_projection import sync_schedule_block_events
 from services.scheduling.pending_schedule_support import build_schedule_pending_prompt
 from services.scheduling.pending_slot_state import (
     clear_scheduling_pending_interaction,
@@ -149,6 +150,7 @@ def handle_schedule_parsing_turn(
                 conflicts=[],
                 conflicts_accepted=False,
             ),
+            "events": _events_for_blocks(state, blocks),
             "awaiting_user_input": True,
             "messages": append_message(messages, "assistant", prompts.work_request),
             **clear_scheduling_pending_interaction(state),
@@ -167,6 +169,7 @@ def handle_schedule_parsing_turn(
             ),
             blocks,
         ),
+        "events": _events_for_blocks(state, blocks),
         "phase": "extras",
         "awaiting_user_input": False,
         **clear_scheduling_pending_interaction(state),
@@ -217,6 +220,7 @@ def _build_pending_section_update(
             conflicts=[],
             conflicts_accepted=False,
         ),
+        "events": _events_for_blocks(state, blocks),
         "awaiting_user_input": True,
         "messages": append_message(messages, "assistant", prompt),
         **schedule_pending_interaction_update(
@@ -252,7 +256,15 @@ def _build_more_prompt_update(
             conflicts=[],
             conflicts_accepted=False,
         ),
+        "events": _events_for_blocks(state, blocks),
         "awaiting_user_input": True,
         "messages": append_message(messages, "assistant", prompt),
         **clear_scheduling_pending_interaction(state),
     }
+
+
+def _events_for_blocks(state: AgentState, blocks: list) -> list:
+    return sync_schedule_block_events(
+        list(state.get("events", [])),
+        blocks,
+    )
