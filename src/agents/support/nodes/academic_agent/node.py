@@ -26,12 +26,16 @@ from agents.support.nodes.repair_fixed_schedule.node import repair_fixed_schedul
 from agents.support.nodes.request_replan.node import request_replan as _request_replan
 from agents.support.nodes.utils import append_message, detect_new_input
 from agents.support.state import AgentState
+from langchain_core.runnables import RunnableConfig
 
 _MAX_PERSISTED_MESSAGES: int = 20  # ~10 Human+AI pairs; older messages are trimmed from the checkpoint
 
 
-def academic_agent(state: AgentState) -> dict:
+def academic_agent(state: AgentState, config: RunnableConfig | None = None) -> dict:
     """Despacha el turno: mantenimiento determinista o agente ReAct en modo running."""
+    whatsapp_recipient_id: str | None = (
+        str(((config or {}).get("configurable") or {}).get("thread_id") or "").strip() or None
+    )
     state, hydration_update = _hydrate_react_runtime_state(state)
     conversation = state.conversation_state
     phase = conversation.phase
@@ -166,9 +170,10 @@ def academic_agent(state: AgentState) -> dict:
             if "operational_note" in todo_update:
                 _append_operational_note(return_dict, str(todo_update["operational_note"]))
             if "academic_activities" in todo_update:
+                pre_todo_snapshot = list(return_dict.get("academic_activities") or [])
                 return_dict["academic_activities"] = todo_update["academic_activities"]
-                _persist_activities_after_tool_update(state, return_dict)
-        reminder_update = _sync_activity_reminders_after_tool_update(state, return_dict)
+                _persist_todo_task_id_updates(state, return_dict, pre_todo_snapshot)
+        reminder_update = _sync_activity_reminders_after_tool_update(state, return_dict, whatsapp_recipient_id=whatsapp_recipient_id)
         if reminder_update:
             return_dict["reminders"] = reminder_update
 
@@ -564,9 +569,75 @@ def _persist_activities_after_tool_update(state: AgentState, update: dict) -> No
     update["academic_activities"] = persisted_list
 
 
+def _persist_todo_task_id_updates(
+    state: AgentState,
+    update: dict,
+    pre_sync_snapshot: list,
+) -> None:
+    """Persiste solo las actividades cuyo todo_task_id cambió tras la sincronización con To Do.
+
+    Evita escribir en BD actividades que ya fueron persistidas en el primer
+    _persist_activities_after_tool_update del mismo turno y cuyo único cambio
+    esperado es el todo_task_id asignado por Microsoft To Do.
+    """
+    student_id = getattr(state.student_profile, "persisted_student_id", None)
+    if not student_id:
+        return
+
+    raw_list = update.get("academic_activities")
+    if not raw_list:
+        return
+
+    from agents.support.dependencies import get_academic_activity_persistence_service
+    from schemas.planning import AcademicActivity
+
+    try:
+        service = get_academic_activity_persistence_service()
+    except Exception:
+        return
+
+    pre_sync_todo_id: dict[str, str | None] = {}
+    for raw in pre_sync_snapshot:
+        try:
+            act = AcademicActivity.model_validate(raw) if isinstance(raw, dict) else raw
+            pre_sync_todo_id[act.activity_id] = getattr(act, "todo_task_id", None)
+        except Exception:
+            pass
+
+    persisted_list: list[dict] = []
+    for raw in raw_list:
+        try:
+            act = AcademicActivity.model_validate(raw) if isinstance(raw, dict) else raw
+        except Exception:
+            persisted_list.append(raw if isinstance(raw, dict) else raw.model_dump())
+            continue
+
+        current_todo_task_id = getattr(act, "todo_task_id", None)
+        pre_todo_task_id = pre_sync_todo_id.get(act.activity_id)
+
+        if pre_todo_task_id == current_todo_task_id:
+            persisted_list.append(act.model_dump())
+            continue
+
+        try:
+            result = service.upsert_activity(student_id=int(student_id), activity=act)
+        except Exception:
+            persisted_list.append(act.model_dump())
+            continue
+
+        if result.persisted and result.activity is not None:
+            persisted_list.append(result.activity.model_dump())
+        else:
+            persisted_list.append(act.model_dump())
+
+    update["academic_activities"] = persisted_list
+
+
 def _sync_activity_reminders_after_tool_update(
     state: AgentState,
     update: dict,
+    *,
+    whatsapp_recipient_id: str | None = None,
 ) -> dict[str, object] | None:
     """Agenda recordatorios durables cuando ReAct cambia actividades académicas."""
 
@@ -585,6 +656,7 @@ def _sync_activity_reminders_after_tool_update(
             activities=list(update.get("academic_activities", state.academic_activities)),
             reminders_state=current_reminders,
             timezone=str(update.get("timezone") or state.timezone or "America/Bogota"),
+            whatsapp_recipient_id=whatsapp_recipient_id,
         )
     except Exception as exc:
         from services.reminders import update_reminders_state

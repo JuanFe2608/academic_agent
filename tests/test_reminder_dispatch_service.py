@@ -306,6 +306,11 @@ def test_due_reminder_runner_marks_sent_and_failed() -> None:
     assert result.leased_count == 2
     assert result.sent_count == 1
     assert result.failed_count == 1
+    assert result.channel_counts == {"in_app": 1, "email": 1}
+    assert result.dispatch_type_counts == {
+        "pre_session_60m": 1,
+        "pre_session_10m": 1,
+    }
     statuses = {row["channel"]: row["status"] for row in repository._dispatches_by_id.values()}
     assert statuses == {"in_app": "sent", "email": "failed"}
 
@@ -371,6 +376,48 @@ def test_due_reminder_runner_sends_whatsapp_and_avoids_duplicate_dispatch() -> N
     row = next(iter(repository._dispatches_by_id.values()))
     assert row["status"] == "sent"
     assert row["provider_message_id"] == "wamid.1"
+
+
+def test_due_reminder_runner_can_filter_by_channel() -> None:
+    repository = InMemoryRemindersRepository()
+    scheduled_for = real_datetime(2026, 1, 5, 7, 30)
+    repository.sync_dispatches(
+        dispatches=[
+            ReminderDispatchSeed(
+                student_id=1,
+                reminder_policy_id=1,
+                study_plan_event_instance_id=11,
+                dispatch_type="pre_session_60m",
+                channel="in_app",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            ),
+            ReminderDispatchSeed(
+                student_id=1,
+                reminder_policy_id=2,
+                study_plan_event_instance_id=11,
+                dispatch_type="pre_session_60m",
+                channel="whatsapp",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            ),
+        ]
+    )
+    runner = ReminderDispatchRunner(repository=repository)
+
+    result = runner.run_due_dispatches(
+        as_of=real_datetime(2026, 1, 5, 8, 0),
+        limit=10,
+        channels={"whatsapp"},
+    )
+
+    assert result.leased_count == 1
+    assert result.channel_counts == {"whatsapp": 1}
+    statuses = {
+        row["channel"]: row["status"]
+        for row in repository._dispatches_by_id.values()
+    }
+    assert statuses == {"in_app": "pending", "whatsapp": "failed"}
 
 
 def test_whatsapp_renderer_handles_activity_due_and_overdue_messages() -> None:
@@ -478,3 +525,148 @@ def test_due_reminder_runner_retries_retryable_whatsapp_failures() -> None:
     assert row["status"] == "failed"
     assert row["failure_reason"] == "whatsapp_send_error"
     assert row["attempt_count"] == 2
+
+
+def test_due_reminder_runner_logs_sent_dispatch(caplog) -> None:
+    import logging
+
+    repository = InMemoryRemindersRepository()
+    scheduled_for = real_datetime(2026, 1, 5, 7, 30)
+    repository.sync_dispatches(
+        dispatches=[
+            ReminderDispatchSeed(
+                student_id=5,
+                reminder_policy_id=1,
+                study_plan_event_instance_id=10,
+                dispatch_type="pre_session_60m",
+                channel="in_app",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            )
+        ]
+    )
+    runner = ReminderDispatchRunner(repository=repository)
+
+    with caplog.at_level(logging.INFO, logger="services.reminders.dispatcher"):
+        runner.run_due_dispatches(as_of=real_datetime(2026, 1, 5, 8, 0), limit=10)
+
+    messages = [r.message for r in caplog.records]
+    sent_logs = [m for m in messages if "reminder_dispatch_sent" in m]
+    assert len(sent_logs) == 1
+    assert "student_id=5" in sent_logs[0]
+    assert "channel=in_app" in sent_logs[0]
+    assert "dispatch_type=pre_session_60m" in sent_logs[0]
+
+
+def test_due_reminder_runner_logs_failed_dispatch(caplog) -> None:
+    import logging
+
+    repository = InMemoryRemindersRepository()
+    scheduled_for = real_datetime(2026, 1, 5, 7, 30)
+    repository.sync_dispatches(
+        dispatches=[
+            ReminderDispatchSeed(
+                student_id=5,
+                reminder_policy_id=2,
+                study_plan_event_instance_id=10,
+                dispatch_type="pre_session_10m",
+                channel="email",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            )
+        ]
+    )
+    runner = ReminderDispatchRunner(repository=repository)
+
+    with caplog.at_level(logging.WARNING, logger="services.reminders.dispatcher"):
+        runner.run_due_dispatches(as_of=real_datetime(2026, 1, 5, 8, 0), limit=10)
+
+    messages = [r.message for r in caplog.records]
+    failed_logs = [m for m in messages if "reminder_dispatch_failed" in m]
+    assert len(failed_logs) == 1
+    assert "student_id=5" in failed_logs[0]
+    assert "channel=email" in failed_logs[0]
+    assert "error_code=" in failed_logs[0]
+
+
+def test_due_reminder_runner_logs_retryable_dispatch(caplog) -> None:
+    import logging
+
+    repository = InMemoryRemindersRepository()
+    scheduled_for = real_datetime(2026, 1, 5, 7, 30)
+    repository.sync_dispatches(
+        dispatches=[
+            ReminderDispatchSeed(
+                student_id=5,
+                reminder_policy_id=3,
+                study_plan_event_instance_id=10,
+                dispatch_type="followup_15m",
+                channel="whatsapp",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            )
+        ]
+    )
+    client = _FailingWhatsAppClient(status_code=500)
+    sender = WhatsAppReminderSender(
+        channel_service=WhatsAppChannelService(client),  # type: ignore[arg-type]
+        recipient_resolver=_StaticRecipientResolver("573001112233"),
+    )
+    runner = ReminderDispatchRunner(
+        repository=repository,
+        whatsapp_sender=sender,
+        max_attempts=3,
+        retry_delay_minutes=15,
+    )
+
+    with caplog.at_level(logging.WARNING, logger="services.reminders.dispatcher"):
+        runner.run_due_dispatches(as_of=real_datetime(2026, 1, 5, 8, 0), limit=10)
+
+    messages = [r.message for r in caplog.records]
+    retryable_logs = [m for m in messages if "reminder_dispatch_retryable" in m]
+    assert len(retryable_logs) == 1
+    assert "student_id=5" in retryable_logs[0]
+    assert "channel=whatsapp" in retryable_logs[0]
+    assert "retry_at=" in retryable_logs[0]
+
+
+def test_due_reminder_runner_logs_batch_summary(caplog) -> None:
+    import logging
+
+    repository = InMemoryRemindersRepository()
+    scheduled_for = real_datetime(2026, 1, 5, 7, 30)
+    repository.sync_dispatches(
+        dispatches=[
+            ReminderDispatchSeed(
+                student_id=5,
+                reminder_policy_id=1,
+                study_plan_event_instance_id=10,
+                dispatch_type="pre_session_60m",
+                channel="in_app",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            ),
+            ReminderDispatchSeed(
+                student_id=5,
+                reminder_policy_id=2,
+                study_plan_event_instance_id=10,
+                dispatch_type="pre_session_10m",
+                channel="email",
+                scheduled_for=scheduled_for,
+                payload={"title": "Calculo"},
+            ),
+        ]
+    )
+    runner = ReminderDispatchRunner(repository=repository)
+
+    with caplog.at_level(logging.INFO, logger="services.reminders.dispatcher"):
+        runner.run_due_dispatches(as_of=real_datetime(2026, 1, 5, 8, 0), limit=10)
+
+    messages = [r.message for r in caplog.records]
+    start_logs = [m for m in messages if "reminder_dispatch_batch_start" in m]
+    done_logs = [m for m in messages if "reminder_dispatch_batch_done" in m]
+    assert len(start_logs) == 1
+    assert "leased=2" in start_logs[0]
+    assert len(done_logs) == 1
+    assert "sent=1" in done_logs[0]
+    assert "failed=1" in done_logs[0]

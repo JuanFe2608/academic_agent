@@ -3,12 +3,16 @@
 from __future__ import annotations
 
 import json
+import logging
 import os
+from collections import Counter
 from collections.abc import Mapping
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from typing import Protocol
 from zoneinfo import ZoneInfo
+
+_logger = logging.getLogger(__name__)
 
 from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
@@ -62,6 +66,8 @@ class RunDueRemindersResult:
     sent_count: int = 0
     failed_count: int = 0
     retryable_count: int = 0
+    channel_counts: dict[str, int] | None = None
+    dispatch_type_counts: dict[str, int] | None = None
     error_code: str | None = None
     detail: str | None = None
 
@@ -330,12 +336,19 @@ class ReminderDispatchRunner:
         *,
         as_of: datetime | None = None,
         limit: int = 50,
+        channels: set[str] | None = None,
     ) -> RunDueRemindersResult:
         effective_as_of = as_of or datetime.now(timezone.utc)
+        allowed_channels = {
+            str(channel).strip()
+            for channel in (channels or set())
+            if str(channel).strip()
+        } or None
         try:
             leased = self.repository.lease_due_dispatches(
                 as_of=effective_as_of,
                 limit=max(1, int(limit)),
+                channels=allowed_channels,
             )
         except (RemindersRepositoryError, RepositoryConfigurationError) as exc:
             return RunDueRemindersResult(
@@ -347,6 +360,16 @@ class ReminderDispatchRunner:
         sent_count = 0
         failed_count = 0
         retryable_count = 0
+        channel_counts = dict(Counter(dispatch.channel for dispatch in leased))
+        dispatch_type_counts = dict(Counter(dispatch.dispatch_type for dispatch in leased))
+
+        _logger.info(
+            "reminder_dispatch_batch_start leased=%d as_of=%s channels=%s",
+            len(leased),
+            effective_as_of.isoformat(),
+            ",".join(sorted(allowed_channels)) if allowed_channels else "all",
+        )
+
         for dispatch in leased:
             sender = self.senders.get(dispatch.channel, UnsupportedReminderSender(dispatch.channel))
             result = sender.send(dispatch)
@@ -358,6 +381,15 @@ class ReminderDispatchRunner:
                         provider_message_id=result.provider_message_id,
                     )
                     sent_count += 1
+                    _logger.info(
+                        "reminder_dispatch_sent dispatch_id=%s student_id=%s channel=%s"
+                        " dispatch_type=%s provider_message_id=%s",
+                        dispatch.id,
+                        dispatch.student_id,
+                        dispatch.channel,
+                        dispatch.dispatch_type,
+                        result.provider_message_id,
+                    )
                 else:
                     retry_at = self._retry_at_for_failure(
                         dispatch=dispatch,
@@ -371,25 +403,65 @@ class ReminderDispatchRunner:
                     )
                     if retry_at is None:
                         failed_count += 1
+                        _logger.warning(
+                            "reminder_dispatch_failed dispatch_id=%s student_id=%s channel=%s"
+                            " dispatch_type=%s attempt=%s error_code=%s detail=%s",
+                            dispatch.id,
+                            dispatch.student_id,
+                            dispatch.channel,
+                            dispatch.dispatch_type,
+                            dispatch.attempt_count,
+                            result.error_code,
+                            result.detail,
+                        )
                     else:
                         retryable_count += 1
+                        _logger.warning(
+                            "reminder_dispatch_retryable dispatch_id=%s student_id=%s channel=%s"
+                            " dispatch_type=%s attempt=%s error_code=%s retry_at=%s",
+                            dispatch.id,
+                            dispatch.student_id,
+                            dispatch.channel,
+                            dispatch.dispatch_type,
+                            dispatch.attempt_count,
+                            result.error_code,
+                            retry_at.isoformat(),
+                        )
             except (RemindersRepositoryError, RepositoryConfigurationError) as exc:
+                _logger.error(
+                    "reminder_dispatch_update_error dispatch_id=%s student_id=%s channel=%s error=%s",
+                    dispatch.id,
+                    dispatch.student_id,
+                    dispatch.channel,
+                    exc,
+                )
                 return RunDueRemindersResult(
                     processed=False,
                     leased_count=len(leased),
                     sent_count=sent_count,
                     failed_count=failed_count,
                     retryable_count=retryable_count,
+                    channel_counts=channel_counts,
+                    dispatch_type_counts=dispatch_type_counts,
                     error_code="reminder_dispatch_update_error",
                     detail=str(exc),
                 )
 
+        _logger.info(
+            "reminder_dispatch_batch_done leased=%d sent=%d failed=%d retryable=%d",
+            len(leased),
+            sent_count,
+            failed_count,
+            retryable_count,
+        )
         return RunDueRemindersResult(
             processed=True,
             leased_count=len(leased),
             sent_count=sent_count,
             failed_count=failed_count,
             retryable_count=retryable_count,
+            channel_counts=channel_counts,
+            dispatch_type_counts=dispatch_type_counts,
         )
 
     def _retry_at_for_failure(

@@ -119,6 +119,7 @@ class RemindersRepository(Protocol):
         *,
         as_of: datetime,
         limit: int,
+        channels: set[str] | None = None,
     ) -> list[LeasedReminderDispatch]: ...
 
     def mark_dispatch_sent(
@@ -350,19 +351,29 @@ class InMemoryRemindersRepository:
         *,
         as_of: datetime,
         limit: int,
+        channels: set[str] | None = None,
     ) -> list[LeasedReminderDispatch]:
+        allowed_channels = {
+            str(channel).strip()
+            for channel in (channels or set())
+            if str(channel).strip()
+        }
         leased: list[LeasedReminderDispatch] = []
         pending = sorted(
             (
                 row
                 for row in self._dispatches_by_id.values()
-                if (
-                    row["status"] == "pending" and row["scheduled_for"] <= as_of
-                )
-                or (
-                    row["status"] == "retryable"
-                    and row.get("next_attempt_at") is not None
-                    and row["next_attempt_at"] <= as_of
+                if (not allowed_channels or row["channel"] in allowed_channels)
+                and (
+                    (
+                        row["status"] == "pending"
+                        and row["scheduled_for"] <= as_of
+                    )
+                    or (
+                        row["status"] == "retryable"
+                        and row.get("next_attempt_at") is not None
+                        and row["next_attempt_at"] <= as_of
+                    )
                 )
             ),
             key=lambda item: (item["scheduled_for"], item["id"]),
@@ -640,21 +651,28 @@ class PostgresRemindersRepository:
         *,
         as_of: datetime,
         limit: int,
+        channels: set[str] | None = None,
     ) -> list[LeasedReminderDispatch]:
+        allowed_channels = sorted(
+            {str(channel).strip() for channel in (channels or set()) if str(channel).strip()}
+        )
         with self._connect() as conn:
             rows = conn.execute(
                 """
                 WITH due AS (
                     SELECT id
                     FROM reminder_dispatches
-                    WHERE (
-                        status = 'pending'
-                        AND scheduled_for <= %s
-                    )
-                    OR (
-                        status = 'retryable'
-                        AND next_attempt_at IS NOT NULL
-                        AND next_attempt_at <= %s
+                    WHERE (%s::text[] IS NULL OR channel = ANY(%s::text[]))
+                      AND (
+                        (
+                            status = 'pending'
+                            AND scheduled_for <= %s
+                        )
+                        OR (
+                            status = 'retryable'
+                            AND next_attempt_at IS NOT NULL
+                            AND next_attempt_at <= %s
+                        )
                     )
                     ORDER BY scheduled_for, id
                     LIMIT %s
@@ -672,7 +690,14 @@ class PostgresRemindersRepository:
                           rd.channel, rd.scheduled_for, rd.payload,
                           rd.attempt_count
                 """,
-                (as_of, as_of, max(1, int(limit)), as_of),
+                (
+                    allowed_channels or None,
+                    allowed_channels or None,
+                    as_of,
+                    as_of,
+                    max(1, int(limit)),
+                    as_of,
+                ),
             ).fetchall()
             conn.commit()
         return [_leased_dispatch_from_row(row) for row in rows]

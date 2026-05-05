@@ -86,6 +86,21 @@ _STATIC_INSTRUCTIONS = (
     "- Si recibes una imagen: interpreta su contenido académico (enunciado, rúbrica, fecha de entrega, etc.) "
     "y ofrece ayuda concreta — registra actividades, sugiere técnicas o ajusta el plan según corresponda\n"
     "\n"
+    "CONTINUIDAD CONVERSACIONAL — LEE ESTO ANTES DE RESPONDER:\n"
+    "- SIEMPRE lee el último mensaje TUYO en el historial antes de interpretar el mensaje del estudiante.\n"
+    "- Si tu último mensaje terminaba con una pregunta, el mensaje del estudiante ES LA RESPUESTA a esa pregunta:\n"
+    "  → Si preguntaste '¿quieres ver tu agenda?', 'Si' → usa get_weekly_plan + get_schedule.\n"
+    "  → Si preguntaste '¿quieres explicación paso a paso de X?', 'Si' → da la explicación de X.\n"
+    "  → Si preguntaste '¿para qué materia quieres la recomendación?', 'Gestión de proyectos' "
+    "→ usa search_study_methods para Gestión de proyectos.\n"
+    "  → Si preguntaste '¿lo marco como prioritario?', 'Si' → registra con is_priority=True.\n"
+    "  → Continúa el flujo abierto. No abras uno nuevo.\n"
+    "- Solo si tu último mensaje NO terminaba con una pregunta, clasifica el mensaje del estudiante como intent nuevo.\n"
+    "- Solo inicies el flujo de actividades académicas (detectar → preguntar prioridad → registrar) "
+    "si el estudiante mencionó explícitamente una actividad, examen, entrega o parcial EN SU MENSAJE ACTUAL.\n"
+    "- No actúes sobre actividades que ya están en ACTIVIDADES ACADÉMICAS PENDIENTES a menos que "
+    "el estudiante las mencione en su mensaje — no las re-registres ni preguntes sobre ellas.\n"
+    "\n"
     "ACTIVIDADES ACADÉMICAS — FLUJO CORRECTO:\n"
     "1. Detecta la actividad del mensaje (tipo, materia, fecha)\n"
     "2. Pregunta UNA SOLA VEZ: '¿Quieres marcarla como prioritaria? ⭐' (sí = is_priority=True)\n"
@@ -99,6 +114,10 @@ _STATIC_INSTRUCTIONS = (
     "- Outlook Calendar: horario fijo (clases, trabajo, extracurriculares) + sesiones de estudio\n"
     "- Microsoft To Do: actividades académicas con fecha límite (parciales, tareas, entregas, proyectos)\n"
     "- NO mezcles: no crees eventos de calendario para actividades puntuales\n"
+    "- sync_plan_to_calendar: SOLO para sesiones del PLAN DE ESTUDIO generadas por el planificador.\n"
+    "  Si el estudiante pide 'agregar Cálculo/mi horario a Outlook' sin pedir un bloque nuevo:\n"
+    "  explícale que el horario fijo ya se sincroniza automáticamente al guardar cambios con\n"
+    "  add_schedule_block o update_schedule_block. NO llames sync_plan_to_calendar en ese caso.\n"
     "\n"
     "PLANIFICACIÓN DE ESTUDIO — REGLAS CRÍTICAS:\n"
     "- Cuando pidan planificar → llama update_study_plan DIRECTAMENTE. NO hagas preguntas previas.\n"
@@ -147,6 +166,36 @@ _STATIC_INSTRUCTIONS = (
 )
 
 
+def _extract_pending_question(messages: list) -> str | None:
+    """Retorna la última pregunta de Lara si el turno anterior la dejó abierta.
+
+    Recorre los mensajes en orden inverso buscando el último AIMessage (type="ai").
+    Si ese mensaje contiene "?", extrae la última línea que lo contenga.
+    Si el último mensaje de Lara NO tenía pregunta, retorna None para no fabricar
+    contexto ficticio.
+    """
+    for msg in reversed(list(messages or [])):
+        if getattr(msg, "type", None) != "ai":
+            continue
+        content = getattr(msg, "content", "")
+        if isinstance(content, list):
+            text = " ".join(
+                str(block.get("text", ""))
+                for block in content
+                if isinstance(block, dict) and block.get("type") == "text"
+            )
+        else:
+            text = str(content or "")
+        text = text.strip()
+        if "?" not in text:
+            break  # Último mensaje de Lara sin pregunta → no hay flujo abierto
+        lines_with_question = [line.strip() for line in text.splitlines() if "?" in line]
+        if lines_with_question:
+            return lines_with_question[-1]
+        break
+    return None
+
+
 def build_dynamic_context(state: AgentState) -> str:
     """Parte dinámica: datos del estudiante que varían con el estado (perfil, horario, actividades, plan)."""
     profile = state.student_profile
@@ -185,6 +234,15 @@ def build_dynamic_context(state: AgentState) -> str:
         if constraints.preferred_study_start and constraints.preferred_study_end
         else "No configurado"
     )
+
+    pending_question = _extract_pending_question(list(state.messages or []))
+    pending_section = (
+        "\n"
+        "PREGUNTA PENDIENTE (tu turno anterior):\n"
+        f"  \"{pending_question}\"\n"
+        "→ El siguiente mensaje del estudiante ES la respuesta a esta pregunta.\n"
+        "  Continúa ese flujo — no lo interpretes como un intent nuevo."
+    ) if pending_question else ""
 
     return (
         "---\n"
@@ -226,6 +284,7 @@ def build_dynamic_context(state: AgentState) -> str:
         f"- Zona horaria: {timezone_name}\n"
         "- Si el estudiante pregunta qué día es hoy, responde usando estos datos, no tu conocimiento interno.\n"
         "- Para expresiones relativas como hoy, mañana, esta semana o próximos días, usa esta fecha local."
+        f"{pending_section}"
     )
 
 
@@ -336,6 +395,7 @@ def format_study_plan(study_plan) -> str:
 
 __all__ = [
     "_STATIC_INSTRUCTIONS",
+    "_extract_pending_question",
     "build_dynamic_context",
     "build_agent_context",
     "current_datetime",

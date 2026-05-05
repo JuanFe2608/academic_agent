@@ -256,7 +256,8 @@ def _is_ignored_academic_line(line: str) -> bool:
         return True
     if folded.isdigit():
         return True
-    if folded in {"image", "imagen"}:
+    # Standalone image placeholders ("image", "imagen", "imagen 1", etc.)
+    if is_placeholder_schedule_title(line.strip()):
         return True
     return any(
         token in folded

@@ -8,7 +8,7 @@ import json
 import logging
 import os
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
 from fastapi.responses import HTMLResponse
@@ -20,6 +20,9 @@ from integrations.whatsapp import (
 from services.sync.microsoft_oauth_callback_handler import handle_microsoft_oauth_callback
 
 logger = logging.getLogger(__name__)
+
+if TYPE_CHECKING:
+    from api.agent_runner import AgentRunner
 
 _runner: "AgentRunner | None" = None  # type: ignore[name-defined]
 
@@ -114,29 +117,57 @@ def health() -> dict[str, str]:
 async def run_due_reminders(
     request: Request,
     limit: int = Query(50, ge=1, le=500),
-    token: str | None = Query(None),
 ) -> dict[str, object]:
     """Ejecuta un ciclo del worker de recordatorios para Azure Scheduler/Functions."""
 
     expected_token = os.getenv("ACADEMIC_AGENT_REMINDER_WORKER_TOKEN", "").strip()
-    provided_token = (request.headers.get("x-reminder-worker-token") or token or "").strip()
-    if expected_token and provided_token != expected_token:
+    if not expected_token:
+        logger.error("Reminder worker rechazado: ACADEMIC_AGENT_REMINDER_WORKER_TOKEN no configurado.")
+        raise HTTPException(status_code=503, detail="Worker de recordatorios no configurado.")
+
+    provided_token = (request.headers.get("x-reminder-worker-token") or "").strip()
+    if provided_token != expected_token:
+        logger.warning("Reminder worker rechazado: token ausente o invalido.")
         raise HTTPException(status_code=403, detail="Token de worker invalido.")
 
     from services.reminders import build_reminder_dispatch_runner
 
     result = build_reminder_dispatch_runner().run_due_dispatches(limit=limit)
     if not result.processed:
+        logger.error(
+            "Reminder worker fallo: error_code=%s detail=%s leased_count=%s "
+            "sent_count=%s failed_count=%s retryable_count=%s channels=%s dispatch_types=%s",
+            result.error_code,
+            result.detail,
+            result.leased_count,
+            result.sent_count,
+            result.failed_count,
+            result.retryable_count,
+            result.channel_counts or {},
+            result.dispatch_type_counts or {},
+        )
         raise HTTPException(
             status_code=500,
             detail=result.detail or result.error_code or "No se pudieron procesar recordatorios.",
         )
+    logger.info(
+        "Reminder worker ejecutado: leased_count=%s sent_count=%s failed_count=%s "
+        "retryable_count=%s channels=%s dispatch_types=%s",
+        result.leased_count,
+        result.sent_count,
+        result.failed_count,
+        result.retryable_count,
+        result.channel_counts or {},
+        result.dispatch_type_counts or {},
+    )
     return {
         "status": "ok",
         "leased_count": result.leased_count,
         "sent_count": result.sent_count,
         "failed_count": result.failed_count,
         "retryable_count": result.retryable_count,
+        "channels": result.channel_counts or {},
+        "dispatch_types": result.dispatch_type_counts or {},
     }
 
 

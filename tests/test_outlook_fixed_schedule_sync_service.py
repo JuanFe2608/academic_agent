@@ -5,6 +5,8 @@ from __future__ import annotations
 from datetime import date
 from datetime import datetime as real_datetime
 
+from services.scheduling.end_date_support import fallback_schedule_end_date
+
 from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
     MicrosoftOAuthClient,
@@ -358,3 +360,59 @@ def test_outlook_fixed_schedule_sync_service_marks_stale_missing_blocks_deleted(
     assert client.deletes == []
     assert old_blocks[0].external_sync_status == "deleted"
     assert old_blocks[0].external_sync_metadata["delete_reason"] == "stale_missing_event"
+
+
+def test_outlook_sync_uses_fallback_end_date_when_schedule_end_date_is_null(
+    monkeypatch,
+) -> None:
+    """Bloque sin schedule_end_date → Outlook recibe endDate (nunca noEnd)."""
+    _freeze_sync_now(monkeypatch)
+    repository = InMemoryScheduleRepository()
+    schedule_service = ScheduleService(repository=repository)
+    persist_result = schedule_service.persist_schedule(
+        student_id=7,
+        occupation="solo_estudio",
+        timezone="America/Bogota",
+        summary_text="Horario sin fecha límite",
+        blocks=[
+            _block(
+                block_id="block-null-end",
+                day_of_week="monday",
+                start_time="08:00",
+                end_time="10:00",
+                title="Algebra",
+            )
+        ],
+        conflicts=[],
+        conflicts_accepted=False,
+        schedule_end_date=None,
+    )
+
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    client = _FakeOutlookCalendarClient()
+    service = OutlookFixedScheduleSyncService(
+        repository=repository,
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    result = service.sync_schedule_profile(
+        student_id=7,
+        schedule_profile_id=persist_result.schedule_profile_id,
+        calendar_id="calendar-1",
+    )
+
+    # Series start: next Monday from 2026-04-10 (frozen) = 2026-04-13
+    series_start = date(2026, 4, 13)
+    expected_fallback = fallback_schedule_end_date(series_start)
+
+    assert result.synced is True
+    assert result.upserted_count == 1
+    assert len(client.upserts) == 1
+    recurrence = client.upserts[0].recurrence
+    assert recurrence is not None
+    assert recurrence.range_type == "endDate", (
+        "Un bloque sin schedule_end_date debe usar endDate, nunca noEnd"
+    )
+    assert recurrence.end_date == expected_fallback

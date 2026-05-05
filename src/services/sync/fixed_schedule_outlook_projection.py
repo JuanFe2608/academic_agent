@@ -10,6 +10,10 @@ from integrations.microsoft_graph.models import (
     OutlookEventRecurrence,
 )
 from repositories.scheduling.repository import PersistedRecurringScheduleBlock
+from services.scheduling.end_date_support import (
+    SCHEDULE_END_DATE_MAX_MONTHS,
+    fallback_schedule_end_date,
+)
 
 _DAY_TO_WEEKDAY_INDEX = {
     "monday": 0,
@@ -40,6 +44,7 @@ def build_outlook_fixed_schedule_event(
     starts_at = datetime.combine(series_start_date, start_time, zone)
     ends_at = datetime.combine(series_start_date, end_time, zone)
 
+    effective_end_date = _resolve_end_date(block, series_start_date)
     return OutlookCalendarEventUpsert(
         external_key=block.source_block_id,
         subject=block.title,
@@ -62,8 +67,8 @@ def build_outlook_fixed_schedule_event(
             interval=1,
             days_of_week=(block.day_of_week,),
             start_date=series_start_date,
-            range_type="endDate" if block.schedule_end_date is not None else "noEnd",
-            end_date=block.schedule_end_date,
+            range_type="endDate",
+            end_date=effective_end_date,
         ),
         use_local_timezone=True,
         existing_external_event_id=(
@@ -101,6 +106,21 @@ def resolve_series_start_date(
         days_back = (block.schedule_end_date.weekday() - target_weekday) % 7
         return block.schedule_end_date - timedelta(days=days_back)
     return candidate_date
+
+
+def _resolve_end_date(
+    block: PersistedRecurringScheduleBlock,
+    series_start_date: date,
+) -> date:
+    """Devuelve la fecha límite efectiva para la serie semanal de Outlook.
+
+    Si el bloque tiene schedule_end_date definida la usa directamente.
+    Si no, aplica un fallback de SCHEDULE_END_DATE_MAX_MONTHS desde series_start_date
+    para garantizar que Outlook nunca reciba range_type="noEnd" (recurrencia infinita).
+    """
+    if block.schedule_end_date is not None:
+        return block.schedule_end_date
+    return fallback_schedule_end_date(series_start_date, max_months=SCHEDULE_END_DATE_MAX_MONTHS)
 
 
 def build_outlook_fixed_schedule_body_preview(

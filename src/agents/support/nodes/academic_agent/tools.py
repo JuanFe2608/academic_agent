@@ -251,6 +251,28 @@ def make_tools(state: AgentState) -> list:
         )
 
         activities = coerce_academic_activities(_current_activities())
+
+        # Guard contra duplicados semánticos: subject + activity_type + due_date ya registrados.
+        # Evita crear una segunda fila en DB cuando el LLM vuelve a llamar esta tool
+        # para una actividad que el estudiante ya registró en el mismo turno o en turnos anteriores.
+        _norm_subject = _normalize_text_key(subject)
+        _norm_type = _normalize_text_key(activity_type)
+        for _existing in activities:
+            if (
+                _existing.status != "deleted"
+                and _normalize_text_key(str(_existing.subject_name or "")) == _norm_subject
+                and _normalize_text_key(str(_existing.activity_type or "")) == _norm_type
+                and str(_existing.due_date or "") == str(due_date or "")
+            ):
+                return json.dumps({
+                    "result": (
+                        f"La actividad '{_existing.activity_title}' de {_existing.subject_name} "
+                        f"para el {_existing.due_date} ya está registrada. "
+                        "Si quieres modificarla usa edit_academic_activity."
+                    ),
+                    "_state_update": {},
+                })
+
         try:
             new_act = build_activity_from_slots(
                 {
@@ -948,9 +970,11 @@ def make_tools(state: AgentState) -> list:
 
     @tool
     def sync_plan_to_calendar() -> str:
-        """Sincroniza el plan de estudio con Outlook Calendar del estudiante.
-        Úsala cuando el estudiante pida sincronizar su plan de estudio con su
-        calendario de Outlook o agregar sesiones de estudio al calendario."""
+        """Sincroniza las SESIONES DEL PLAN DE ESTUDIO (bloques generados por el planificador)
+        con Outlook Calendar. SOLO usar cuando el estudiante pida sincronizar su PLAN DE SESIONES
+        de estudio con Outlook. NO usar para clases, materias ni bloques del horario fijo (work,
+        academic, extracurricular): esos se sincronizan automáticamente al usar add_schedule_block
+        o update_schedule_block."""
         from agents.support.dependencies import (
             get_outlook_calendar_sync_service,
             get_study_plan_materialization_service,
@@ -979,9 +1003,14 @@ def make_tools(state: AgentState) -> list:
                 study_plan_profile_id=state.study_plan.persisted_profile_id,
             )
             if result.synced:
+                if result.upserted_count == 0 and result.deleted_count == 0:
+                    return (
+                        "No había sesiones del plan de estudio pendientes de sincronizar con Outlook. "
+                        "Si esperabas eventos nuevos, verifica que el plan tenga sesiones generadas y guardadas."
+                    )
                 return (
-                    f"Sincronización completada: {result.upserted_count} sesiones "
-                    f"creadas/actualizadas, {result.deleted_count} eliminadas."
+                    f"✅ Sincronización completada: {result.upserted_count} sesión(es) "
+                    f"creadas/actualizadas, {result.deleted_count} eliminadas en Outlook."
                 )
             return f"No se pudo sincronizar: {result.detail or result.error_code or 'error desconocido'}"
         except Exception as exc:

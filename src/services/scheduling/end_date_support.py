@@ -81,6 +81,20 @@ def format_schedule_end_date(value: date | None) -> str:
     return value.strftime("%d/%m/%Y")
 
 
+def fallback_schedule_end_date(
+    from_date: date,
+    *,
+    max_months: int = SCHEDULE_END_DATE_MAX_MONTHS,
+) -> date:
+    """Fecha límite por defecto cuando el perfil no tiene una definida.
+
+    Devuelve from_date + max_months meses. Usado en la proyección Outlook
+    para evitar crear series "noEnd" (recurrencias sin fin) cuando el estudiante
+    no proporcionó una fecha límite explícita.
+    """
+    return _add_months(from_date, max_months)
+
+
 def _add_months(d: date, months: int) -> date:
     """Suma N meses a una fecha, ajustando al último día del mes si es necesario."""
     month = d.month - 1 + months
@@ -122,6 +136,7 @@ def _safe_date(year: int, month: int, day: int) -> date | None:
 __all__ = [
     "SCHEDULE_END_DATE_MAX_MONTHS",
     "current_local_date",
+    "fallback_schedule_end_date",
     "format_schedule_end_date",
     "is_schedule_expired",
     "parse_schedule_end_date",
