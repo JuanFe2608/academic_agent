@@ -148,6 +148,32 @@ def test_onboarding_service_prepares_oauth_identity_without_email_verification()
     assert repository._students_by_email["ana@outlook.com"]["email_verified"] is False
 
 
+def test_onboarding_service_updates_prepared_oauth_identity_email() -> None:
+    config = OnboardingConfig()
+    repository = InMemoryOnboardingRepository()
+    service = OnboardingService(config=config, repository=repository)
+    profile = {
+        "full_name": "Ana Maria Perez",
+        "student_code": "67000912",
+        "age": 20,
+        "institutional_email": "correo.mal@outlook.com",
+        "email_verified": False,
+        "academic_program": "Ingenieria de Sistemas y Computacion",
+        "supported_program": True,
+    }
+
+    first = service.persist_verified_identity(profile)
+    corrected_profile = {**profile, "institutional_email": "ana@outlook.com"}
+    second = service.persist_verified_identity(
+        {**corrected_profile, "persisted_student_id": first.student_id}
+    )
+
+    assert second.persisted is True
+    assert second.student_id == first.student_id
+    assert repository.student_exists_by_email("ana@outlook.com") is True
+    assert repository.student_exists_by_email("correo.mal@outlook.com") is False
+
+
 def test_onboarding_service_can_skip_verification_in_disabled_mode() -> None:
     config = OnboardingConfig(verification_mode="disabled")
     repository = InMemoryOnboardingRepository()

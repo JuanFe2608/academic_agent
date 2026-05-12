@@ -462,6 +462,54 @@ def test_request_microsoft_oauth_allows_retry_with_new_state(monkeypatch) -> Non
         set_microsoft_oauth_flow_service(None)
 
 
+def test_request_microsoft_oauth_allows_email_correction_from_pending_state(
+    monkeypatch,
+) -> None:
+    monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
+    repository = InMemoryMicrosoftGraphStateRepository()
+    service = MicrosoftOAuthFlowService(
+        state_repository=repository,
+        auth_client=_FakeOAuthClient(),
+        now_factory=lambda: datetime(2026, 4, 18, tzinfo=timezone.utc),
+    )
+    set_onboarding_service(_onboarding_service())
+    set_microsoft_oauth_flow_service(service)
+
+    try:
+        base_state = _verified_profile_state(
+            student_profile={
+                "institutional_email": "correo.mal@outlook.com",
+                "email_verified": False,
+            }
+        )
+        first_update = request_microsoft_oauth(base_state)
+        state_token = first_update["onboarding"]["microsoft_oauth"]["state_token"]
+        correction_state = _state_from_update(
+            base_state,
+            first_update,
+            user_message="escribi mal el correo, quiero cambiar correo",
+        )
+
+        correction_update = request_microsoft_oauth(correction_state)
+        stored_state = repository.get_oauth_pending_state(state_token=state_token)
+
+        assert correction_update["phase"] == "profile"
+        assert correction_update["awaiting_user_input"] is True
+        assert "institutional_email" not in correction_update["student_profile"]
+        assert correction_update["student_profile"]["email_verified"] is False
+        assert correction_update["onboarding"]["current_field"] == "institutional_email"
+        assert correction_update["onboarding"]["profile_stage"] == "collecting"
+        assert correction_update["onboarding"]["microsoft_oauth"]["status"] == "idle"
+        assert correction_update["interaction"]["is_waiting_for_oauth"] is False
+        assert "correo correcto" in correction_update["messages"][0].content
+        assert stored_state is not None
+        assert stored_state.status == "failed"
+        assert stored_state.last_error == "email_correction_requested"
+    finally:
+        set_onboarding_service(None)
+        set_microsoft_oauth_flow_service(None)
+
+
 def test_request_microsoft_oauth_continues_when_connection_exists(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH", "1")
     fake_client = _FakeOAuthClient()

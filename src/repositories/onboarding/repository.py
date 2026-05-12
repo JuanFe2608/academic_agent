@@ -131,8 +131,26 @@ class InMemoryOnboardingRepository:
     def upsert_verified_student_identity(self, profile: Any) -> int:
         institutional_email = str(_profile_value(profile, "institutional_email") or "")
         student_code = str(_profile_value(profile, "student_code") or "")
+        persisted_student_id = _profile_value(profile, "persisted_student_id")
         existing_by_email = self._students_by_email.get(institutional_email)
         existing_by_code = self._students_by_code.get(student_code)
+
+        if persisted_student_id is not None:
+            expected_id = int(persisted_student_id)
+            if existing_by_email and int(existing_by_email["id"]) != expected_id:
+                raise DuplicateInstitutionalEmailError(institutional_email)
+            if existing_by_code and int(existing_by_code["id"]) != expected_id:
+                raise DuplicateStudentCodeError(student_code)
+            existing = existing_by_email or existing_by_code
+            if existing is None:
+                existing = _student_payload(profile, student_id=expected_id)
+            else:
+                existing.update(_student_payload(profile, student_id=expected_id))
+            self._replace_student_indexes(existing, institutional_email, student_code)
+            self._students_by_email[institutional_email] = existing
+            self._students_by_code[student_code] = existing
+            return expected_id
+
         existing = existing_by_email or existing_by_code
         if existing_by_email and existing_by_code and existing_by_email["id"] != existing_by_code["id"]:
             raise DuplicateStudentCodeError(student_code)
@@ -142,6 +160,7 @@ class InMemoryOnboardingRepository:
             raise DuplicateStudentCodeError(student_code)
         if existing is not None:
             existing.update(_student_payload(profile, student_id=int(existing["id"])))
+            self._replace_student_indexes(existing, institutional_email, student_code)
             self._students_by_email[institutional_email] = existing
             self._students_by_code[student_code] = existing
             return int(existing["id"])
@@ -171,6 +190,7 @@ class InMemoryOnboardingRepository:
                 existing = _student_payload(profile, student_id=expected_id)
             else:
                 existing.update(_student_payload(profile, student_id=expected_id))
+            self._replace_student_indexes(existing, institutional_email, student_code)
             self._students_by_email[institutional_email] = existing
             self._students_by_code[student_code] = existing
             return expected_id
@@ -184,6 +204,7 @@ class InMemoryOnboardingRepository:
         ):
             existing = existing_by_email
             existing.update(_student_payload(profile, student_id=int(existing["id"])))
+            self._replace_student_indexes(existing, institutional_email, student_code)
             self._students_by_email[institutional_email] = existing
             self._students_by_code[student_code] = existing
             return int(existing["id"])
@@ -200,6 +221,20 @@ class InMemoryOnboardingRepository:
         self._students_by_email[institutional_email] = payload
         self._students_by_code[student_code] = payload
         return student_id
+
+    def _replace_student_indexes(
+        self,
+        student: dict[str, object],
+        institutional_email: str,
+        student_code: str,
+    ) -> None:
+        student_id = int(student["id"])
+        for email, indexed in list(self._students_by_email.items()):
+            if email != institutional_email and int(indexed["id"]) == student_id:
+                self._students_by_email.pop(email, None)
+        for code, indexed in list(self._students_by_code.items()):
+            if code != student_code and int(indexed["id"]) == student_id:
+                self._students_by_code.pop(code, None)
 
 
 class PostgresOnboardingRepository:

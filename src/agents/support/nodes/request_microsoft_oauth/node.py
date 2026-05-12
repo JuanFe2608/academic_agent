@@ -35,6 +35,19 @@ _COMPLETION_TOKENS = {
     "autorizado",
     "termine",
 }
+_EMAIL_CORRECTION_TOKENS = {
+    "cambiar correo",
+    "corregir correo",
+    "editar correo",
+    "modificar correo",
+    "actualizar correo",
+    "me equivoque de correo",
+    "me equivoque con el correo",
+    "escribi mal el correo",
+    "correo incorrecto",
+    "correo mal escrito",
+    "otro correo",
+}
 
 
 def request_microsoft_oauth(state: AgentState) -> dict:
@@ -175,6 +188,7 @@ def request_microsoft_oauth(state: AgentState) -> dict:
 
     oauth_substate = dict(onboarding.get("microsoft_oauth", {}))
     should_retry = has_new_input and _matches_any(last_text, _RETRY_TOKENS)
+    should_correct_email = has_new_input and _is_email_correction_request(last_text)
     user_claims_done = has_new_input and _matches_any(last_text, _COMPLETION_TOKENS)
     pending_url = str(oauth_substate.get("authorization_url") or "").strip()
     pending_is_current = (
@@ -182,6 +196,48 @@ def request_microsoft_oauth(state: AgentState) -> dict:
         and pending_url
         and not _is_expired(oauth_substate.get("expires_at"))
     )
+
+    if should_correct_email:
+        _mark_pending_oauth_failed(
+            service=service,
+            state_token=oauth_substate.get("state_token"),
+            last_error="email_correction_requested",
+        )
+        profile.pop("institutional_email", None)
+        profile["email_verified"] = False
+        onboarding["current_field"] = "institutional_email"
+        onboarding["profile_stage"] = "collecting"
+        onboarding["persistence_error"] = None
+        slot_errors = dict(onboarding.get("slot_errors", {}))
+        slot_errors.pop("institutional_email", None)
+        onboarding["slot_errors"] = slot_errors
+        onboarding["microsoft_oauth"] = _oauth_state(
+            onboarding,
+            status="idle",
+            state_token=None,
+            authorization_url=None,
+            expires_at=None,
+            last_error="email_correction_requested",
+        )
+        interaction["is_waiting_for_oauth"] = False
+        interaction["current_step"] = "institutional_email"
+        return {
+            "student_profile": profile,
+            "onboarding": onboarding,
+            "interaction": interaction,
+            "phase": "profile",
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "awaiting_user_input": True,
+            "messages": append_message(
+                messages,
+                "assistant",
+                (
+                    "Listo, vamos a corregir el correo Microsoft. "
+                    "Escribe el correo correcto, por ejemplo: usuario@outlook.com"
+                ),
+            ),
+        }
 
     if pending_is_current and not should_retry:
         interaction["is_waiting_for_oauth"] = True
@@ -461,7 +517,8 @@ def _authorization_message(authorization_url: str) -> str:
         "Toca el link para iniciar sesion en Microsoft y autorizar el acceso:\n"
         f"🔗 {authorization_url}\n\n"
         "Cuando termines, vuelve aqui y escribe listo ✅. "
-        "Si el enlace vence, escribe reintentar 🔃."
+        "Si el enlace vence, escribe reintentar 🔃. "
+        "Si escribiste mal tu correo, escribe cambiar correo."
     )
 
 
@@ -472,20 +529,45 @@ def _pending_message(authorization_url: str, *, user_claims_done: bool) -> str:
             "Revisa que hayas completado el inicio de sesion en el navegador.\n\n"
             f"🔗 {authorization_url}\n\n"
             "Si ya te aparecio la pantalla de Listo, escribe listo ✅. "
-            "Si el enlace vencio o fallo, escribe reintentar 🔃."
+            "Si el enlace vencio o fallo, escribe reintentar 🔃. "
+            "Si escribiste mal tu correo, escribe cambiar correo."
         )
     return (
         "Sigo esperando la autorizacion de Microsoft. "
         "Usa este enlace para completar el acceso:\n\n"
         f"🔗 {authorization_url}\n\n"
         "Cuando termines, escribe listo ✅. "
-        "Si vencio o fallo, escribe reintentar 🔃."
+        "Si vencio o fallo, escribe reintentar 🔃. "
+        "Si escribiste mal tu correo, escribe cambiar correo."
     )
 
 
 def _matches_any(raw: str, tokens: set[str]) -> bool:
     normalized = normalize_text(raw or "")
     return normalized in tokens
+
+
+def _is_email_correction_request(raw: str) -> bool:
+    normalized = normalize_text(raw or "")
+    return any(token in normalized for token in _EMAIL_CORRECTION_TOKENS)
+
+
+def _mark_pending_oauth_failed(
+    *,
+    service: Any,
+    state_token: Any,
+    last_error: str,
+) -> None:
+    token = str(state_token or "").strip()
+    if not token:
+        return
+    try:
+        service.state_repository.mark_oauth_pending_state_failed(
+            state_token=token,
+            last_error=last_error,
+        )
+    except Exception:
+        return
 
 
 def _is_expired(raw_expires_at: Any) -> bool:
