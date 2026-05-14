@@ -16,6 +16,7 @@ from agents.support.scheduling.state_helpers import (
     update_schedule_flow_state,
 )
 from agents.support.state import AgentState
+from services.scheduling.event_projection import sync_schedule_block_events
 
 
 def build_schedule_draft_turn(state: AgentState) -> dict:
@@ -35,5 +36,9 @@ def build_schedule_draft_turn(state: AgentState) -> dict:
             review_stage="idle",
         ),
         "schedule_preview": {"text": summary_text, "image_path": None},
+        "events": sync_schedule_block_events(
+            list(state.get("events", [])),
+            updated_blocks,
+        ),
         "phase": "validate",
     }

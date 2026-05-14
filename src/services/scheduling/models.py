@@ -91,6 +91,7 @@ class ScheduleFlowState(BaseModel):
     capture_stage: ScheduleCaptureStage = "idle"
     correction_target: Optional[CorrectionTarget] = None
     editing_block_id: Optional[str] = None
+    editing_block_ids: list[str] = Field(default_factory=list)
     editing_field: Optional[EditableScheduleField] = None
     pending_correction_text: Optional[str] = None
     conflicts_accepted: bool = False

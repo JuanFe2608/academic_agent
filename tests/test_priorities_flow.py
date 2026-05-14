@@ -173,7 +173,7 @@ def test_collect_priorities_accepts_manual_subjects_and_rebuilds_plan(monkeypatc
     assert _route_collect_priorities(next_state) == "end"
 
     plan_update = build_study_plan(next_state)
-    assert plan_update["phase"] == "end"
+    assert plan_update["phase"] == "running"
     assert plan_update["study_plan"]["rules"]["subjects_source"] == "state.subjects"
     assert len(plan_update["study_plan"]["plan_events"]) >= 2
     assert "Calculo" in plan_update["messages"][0].content
@@ -205,11 +205,12 @@ def test_collect_priorities_starts_from_schedule_activities_and_radar_technique(
 
     assert "Calculo" in names
     assert "Programacion" in names
-    assert update["priorities"]["capture_stage"] == "ask_update"
+    assert update["priorities"]["capture_stage"] == "ask_context"
+    assert "Orden de prioridades" in update["messages"][0].content
     assert "Programacion" in update["messages"][0].content
 
 
-def test_collect_priorities_direct_request_starts_at_ranking_step() -> None:
+def test_collect_priorities_direct_request_starts_at_context_step() -> None:
     state = AgentState(
         phase="end",
         awaiting_user_input=False,
@@ -226,9 +227,9 @@ def test_collect_priorities_direct_request_starts_at_ranking_step() -> None:
     update = collect_priorities(state)
 
     assert update["phase"] == "priorities"
-    assert update["priorities"]["capture_stage"] == "ask_top3"
+    assert update["priorities"]["capture_stage"] == "ask_context"
     assert update["user_message_count"] == 1
-    assert "materias más importantes" in update["messages"][0].content
+    assert "Orden de prioridades" in update["messages"][0].content
 
 
 def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
@@ -256,7 +257,7 @@ def test_collect_priorities_supports_use_schedule_command(monkeypatch) -> None:
     assert update["priorities"]["status"] == "completed"
 
     plan_update = build_study_plan(next_state)
-    assert plan_update["phase"] == "end"
+    assert plan_update["phase"] == "running"
     assert plan_update["study_plan"]["rules"]["subjects_source"] == "state.subjects"
     assert plan_update["study_plan"]["rules"]["spacing_days"] == 2
 
@@ -284,13 +285,10 @@ def test_collect_priorities_routes_completed_snapshot_to_study_plan_when_post_ra
     next_state = _apply_update(state, update)
 
     assert update["phase"] == "running"
-    assert _route_collect_priorities(next_state) == "build_study_plan"
-    assert _route_from_phase(next_state) == "end"
-
-    plan_update = build_study_plan(next_state)
-    assert plan_update["phase"] == "end"
-    assert plan_update["study_plan"]["rules"]["external_sync_requires_confirmation"] is True
-    assert "No he creado eventos en Outlook" in plan_update["messages"][0].content
+    assert _route_collect_priorities(next_state) == "end"
+    assert _route_from_phase(next_state) == "academic_agent"
+    assert update["study_plan"]["rules"]["external_sync_requires_confirmation"] is True
+    assert "No he creado eventos en Outlook" in update["messages"][0].content
 
 
 def test_collect_priorities_supports_visible_later_option(monkeypatch) -> None:
@@ -339,44 +337,12 @@ def test_collect_priorities_guides_weekly_snapshot_until_confirmation(monkeypatc
 
     update = collect_priorities(state)
     state = _apply_update(state, update)
-    assert update["priorities"]["capture_stage"] == "ask_update"
-    assert "prioridades de esta semana" in update["messages"][0].content
+    assert update["priorities"]["capture_stage"] == "ask_context"
+    assert "Orden de prioridades" in update["messages"][0].content
     assert "120 min/semana" in update["messages"][0].content
 
     update = collect_priorities(_with_user_message(state, "si"))
-    state = _apply_update(_with_user_message(state, "si"), update)
-    assert update["priorities"]["capture_stage"] == "ask_top3"
-
-    update = collect_priorities(_with_user_message(state, "3,1,2"))
-    state = _apply_update(_with_user_message(state, "3,1,2"), update)
-    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
-    assert update["priorities"]["draft"]["importance_order"] == [3, 1, 2]
-    assert "Materia 1 de 3" in update["messages"][0].content
-
-    update = collect_priorities(_with_user_message(state, "no"))
-    state = _apply_update(_with_user_message(state, "no"), update)
-    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
-    assert update["priorities"]["draft"]["urgency_subject_index"] == 2
-    assert "Materia 2 de 3" in update["messages"][0].content
-
-    update = collect_priorities(_with_user_message(state, "parcial viernes"))
-    state = _apply_update(_with_user_message(state, "parcial viernes"), update)
-    assert update["priorities"]["capture_stage"] == "ask_urgent_subjects"
-    assert update["priorities"]["draft"]["urgency_subject_index"] == 3
-    assert update["priorities"]["draft"]["urgency_details"][0]["subject_number"] == 2
-
-    update = collect_priorities(_with_user_message(state, "no"))
-    state = _apply_update(_with_user_message(state, "no"), update)
-    assert update["priorities"]["capture_stage"] == "ask_difficult_subjects"
-
-    update = collect_priorities(_with_user_message(state, "2,3"))
-    state = _apply_update(_with_user_message(state, "2,3"), update)
-    assert update["priorities"]["capture_stage"] == "confirm_summary"
-    assert any(subject.computed_priority_score is not None for subject in update["subjects"])
-    assert "prioridad semanal" in update["messages"][0].content
-
-    update = collect_priorities(_with_user_message(state, "confirmar"))
-    next_state = _apply_update(_with_user_message(state, "confirmar"), update)
+    next_state = _apply_update(_with_user_message(state, "si"), update)
 
     assert update["phase"] == "running"
     assert update["priorities"]["status"] == "completed"

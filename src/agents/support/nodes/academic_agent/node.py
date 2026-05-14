@@ -80,9 +80,9 @@ def academic_agent(state: AgentState, config: RunnableConfig | None = None) -> d
     #    - data URLs (Studio) → ya fueron reemplazadas por IMAGE_RECEIVED_MARKER en el reducer.
     #    - Rutas locales (WhatsApp) → sobreviven al reducer y se procesan aquí con visión.
     from utils.media_artifacts import IMAGE_RECEIVED_MARKER
-    from integrations.ai._llm_impl import maybe_get_llm
     from langchain_core.messages import HumanMessage, SystemMessage
     from langgraph.prebuilt import create_react_agent
+    from services.ai_runtime import maybe_get_llm
 
     last_images = list(state.last_user_images or [])
     has_image_marker = IMAGE_RECEIVED_MARKER in (last_text or "")
@@ -432,8 +432,8 @@ def _text_only_message_content(content: object, *, image_marker: str) -> str:
 
 def _build_human_message(text: str, image_paths: list[str]):
     """Construye HumanMessage: texto plano si no hay imágenes, multimodal si las hay."""
-    from integrations.ai._llm_impl import load_image_as_data_url
     from langchain_core.messages import HumanMessage
+    from services.ai_runtime import load_image_as_data_url
     from utils.media_artifacts import IMAGE_RECEIVED_MARKER
 
     if not image_paths:

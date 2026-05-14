@@ -73,6 +73,7 @@ def _completed_profile_payload() -> dict[str, object]:
 def test_persist_study_profile_does_not_sync_reminders_after_radar(monkeypatch) -> None:
     monkeypatch.setattr(materialization_module, "datetime", _FrozenDateTime)
     monkeypatch.setattr(reminders_module, "datetime", _FrozenDateTime)
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),

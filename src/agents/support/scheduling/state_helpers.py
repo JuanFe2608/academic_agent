@@ -52,6 +52,8 @@ def ensure_schedule_flow_state(
         ensure_schedule_conflict(conflict)
         for conflict in data.get("conflicts", [])
     ]
+    if data.get("editing_block_ids") is None:
+        data["editing_block_ids"] = []
     return ScheduleFlowState(**data)
 
 
@@ -77,6 +79,7 @@ def schedule_flow_state_to_update(schedule_state: ScheduleFlowState) -> dict[str
         "capture_stage": schedule_state.capture_stage,
         "correction_target": schedule_state.correction_target,
         "editing_block_id": schedule_state.editing_block_id,
+        "editing_block_ids": list(schedule_state.editing_block_ids),
         "editing_field": schedule_state.editing_field,
         "pending_correction_text": schedule_state.pending_correction_text,
         "conflicts_accepted": schedule_state.conflicts_accepted,
@@ -165,6 +168,18 @@ def update_schedule_flow_state(
             ensure_schedule_conflict(conflict)
             for conflict in list(changes["conflicts"])
         ]
+    if "editing_block_ids" in changes and changes["editing_block_ids"] is not None:
+        changes["editing_block_ids"] = [
+            str(block_id)
+            for block_id in list(changes["editing_block_ids"])
+            if str(block_id or "").strip()
+        ]
+    if (
+        changes.get("editing_block_id") is None
+        and "editing_block_id" in changes
+        and "editing_block_ids" not in changes
+    ):
+        changes["editing_block_ids"] = []
     updated_state = schedule_state.model_copy(update=changes)
     return schedule_flow_state_to_update(updated_state)
 
@@ -184,6 +199,7 @@ def reset_schedule_review_state(
         review_stage="idle",
         correction_target=None,
         editing_block_id=None,
+        editing_block_ids=[],
         editing_field=None,
         pending_correction_text=None,
         conflicts=[],
@@ -369,23 +385,17 @@ def get_all_schedule_events(state: AgentState | Mapping[str, object]) -> list[Ev
     schedule.blocks es la fuente de verdad para el horario fijo (académico/laboral).
     Los eventos extracurriculares se recuperan del campo `tentativo` de cada item,
     que se popula en el nodo generate_tentative_extracurricular durante el setup.
+    Si existe un estado legacy con `events`, se usa como fallback de compatibilidad
+    para no perder IDs estables en flujos de edición/replanificación.
     """
     from services.scheduling.extracurricular_events import build_fixed_events
 
-    raw_schedule = (
-        state.get("schedule", {}) if hasattr(state, "get") else getattr(state, "schedule", {})
-    )
+    raw_schedule = _state_get(state, "schedule", {})
     schedule_state = ensure_schedule_flow_state(raw_schedule)
     block_events: list[Event] = blocks_to_schedule_events(list(schedule_state.blocks))
 
-    tz = str(
-        state.get("timezone", "America/Bogota")
-        if hasattr(state, "get")
-        else getattr(state, "timezone", "America/Bogota")
-    )
-    raw_extras = (
-        state.get("extracurricular", []) if hasattr(state, "get") else getattr(state, "extracurricular", [])
-    )
+    tz = str(_state_get(state, "timezone", "America/Bogota"))
+    raw_extras = _state_get(state, "extracurricular", [])
     extra_events: list[Event] = []
     for raw_item in raw_extras:
         item = ensure_extracurricular_item(raw_item)
@@ -394,4 +404,110 @@ def get_all_schedule_events(state: AgentState | Mapping[str, object]) -> list[Ev
         elif not item.es_variable and item.dias and item.hora_inicio:
             extra_events.extend(build_fixed_events(item, tz))
 
-    return block_events + extra_events
+    legacy_events = [
+        ensure_event(item)
+        for item in list(_state_get(state, "events", []))
+    ]
+    return _merge_derived_and_legacy_events(
+        block_events=block_events,
+        extra_events=extra_events,
+        legacy_events=legacy_events,
+    )
+
+
+def events_for_scheduling_update(
+    state: AgentState | Mapping[str, object],
+    *,
+    schedule: ScheduleFlowState | dict | None = None,
+    extracurricular: list | None = None,
+    exclude_event_ids: set[str] | list[str] | tuple[str, ...] | None = None,
+) -> list[Event]:
+    """Proyecta `events` para updates que cambian schedule/extracurricular.
+
+    Mantiene compatibilidad con estados legacy que aún traen eventos planos,
+    excluyendo IDs que acaban de ser editados o eliminados.
+    """
+
+    excluded = {str(event_id) for event_id in (exclude_event_ids or [])}
+    base_events = [
+        event
+        for event in (ensure_event(item) for item in list(_state_get(state, "events", [])))
+        if str(event.get("id") or "") not in excluded
+    ]
+    update_state: dict[str, object] = {
+        "timezone": _state_get(state, "timezone", "America/Bogota"),
+        "schedule": schedule if schedule is not None else _state_get(state, "schedule", {}),
+        "extracurricular": (
+            extracurricular
+            if extracurricular is not None
+            else _state_get(state, "extracurricular", [])
+        ),
+        "events": base_events,
+    }
+    return get_all_schedule_events(update_state)
+
+
+def _state_get(
+    state: AgentState | Mapping[str, object],
+    key: str,
+    default: object,
+) -> object:
+    if hasattr(state, "get"):
+        return state.get(key, default)  # type: ignore[union-attr]
+    return getattr(state, key, default)
+
+
+def _merge_derived_and_legacy_events(
+    *,
+    block_events: list[Event],
+    extra_events: list[Event],
+    legacy_events: list[Event],
+) -> list[Event]:
+    legacy_by_identity = {
+        _event_identity(event): event
+        for event in legacy_events
+        if str(event.get("id") or "")
+    }
+    merged: list[Event] = []
+    seen_ids: set[str] = set()
+    seen_identities: set[tuple[str, str, str, str, str]] = set()
+
+    for event in block_events:
+        _append_unique_event(event, merged, seen_ids, seen_identities)
+
+    for event in extra_events:
+        legacy_match = legacy_by_identity.get(_event_identity(event))
+        _append_unique_event(legacy_match or event, merged, seen_ids, seen_identities)
+
+    for event in legacy_events:
+        _append_unique_event(event, merged, seen_ids, seen_identities)
+
+    return merged
+
+
+def _append_unique_event(
+    event: Event,
+    merged: list[Event],
+    seen_ids: set[str],
+    seen_identities: set[tuple[str, str, str, str, str]],
+) -> None:
+    event_id = str(event.get("id") or "")
+    identity = _event_identity(event)
+    if event_id and event_id in seen_ids:
+        return
+    if identity in seen_identities:
+        return
+    merged.append(event)
+    if event_id:
+        seen_ids.add(event_id)
+    seen_identities.add(identity)
+
+
+def _event_identity(event: Event | dict) -> tuple[str, str, str, str, str]:
+    return (
+        str(event.get("categoria") or "").strip().lower(),
+        str(event.get("dia") or "").strip().lower(),
+        str(event.get("inicio") or "").strip(),
+        str(event.get("fin") or "").strip(),
+        str(event.get("titulo") or "").strip().lower(),
+    )

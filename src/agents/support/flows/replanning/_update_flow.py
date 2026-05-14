@@ -8,6 +8,7 @@ from agents.support.nodes.collect_extracurricular_details import parse_extracurr
 from agents.support.nodes.utils import normalize_text, parse_yes_no
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
+    events_for_scheduling_update,
     get_all_schedule_events,
     schedule_flow_state_to_update,
 )
@@ -678,11 +679,17 @@ def _apply_selected_academic_update(
     raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_academic_events, "academico")
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            exclude_event_ids=[str(selected_event.get("id") or "")],
+        ),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -720,11 +727,17 @@ def _apply_selected_laboral_update(
     raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_work_events, "laboral")
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            exclude_event_ids=[str(selected_event.get("id") or "")],
+        ),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -762,11 +775,17 @@ def _apply_selected_academic_update_all(
     raw_inputs["horario_academico_text"] = serialize_events_for_category(updated_academic_events, "academico")
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            exclude_event_ids=[str(event.get("id") or "") for event in selected_events],
+        ),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -804,11 +823,17 @@ def _apply_selected_laboral_update_all(
     raw_inputs["horario_laboral_text"] = serialize_events_for_category(updated_work_events, "laboral")
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            exclude_event_ids=[str(event.get("id") or "") for event in selected_events],
+        ),
         errors=list(state.get("errors", [])),
         raw_inputs=raw_inputs,
     )
@@ -876,6 +901,11 @@ def _apply_selected_extracurricular_update(
         replan=replan,
         awaiting_user_input=False,
         extracurricular=extracurricular_items,
+        events=events_for_scheduling_update(
+            state,
+            extracurricular=extracurricular_items,
+            exclude_event_ids=[str(selected_event.get("id") or "")],
+        ),
         errors=errors,
     )
 

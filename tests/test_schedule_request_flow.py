@@ -8,8 +8,33 @@ from langchain_core.messages import HumanMessage
 
 import agents.support.nodes.parse_schedules_to_events.node as parse_node
 from agents.support.agent import _route_collect_schedule
+from agents.support.flows.scheduling.section_confirmation_service import (
+    _build_section_confirmation_prompt,
+)
 from agents.support.nodes.request_schedules.node import request_schedules
 from agents.support.state import AgentState
+
+
+def _message_text(update: dict, idx: int = 0) -> str:
+    content = update["messages"][idx].content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return str(block.get("text", ""))
+    return ""
+
+
+def _message_image_url(update: dict, idx: int = 0) -> str:
+    content = update["messages"][idx].content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "image_url":
+                image_url = block.get("image_url")
+                if isinstance(image_url, dict):
+                    return str(image_url.get("url") or "")
+    return ""
 
 
 def test_route_collect_schedule_requires_academic_first_for_ambos() -> None:
@@ -145,6 +170,48 @@ def test_parse_schedules_to_events_prompts_to_add_more_before_moving_on() -> Non
     assert "escribe el número" in prompt
 
 
+def test_section_confirmation_prompt_places_option_hint_under_question_for_all_types() -> None:
+    blocks = [
+        {
+            "block_type": "academic",
+            "title": "Algebra",
+            "day_of_week": "monday",
+            "start_time": "08:00",
+            "end_time": "10:00",
+            "source_text": "Lunes Algebra 08:00-10:00",
+        },
+        {
+            "block_type": "work",
+            "title": "Trabajo",
+            "day_of_week": "tuesday",
+            "start_time": "09:00",
+            "end_time": "17:00",
+            "source_text": "Martes Trabajo 09:00-17:00",
+        },
+        {
+            "block_type": "extracurricular",
+            "title": "Gimnasio",
+            "day_of_week": "wednesday",
+            "start_time": "18:00",
+            "end_time": "19:00",
+            "source_text": "Miércoles Gimnasio 18:00-19:00",
+        },
+    ]
+
+    for target in ("academic", "work", "extracurricular"):
+        prompt = _build_section_confirmation_prompt(blocks, target)
+        lines = prompt.splitlines()
+        question_index = lines.index("¿Está bien así?")
+        hint_index = lines.index("(Escribe el número de la opción que quieres elegir)")
+
+        assert hint_index == question_index + 1
+        assert lines[hint_index + 1] == "1. Sí, está correcto"
+        assert lines[hint_index + 2] == "2. No, quiero cambiar algo"
+        assert "(Escribe el número de la opción que quieres elegir)" not in lines[
+            :question_index
+        ]
+
+
 def test_parse_schedules_to_events_registers_pending_fixed_schedule_interaction() -> None:
     state = AgentState(
         phase="schedules",
@@ -235,13 +302,15 @@ def test_request_schedules_allows_closing_academic_section_and_moves_to_work() -
     assert update["awaiting_user_input"] is True
     assert update["schedule"]["capture_target"] == "academic"
     assert update["schedule"]["review_stage"] == "section_awaiting_confirmation"
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario académico actual" in prompt
     assert "está bien así" in prompt
     assert "- algebra" in prompt
     assert "1. algebra" not in prompt
     assert "1. sí, está correcto" in prompt
     assert "2. no, quiero cambiar algo" in prompt
+    assert Path(_message_image_url(update)).exists()
+    assert "schedule_preview" not in update
 
 
 def test_request_schedules_section_confirmation_yes_moves_to_work_prompt() -> None:
@@ -277,6 +346,44 @@ def test_request_schedules_section_confirmation_yes_moves_to_work_prompt() -> No
     assert update["schedule"]["capture_target"] == "work"
     assert update["schedule"]["review_stage"] == "idle"
     assert "horario laboral" in update["messages"][0].content.lower()
+
+
+def test_request_schedules_section_change_prompt_includes_schedule_image() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={"horario_academico_text": "Lunes 08:00-10:00 Algebra"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                    "block_id": "academic-1",
+                }
+            ],
+            "capture_target": "academic",
+            "capture_stage": "idle",
+            "review_stage": "section_awaiting_confirmation",
+            "correction_target": "academic",
+        },
+        messages=[HumanMessage(content="2")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["schedule"]["review_stage"] == "section_awaiting_item_selection"
+    prompt = _message_text(update).lower()
+    assert "horario académico actual" in prompt
+    assert "elige el número" in prompt
+    assert "añadir" in prompt
+    assert "cancelar" in prompt
+    assert Path(_message_image_url(update)).exists()
 
 
 def test_request_schedules_section_edit_revalidates_conflicts_after_change(monkeypatch, tmp_path) -> None:
@@ -582,6 +689,252 @@ def test_request_schedules_field_selection_includes_delete_option() -> None:
     assert "escribe el número del cambio" in prompt
     assert "3. horario" in prompt
     assert "eliminar materia" in prompt
+
+
+def test_request_schedules_accepts_multi_item_selection_with_commas_and_spaces() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "monday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Lunes 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-1",
+                },
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "tuesday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Martes 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-2",
+                },
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "wednesday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Miercoles 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-3",
+                },
+            ],
+            "review_stage": "section_awaiting_item_selection",
+            "correction_target": "academic",
+        },
+        messages=[HumanMessage(content="1,2 3")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["schedule"]["review_stage"] == "section_awaiting_field_selection"
+    assert update["schedule"]["editing_block_id"] == "academic-1"
+    assert update["schedule"]["editing_block_ids"] == [
+        "academic-1",
+        "academic-2",
+        "academic-3",
+    ]
+    prompt = update["messages"][0].content.lower()
+    assert "vas a editar estos 3 registros" in prompt
+    assert "6. reemplazar todos los datos" not in prompt
+
+
+def test_request_schedules_multi_item_time_edit_updates_raw_inputs_and_preview(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    rendered_path = tmp_path / "schedule.png"
+    rendered_path.write_bytes(b"fake image")
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.section_confirmation_service.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": str(rendered_path)}},
+            ],
+            str(rendered_path),
+        ),
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        raw_inputs={
+            "horario_academico_text": (
+                "Lunes 06:00-07:00 Data Science Fundamentals\n"
+                "Martes 06:00-07:00 Data Science Fundamentals\n"
+                "Miercoles 06:00-07:00 Data Science Fundamentals\n"
+                "Jueves 11:00-13:00 Android"
+            )
+        },
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "monday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Lunes 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-1",
+                },
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "tuesday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Martes 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-2",
+                },
+                {
+                    "block_type": "academic",
+                    "title": "Data Science Fundamentals",
+                    "day_of_week": "wednesday",
+                    "start_time": "06:00",
+                    "end_time": "07:00",
+                    "source_text": "Miercoles 06:00-07:00 Data Science Fundamentals",
+                    "block_id": "academic-3",
+                },
+                {
+                    "block_type": "academic",
+                    "title": "Android",
+                    "day_of_week": "thursday",
+                    "start_time": "11:00",
+                    "end_time": "13:00",
+                    "source_text": "Jueves 11:00-13:00 Android",
+                    "block_id": "academic-4",
+                },
+            ],
+            "review_stage": "section_awaiting_field_value",
+            "correction_target": "academic",
+            "editing_block_id": "academic-1",
+            "editing_block_ids": ["academic-1", "academic-2", "academic-3"],
+            "editing_field": "time_range",
+        },
+        messages=[HumanMessage(content="7:00 am a 8:00 am")],
+    )
+
+    update = request_schedules(state)
+
+    updated_blocks = {block.block_id: block for block in update["schedule"]["blocks"]}
+    for block_id in ("academic-1", "academic-2", "academic-3"):
+        assert updated_blocks[block_id].start_time == "07:00"
+        assert updated_blocks[block_id].end_time == "08:00"
+    assert updated_blocks["academic-4"].start_time == "11:00"
+    raw_text = update["raw_inputs"]["horario_academico_text"]
+    assert "Lunes 07:00-08:00 Data Science Fundamentals" in raw_text
+    assert "Martes 07:00-08:00 Data Science Fundamentals" in raw_text
+    assert "Miercoles 07:00-08:00 Data Science Fundamentals" in raw_text
+    text = update["messages"][0].content[0]["text"].lower()
+    assert "así quedaron actualizados estos registros" in text
+    assert Path(update["messages"][0].content[1]["image_url"]["url"]).exists()
+
+
+def test_request_schedules_multi_work_time_edit_updates_work_raw_input(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    rendered_path = tmp_path / "work-schedule.png"
+    rendered_path.write_bytes(b"fake image")
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.section_confirmation_service.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": str(rendered_path)}},
+            ],
+            str(rendered_path),
+        ),
+    )
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "ambos"},
+        raw_inputs={"horario_laboral_text": "Lunes 09:00-17:00\nMartes 09:00-17:00"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "work",
+                    "title": "Trabajo",
+                    "day_of_week": "monday",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "source_text": "Lunes 09:00-17:00",
+                    "block_id": "work-1",
+                },
+                {
+                    "block_type": "work",
+                    "title": "Trabajo",
+                    "day_of_week": "tuesday",
+                    "start_time": "09:00",
+                    "end_time": "17:00",
+                    "source_text": "Martes 09:00-17:00",
+                    "block_id": "work-2",
+                },
+            ],
+            "review_stage": "section_awaiting_field_value",
+            "correction_target": "work",
+            "editing_block_id": "work-1",
+            "editing_block_ids": ["work-1", "work-2"],
+            "editing_field": "time_range",
+        },
+        messages=[HumanMessage(content="10 am a 6 pm")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["raw_inputs"]["horario_laboral_text"] == (
+        "Lunes 10:00-18:00\nMartes 10:00-18:00"
+    )
+    updated_blocks = {block.block_id: block for block in update["schedule"]["blocks"]}
+    assert updated_blocks["work-1"].start_time == "10:00"
+    assert updated_blocks["work-2"].end_time == "18:00"
+
+
+def test_request_schedules_item_selection_cancel_returns_to_section_confirmation() -> None:
+    state = AgentState(
+        phase="schedules",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile={"occupation": "solo_estudio"},
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "academic",
+                    "title": "Algebra",
+                    "day_of_week": "monday",
+                    "start_time": "08:00",
+                    "end_time": "10:00",
+                    "source_text": "Lunes 08:00-10:00 Algebra",
+                    "block_id": "academic-1",
+                }
+            ],
+            "review_stage": "section_awaiting_item_selection",
+            "correction_target": "academic",
+        },
+        messages=[HumanMessage(content="cancelar")],
+    )
+
+    update = request_schedules(state)
+
+    assert update["schedule"]["review_stage"] == "section_awaiting_confirmation"
+    assert update["schedule"]["editing_block_id"] is None
+    assert update["schedule"]["editing_block_ids"] == []
+    prompt = _message_text(update).lower()
+    assert "no hice cambios" in prompt
+    assert "¿está bien así?" in prompt
+    assert Path(_message_image_url(update)).exists()
 
 
 def test_request_schedules_rejects_incoherent_time_range_in_shared_editor() -> None:

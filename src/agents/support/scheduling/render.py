@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
+from uuid import uuid4
 
 from agents.support.scheduling.schedule_renderer import (
     _DEFAULT_RENDER_DIR,
@@ -52,7 +53,12 @@ def render_schedule_preview_image(
 ) -> RenderedSchedulePreview:
     """Renderiza el horario y devuelve path + data URL reutilizable."""
 
-    image_path = render_recurring_schedule(blocks, timezone_name=timezone_name)
+    filename = f"schedule-{uuid4().hex}.png"
+    image_path = render_recurring_schedule(
+        blocks,
+        filename=filename,
+        timezone_name=timezone_name,
+    )
     return RenderedSchedulePreview(
         image_path=image_path,
         image_ref=materialize_image_reference(image_path),

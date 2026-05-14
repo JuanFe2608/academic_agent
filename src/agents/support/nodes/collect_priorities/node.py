@@ -11,6 +11,7 @@ from agents.support.flows.priorities.priority_capture_service import (
 from agents.support.nodes.build_study_plan.node import build_study_plan as _build_study_plan
 from agents.support.nodes.utils import append_message
 from agents.support.priorities.config import is_post_radar_flow_enabled
+from agents.support.scheduling.state_helpers import ensure_schedule_flow_state
 from agents.support.state import AgentState
 from services.planning import coerce_academic_activities
 
@@ -28,11 +29,18 @@ _NO_ACTIVITIES_REDIRECT = (
 def collect_priorities(state: AgentState) -> dict:
     """Lee estado, delega al servicio y devuelve el update final."""
 
-    # Guard: priorizar tiene sentido solo cuando hay actividades pendientes con fechas reales.
-    # Sin actividades, el agente no tiene nada concreto con qué comparar urgencias.
+    # Guard: solo redirigir cuando no hay ningún insumo priorizable.
+    # El flujo puede partir de materias del horario, materias ya normalizadas o
+    # actividades pendientes; no exige que existan entregas registradas.
     activities = coerce_academic_activities(list(state.get("academic_activities", [])))
     has_pending = any(a.status == "pending" for a in activities)
-    if not has_pending:
+    schedule = ensure_schedule_flow_state(state.get("schedule", {}))
+    has_academic_schedule = any(
+        block.is_active and block.block_type == "academic"
+        for block in schedule.blocks
+    )
+    has_subjects = bool(list(state.get("subjects", [])))
+    if not (has_pending or has_academic_schedule or has_subjects):
         messages = state.get("messages", [])
         return {
             "phase": "running",
@@ -50,7 +58,7 @@ def collect_priorities(state: AgentState) -> dict:
         # build_study_plan lea el historial.
         priority_final = dict(update)
         intermediate = state.model_copy(
-            update={k: v for k, v in priority_final.items() if k in state.model_fields}
+            update={k: v for k, v in priority_final.items() if k in AgentState.model_fields}
         )
         plan_result = _build_study_plan(intermediate)
         return {**priority_final, **plan_result}

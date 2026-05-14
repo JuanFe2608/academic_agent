@@ -16,7 +16,9 @@ from .state_helpers import ensure_interaction_state
 from .text_normalization import normalize_text
 
 _SCOPE_INTENT_TO_ROUTE: dict[str, str] = {
+    "request_weekly_prioritization": "collect_priorities",
     "prioritize_academic_work": "collect_priorities",
+    "register_academic_activity": "handle_academic_update",
     "manage_academic_activity": "handle_academic_update",
     "track_study_session": "handle_academic_update",
     "view_weekly_agenda": "view_weekly_agenda",
@@ -24,7 +26,11 @@ _SCOPE_INTENT_TO_ROUTE: dict[str, str] = {
     "request_replan": "request_replan",
     "sync_study_calendar": "sync_study_calendar",
     "sync_study_todo": "sync_study_todo",
+    "view_fixed_schedule": "manage_fixed_schedule",
+    "update_fixed_schedule": "manage_fixed_schedule",
+    "delete_fixed_schedule_item": "manage_fixed_schedule",
     "manage_fixed_schedule": "manage_fixed_schedule",
+    "request_study_method_recommendation": "answer_study_recommendation",
     "study_method_recommendation": "answer_study_recommendation",
     "request_guided_academic_help": "guided_academic_support",
     "enter_socratic_mode": "guided_academic_support",
@@ -73,6 +79,22 @@ _ACTIVE_PHASE_ROUTES = {
     "priorities": "collect_priorities",
     "study_plan": "build_study_plan",
     "running": "end",
+}
+_ACTIVE_INTENT_TO_ROUTE: dict[str, str] = {
+    "register_academic_activity": "handle_academic_update",
+    "manage_academic_activity": "handle_academic_update",
+    "track_study_session": "handle_academic_update",
+    "request_replan": "request_replan",
+    "sync_study_calendar": "sync_study_calendar",
+    "sync_study_todo": "sync_study_todo",
+    "view_fixed_schedule": "manage_fixed_schedule",
+    "update_fixed_schedule": "manage_fixed_schedule",
+    "delete_fixed_schedule_item": "manage_fixed_schedule",
+    "manage_fixed_schedule": "manage_fixed_schedule",
+    "request_weekly_prioritization": "collect_priorities",
+    "prioritize_academic_work": "collect_priorities",
+    "request_guided_academic_help": "guided_academic_support",
+    "enter_socratic_mode": "guided_academic_support",
 }
 _PHASE_DOMAINS = {
     "consent": "student_profile",
@@ -135,6 +157,7 @@ def route_conversation_input(
         has_prior_context=has_prior_context,
         recent_messages=recent_messages,
     )
+    has_active_context = _has_active_context(active_phase, normalized_interaction)
 
     if policy.category == "human_support_case":
         return _decision(
@@ -161,6 +184,14 @@ def route_conversation_input(
         return _policy_boundary_decision(policy, input_classification)
 
     if _is_critical_command(input_classification):
+        if has_active_context and normalized_interaction.active_intent:
+            return _active_interrupt_decision(
+                input_classification,
+                active_phase,
+                normalized_interaction,
+                policy,
+                reason="critical_command_interrupts_active_block",
+            )
         return _route_new_intent(
             text,
             input_classification,
@@ -198,10 +229,10 @@ def route_conversation_input(
                 missing_fields=normalized_interaction.missing_fields_json,
             )
 
-    if _has_active_block(active_phase) and _is_interruptible_question(input_classification, policy):
+    if has_active_context and _is_interruptible_question(input_classification, policy):
         return _interrupt_and_return_decision(policy, input_classification)
 
-    if _has_active_block(active_phase):
+    if has_active_context:
         if _is_contextual_smalltalk(input_classification):
             return _active_block_decision(
                 intent="smalltalk_contextual",
@@ -229,6 +260,19 @@ def route_conversation_input(
 
     # Intents ya resueltos por scope_policy o input_classifier: rutar directamente
     # sin re-clasificar con el LLM para evitar fallbacks incorrectos.
+    if _is_study_method_question(input_classification, policy):
+        return _decision(
+            intent="request_study_method_recommendation",
+            domain="study_method_recommendation",
+            action="route",
+            route_name="answer_study_recommendation",
+            priority=7,
+            reason="study_method_question_direct_route",
+            classification=input_classification,
+            scope_decision=policy,
+            confidence=max(input_classification.confidence, policy.confidence, 0.80),
+        )
+
     if policy.intent == "answer_academic_concept_question" or input_classification.possible_intent == "answer_academic_concept_question":
         return _decision(
             intent="answer_academic_concept_question",
@@ -347,15 +391,20 @@ def _route_new_intent(
     # 2. Si el intent es ambiguo, caer a guided_academic_support como fallback seguro.
     # Crítico en WhatsApp donde mensajes informales o con errores de tipeo son la norma.
     if llm_result.route_name == "answer_scope_boundary" and scope_decision.allowed:
-        scope_route = _SCOPE_INTENT_TO_ROUTE.get(scope_decision.intent or "")
+        intent, domain = _canonical_route_identity(
+            text or classification.normalized_text,
+            scope_decision.intent,
+            scope_decision.domain,
+        )
+        scope_route = _SCOPE_INTENT_TO_ROUTE.get(intent) or _SCOPE_INTENT_TO_ROUTE.get(scope_decision.intent or "")
         if scope_route:
             return _decision(
-                intent=scope_decision.intent,
-                domain=scope_decision.domain,
+                intent=intent,
+                domain=domain,
                 action="route",
                 route_name=scope_route,
                 priority=9,
-                reason=f"scope_intent_fallback:{llm_result.source}",
+                reason=reason,
                 classification=classification,
                 scope_decision=scope_decision,
                 confidence=0.62,
@@ -375,13 +424,19 @@ def _route_new_intent(
         )
 
     action = "answer_policy" if llm_result.route_name == "answer_scope_boundary" else "route"
+    intent, domain = _canonical_route_identity(
+        text or classification.normalized_text,
+        llm_result.intent,
+        llm_result.domain,
+    )
+    route_name = _SCOPE_INTENT_TO_ROUTE.get(intent, llm_result.route_name)
     return _decision(
-        intent=llm_result.intent,
-        domain=llm_result.domain,
+        intent=intent,
+        domain=domain,
         action=action,
-        route_name=llm_result.route_name,
+        route_name=route_name,
         priority=9,
-        reason=f"llm_classifier:{llm_result.source}",
+        reason=reason if action == "route" else f"llm_classifier:{llm_result.source}",
         classification=classification,
         scope_decision=scope_decision,
         confidence=llm_result.confidence,
@@ -401,7 +456,7 @@ def _active_block_decision(
     confidence: float = 0.0,
     missing_fields: list[object] | None = None,
 ) -> ConversationRouteDecision:
-    route_name = _ACTIVE_PHASE_ROUTES.get(str(phase or ""))
+    route_name = _route_for_active_context(phase, interaction, intent=intent)
     domain = (
         interaction.current_domain
         or _PHASE_DOMAINS.get(str(phase or ""))
@@ -486,6 +541,156 @@ def _is_blocking_policy(policy: ScopeDecision) -> bool:
 
 def _has_active_block(phase: str | None) -> bool:
     return bool(phase and phase not in {"end", "running"})
+
+
+def _has_active_context(phase: str | None, interaction: InteractionState) -> bool:
+    if _has_active_block(phase):
+        return True
+    return bool(
+        str(phase or "") == "running"
+        and interaction.active_intent
+        and interaction.current_domain
+    )
+
+
+def _route_for_active_context(
+    phase: str | None,
+    interaction: InteractionState,
+    *,
+    intent: str | None = None,
+) -> str | None:
+    for candidate_intent in (intent, interaction.active_intent):
+        canonical_intent, _domain = _canonical_route_identity(
+            "",
+            candidate_intent or "",
+            interaction.current_domain or "",
+        )
+        if canonical_intent in _ACTIVE_INTENT_TO_ROUTE:
+            return _ACTIVE_INTENT_TO_ROUTE[canonical_intent]
+    active_subflow = str(interaction.active_subflow or "").strip()
+    if active_subflow in _ACTIVE_PHASE_ROUTES:
+        return _ACTIVE_PHASE_ROUTES[active_subflow]
+    return _ACTIVE_PHASE_ROUTES.get(str(phase or ""))
+
+
+def _active_interrupt_decision(
+    classification: InputClassification,
+    phase: str | None,
+    interaction: InteractionState,
+    scope_decision: ScopeDecision,
+    *,
+    reason: str,
+) -> ConversationRouteDecision:
+    intent, domain = _canonical_route_identity(
+        classification.normalized_text,
+        interaction.active_intent or classification.possible_intent or "continue_active_block",
+        interaction.current_domain or _PHASE_DOMAINS.get(str(phase or ""), ""),
+    )
+    return _decision(
+        intent=intent,
+        domain=domain or "guided_academic_support",
+        action="route",
+        route_name=_route_for_active_context(phase, interaction, intent=intent),
+        priority=4,
+        reason=reason,
+        classification=classification,
+        scope_decision=scope_decision,
+        confidence=max(classification.confidence, 0.78),
+        interrupts_active_block=True,
+    )
+
+
+def _canonical_route_identity(text: str | None, intent: str | None, domain: str | None) -> tuple[str, str]:
+    normalized_intent = str(intent or "").strip()
+    normalized_domain = str(domain or "").strip()
+
+    if normalized_intent == "manage_fixed_schedule":
+        normalized_intent = _fixed_schedule_intent_from_text(text)
+    elif normalized_intent == "manage_academic_activity":
+        normalized_intent = "register_academic_activity"
+    elif normalized_intent == "prioritize_academic_work":
+        normalized_intent = "request_weekly_prioritization"
+    elif normalized_intent == "study_method_recommendation":
+        normalized_intent = "request_study_method_recommendation"
+
+    if normalized_domain == "calendar_sync":
+        normalized_domain = "calendar_action"
+    elif normalized_domain == "todo_sync":
+        normalized_domain = "todo_action"
+    elif normalized_intent == "request_study_method_recommendation":
+        normalized_domain = "study_method_recommendation"
+    elif normalized_intent in {
+        "view_fixed_schedule",
+        "update_fixed_schedule",
+        "delete_fixed_schedule_item",
+    }:
+        normalized_domain = "schedule_management"
+
+    return normalized_intent, normalized_domain
+
+
+def _fixed_schedule_intent_from_text(text: str | None) -> str:
+    normalized = normalize_text(text)
+    if any(term in normalized for term in ("eliminar", "borra", "borrar", "quita", "quitar")):
+        return "delete_fixed_schedule_item"
+    if any(
+        term in normalized
+        for term in (
+            "cambiar",
+            "cambia",
+            "modificar",
+            "ajustar",
+            "mover",
+            "reprogramar",
+            "agregar",
+            "anadir",
+            "añadir",
+        )
+    ):
+        return "update_fixed_schedule"
+    if any(term in normalized for term in ("mostrar", "muestra", "ver", "consultar", "listar")):
+        return "view_fixed_schedule"
+    return "manage_fixed_schedule"
+
+
+def _is_study_method_question(
+    classification: InputClassification,
+    policy: ScopeDecision,
+) -> bool:
+    if classification.possible_intent == "study_method_recommendation":
+        return True
+    if policy.intent == "study_method_recommendation":
+        return True
+    if policy.intent == "request_study_method_recommendation":
+        return True
+    if (
+        classification.possible_intent != "answer_academic_concept_question"
+        and policy.intent != "answer_academic_concept_question"
+    ):
+        return False
+    normalized = normalize_text(classification.normalized_text)
+    return any(
+        term in normalized
+        for term in (
+            "pomodoro",
+            "feynman",
+            "cornell",
+            "active recall",
+            "spaced repetition",
+            "repeticion espaciada",
+            "mapa conceptual",
+            "mapas conceptuales",
+            "mnemotecnia",
+            "interleaving",
+            "tecnica",
+            "tecnicas",
+            "metodo",
+            "metodos",
+            "estudiar",
+            "repasar",
+            "memorizar",
+        )
+    )
 
 
 def _is_interruptible_question(

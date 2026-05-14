@@ -43,7 +43,7 @@ _SEMESTER_PATTERNS = (
 )
 _AVERAGE_PATTERN = re.compile(
     r"\bpromedio(?:\s+(?:academico|acumulado))?(?:\s+(?:es|de))?\D{0,10}"
-    r"(\d{1,3})\b",
+    r"(\d{1,3}(?:[.,]\d+)?)\b",
     re.IGNORECASE,
 )
 _NAME_MARKER_PATTERN = re.compile(
@@ -180,7 +180,7 @@ def _extract_semester(raw_text: str) -> str | None:
 
 def _extract_average(raw_text: str) -> str | None:
     match = _AVERAGE_PATTERN.search(raw_text)
-    return match.group(1) if match else None
+    return match.group(1).replace(",", ".") if match else None
 
 
 def _strip_accents(value: str) -> str:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 
 from agents.support.nodes.utils import (
@@ -132,6 +133,7 @@ def start_section_review(
             review_stage=initial_stage,
             correction_target=target,
             editing_block_id=None,
+            editing_block_ids=[],
             editing_field=None,
             pending_correction_text=None,
         ),
@@ -140,6 +142,7 @@ def start_section_review(
         last_text=last_text,
         awaiting_user_input=True,
         prompt=_build_entry_prompt(schedule_state.blocks, target, initial_stage),
+        render_preview_blocks=schedule_state.blocks,
     )
 
 
@@ -196,6 +199,7 @@ def handle_section_review_turn(
                 last_text=last_text if has_new_input else state.get("last_user_text"),
                 awaiting_user_input=True,
                 prompt=_build_item_selection_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                render_preview_blocks=schedule_state.blocks,
             )
         return _build_section_review_update(
             state,
@@ -205,9 +209,28 @@ def handle_section_review_turn(
             last_text=last_text if has_new_input else state.get("last_user_text"),
             awaiting_user_input=True,
             prompt=_build_invalid_choice_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+            render_preview_blocks=schedule_state.blocks,
         )
 
     if schedule_state.review_stage == "section_awaiting_item_selection":
+        if has_new_input and _is_cancel_command(last_text):
+            return _build_section_review_update(
+                state,
+                schedule=update_schedule_flow_state(
+                    schedule_state,
+                    review_stage="section_awaiting_confirmation",
+                    editing_block_id=None,
+                    editing_block_ids=[],
+                    editing_field=None,
+                    pending_correction_text=None,
+                ),
+                phase=state.get("phase", "schedules"),
+                current_count=current_count,
+                last_text=last_text,
+                awaiting_user_input=True,
+                prompt=_build_cancel_selection_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                render_preview_blocks=schedule_state.blocks,
+            )
         if has_new_input and _is_add_command(last_text):
             return _build_section_review_update(
                 state,
@@ -215,6 +238,7 @@ def handle_section_review_turn(
                     schedule_state,
                     review_stage="section_awaiting_add_payload",
                     editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                     pending_correction_text=None,
                 ),
@@ -224,25 +248,27 @@ def handle_section_review_turn(
                 awaiting_user_input=True,
                 prompt=_build_add_payload_prompt(target),  # type: ignore[arg-type]
             )
-        selected_block = (
-            _parse_selected_block(schedule_state.blocks, target, last_text)  # type: ignore[arg-type]
+        selected_blocks = (
+            _parse_selected_blocks(schedule_state.blocks, target, last_text)  # type: ignore[arg-type]
             if has_new_input
-            else None
+            else []
         )
-        if selected_block is not None:
+        if selected_blocks:
+            selected_ids = [block.block_id for block in selected_blocks]
             return _build_section_review_update(
                 state,
                 schedule=update_schedule_flow_state(
                     schedule_state,
                     review_stage="section_awaiting_field_selection",
-                    editing_block_id=selected_block.block_id,
+                    editing_block_id=selected_ids[0],
+                    editing_block_ids=selected_ids,
                     editing_field=None,
                 ),
                 phase=state.get("phase", "schedules"),
                 current_count=current_count,
                 last_text=last_text,
                 awaiting_user_input=True,
-                prompt=_build_field_selection_prompt(target, selected_block),  # type: ignore[arg-type]
+                prompt=_build_field_selection_prompt_for_selection(target, selected_blocks),  # type: ignore[arg-type]
             )
         return _build_section_review_update(
             state,
@@ -252,15 +278,23 @@ def handle_section_review_turn(
             last_text=last_text if has_new_input else state.get("last_user_text"),
             awaiting_user_input=True,
             prompt=_build_invalid_item_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+            render_preview_blocks=schedule_state.blocks,
         )
 
     if schedule_state.review_stage == "section_awaiting_field_selection":
-        choice = _parse_field_choice(last_text) if has_new_input else None
+        selected_block_ids = _active_editing_block_ids(schedule_state)
+        selected_blocks = _find_selected_blocks(schedule_state.blocks, selected_block_ids)
+        is_multi_selection = len(selected_blocks) > 1
+        choice = (
+            _parse_field_choice(last_text, allow_replace_all=not is_multi_selection)
+            if has_new_input
+            else None
+        )
         if choice == "delete":
-            delete_result = _apply_block_delete(
+            delete_result = _apply_blocks_delete(
                 state,
                 target=target,  # type: ignore[arg-type]
-                block_id=str(schedule_state.editing_block_id or ""),
+                block_ids=selected_block_ids,
             )
             if delete_result.error_prompt is not None:
                 return _build_section_review_update(
@@ -284,6 +318,7 @@ def handle_section_review_turn(
                         review_stage="idle",
                         correction_target=None,
                         editing_block_id=None,
+                        editing_block_ids=[],
                         editing_field=None,
                         pending_correction_text=None,
                     ),
@@ -303,6 +338,7 @@ def handle_section_review_turn(
                     review_stage="section_awaiting_confirmation",
                     correction_target=target,
                     editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                     pending_correction_text=None,
                 ),
@@ -324,6 +360,7 @@ def handle_section_review_turn(
                     schedule_state,
                     review_stage="section_awaiting_confirmation",
                     editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                 ),
                 phase=state.get("phase", "schedules"),
@@ -331,9 +368,10 @@ def handle_section_review_turn(
                 last_text=last_text if has_new_input else state.get("last_user_text"),
                 awaiting_user_input=True,
                 prompt=_build_section_confirmation_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                render_preview_blocks=schedule_state.blocks,
             )
         if choice == "replace_all":
-            selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
+            selected_block = selected_blocks[0] if len(selected_blocks) == 1 else None
             if selected_block is None:
                 return _build_section_review_update(
                     state,
@@ -341,6 +379,7 @@ def handle_section_review_turn(
                         schedule_state,
                         review_stage="section_awaiting_item_selection",
                         editing_block_id=None,
+                        editing_block_ids=[],
                         editing_field=None,
                     ),
                     phase=state.get("phase", "schedules"),
@@ -348,6 +387,7 @@ def handle_section_review_turn(
                     last_text=last_text if has_new_input else state.get("last_user_text"),
                     awaiting_user_input=True,
                     prompt=_build_item_selection_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                    render_preview_blocks=schedule_state.blocks,
                 )
             return _build_section_review_update(
                 state,
@@ -363,14 +403,14 @@ def handle_section_review_turn(
                 prompt=_build_replace_all_payload_prompt(target, selected_block),  # type: ignore[arg-type]
             )
         if choice in {"title", "day_of_week", "time_range"}:
-            selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
-            if selected_block is None:
+            if not selected_blocks:
                 return _build_section_review_update(
                     state,
                     schedule=update_schedule_flow_state(
                         schedule_state,
                         review_stage="section_awaiting_item_selection",
                         editing_block_id=None,
+                        editing_block_ids=[],
                         editing_field=None,
                     ),
                     phase=state.get("phase", "schedules"),
@@ -378,6 +418,7 @@ def handle_section_review_turn(
                     last_text=last_text if has_new_input else state.get("last_user_text"),
                     awaiting_user_input=True,
                     prompt=_build_item_selection_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                    render_preview_blocks=schedule_state.blocks,
                 )
             return _build_section_review_update(
                 state,
@@ -390,9 +431,8 @@ def handle_section_review_turn(
                 current_count=current_count,
                 last_text=last_text,
                 awaiting_user_input=True,
-                prompt=_build_field_value_prompt(target, selected_block, choice),  # type: ignore[arg-type]
+                prompt=_build_field_value_prompt_for_selection(target, selected_blocks, choice),  # type: ignore[arg-type]
             )
-        selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
         return _build_section_review_update(
             state,
             schedule=update_schedule_flow_state(schedule_state),
@@ -400,12 +440,13 @@ def handle_section_review_turn(
             current_count=current_count if has_new_input else state.get("user_message_count", 0),
             last_text=last_text if has_new_input else state.get("last_user_text"),
             awaiting_user_input=True,
-            prompt=_build_invalid_field_prompt(target, selected_block),  # type: ignore[arg-type]
+            prompt=_build_invalid_field_prompt_for_selection(target, selected_blocks),  # type: ignore[arg-type]
         )
 
     if schedule_state.review_stage == "section_awaiting_field_value":
+        selected_block_ids = _active_editing_block_ids(schedule_state)
+        selected_blocks = _find_selected_blocks(schedule_state.blocks, selected_block_ids)
         if not has_new_input or not str(last_text or "").strip():
-            selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
             return _build_section_review_update(
                 state,
                 schedule=update_schedule_flow_state(schedule_state),
@@ -413,16 +454,16 @@ def handle_section_review_turn(
                 current_count=state.get("user_message_count", 0),
                 last_text=state.get("last_user_text"),
                 awaiting_user_input=True,
-                prompt=_build_field_value_prompt(
+                prompt=_build_field_value_prompt_for_selection(
                     target,  # type: ignore[arg-type]
-                    selected_block,
+                    selected_blocks,
                     str(schedule_state.editing_field or ""),
                 ),
             )
-        edit_result = _apply_block_edit(
+        edit_result = _apply_blocks_edit(
             state,
             target=target,  # type: ignore[arg-type]
-            block_id=str(schedule_state.editing_block_id or ""),
+            block_ids=selected_block_ids,
             field_name=str(schedule_state.editing_field or ""),
             raw_value=str(last_text or ""),
         )
@@ -448,6 +489,7 @@ def handle_section_review_turn(
                     review_stage="idle",
                     correction_target=None,
                     editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                     pending_correction_text=None,
                 ),
@@ -466,7 +508,20 @@ def handle_section_review_turn(
                 summary_text=None,
                 review_stage="section_awaiting_item_confirmation",
                 correction_target=target,
-                editing_block_id=edit_result.updated_block.block_id,
+                editing_block_id=(
+                    edit_result.updated_blocks[0].block_id
+                    if edit_result.updated_blocks
+                    else edit_result.updated_block.block_id
+                    if edit_result.updated_block is not None
+                    else None
+                ),
+                editing_block_ids=[
+                    block.block_id
+                    for block in (
+                        edit_result.updated_blocks
+                        or ([edit_result.updated_block] if edit_result.updated_block is not None else [])
+                    )
+                ],
                 editing_field=None,
                 pending_correction_text=None,
             ),
@@ -474,9 +529,10 @@ def handle_section_review_turn(
             current_count=current_count,
             last_text=last_text,
             awaiting_user_input=True,
-            prompt=_build_item_confirmation_prompt(
+            prompt=_build_item_confirmation_prompt_for_selection(
                 target,  # type: ignore[arg-type]
-                edit_result.updated_block,
+                edit_result.updated_blocks
+                or ([edit_result.updated_block] if edit_result.updated_block is not None else []),
                 edit_result.conflicts,
             ),
             render_preview_blocks=edit_result.blocks,
@@ -491,6 +547,8 @@ def handle_section_review_turn(
                 schedule=update_schedule_flow_state(
                     schedule_state,
                     review_stage="section_awaiting_confirmation",
+                    editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                 ),
                 phase=state.get("phase", "schedules"),
@@ -498,9 +556,13 @@ def handle_section_review_turn(
                 last_text=last_text if has_new_input else state.get("last_user_text"),
                 awaiting_user_input=True,
                 prompt=_build_section_confirmation_prompt(schedule_state.blocks, target),  # type: ignore[arg-type]
+                render_preview_blocks=schedule_state.blocks,
             )
         if decision == 2:
-            selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
+            selected_blocks = _find_selected_blocks(
+                schedule_state.blocks,
+                _active_editing_block_ids(schedule_state),
+            )
             return _build_section_review_update(
                 state,
                 schedule=update_schedule_flow_state(
@@ -511,9 +573,12 @@ def handle_section_review_turn(
                 current_count=current_count if has_new_input else state.get("user_message_count", 0),
                 last_text=last_text if has_new_input else state.get("last_user_text"),
                 awaiting_user_input=True,
-                prompt=_build_field_selection_prompt(target, selected_block),  # type: ignore[arg-type]
+                prompt=_build_field_selection_prompt_for_selection(target, selected_blocks),  # type: ignore[arg-type]
             )
-        selected_block = _find_selected_block(schedule_state.blocks, schedule_state.editing_block_id)
+        selected_blocks = _find_selected_blocks(
+            schedule_state.blocks,
+            _active_editing_block_ids(schedule_state),
+        )
         return _build_section_review_update(
             state,
             schedule=update_schedule_flow_state(schedule_state),
@@ -521,7 +586,7 @@ def handle_section_review_turn(
             current_count=current_count if has_new_input else state.get("user_message_count", 0),
             last_text=last_text if has_new_input else state.get("last_user_text"),
             awaiting_user_input=True,
-            prompt=_build_invalid_item_confirmation_prompt(target, selected_block),  # type: ignore[arg-type]
+            prompt=_build_invalid_item_confirmation_prompt_for_selection(target, selected_blocks),  # type: ignore[arg-type]
         )
 
     if schedule_state.review_stage == "section_awaiting_replace_all_payload":
@@ -565,6 +630,7 @@ def handle_section_review_turn(
                     review_stage="idle",
                     correction_target=None,
                     editing_block_id=None,
+                    editing_block_ids=[],
                     editing_field=None,
                     pending_correction_text=None,
                 ),
@@ -584,6 +650,9 @@ def handle_section_review_turn(
                 review_stage="section_awaiting_item_confirmation",
                 correction_target=target,
                 editing_block_id=replace_result.updated_block.block_id if replace_result.updated_block else None,
+                editing_block_ids=[
+                    replace_result.updated_block.block_id
+                ] if replace_result.updated_block else [],
                 editing_field=None,
                 pending_correction_text=None,
             ),
@@ -591,9 +660,9 @@ def handle_section_review_turn(
             current_count=current_count,
             last_text=last_text,
             awaiting_user_input=True,
-            prompt=_build_item_confirmation_prompt(
+            prompt=_build_item_confirmation_prompt_for_selection(
                 target,  # type: ignore[arg-type]
-                replace_result.updated_block,
+                [replace_result.updated_block] if replace_result.updated_block else [],
                 replace_result.conflicts,
             ),
             render_preview_blocks=replace_result.blocks,
@@ -637,6 +706,7 @@ def handle_section_review_turn(
             review_stage="section_awaiting_confirmation",
             correction_target=target,
             editing_block_id=None,
+            editing_block_ids=[],
             editing_field=None,
             pending_correction_text=None,
         )
@@ -671,6 +741,7 @@ class _BlockEditResult:
     updated_block: WeeklyScheduleBlock | None
     scheduling_changes: dict[str, object]
     error_prompt: str | None = None
+    updated_blocks: list[WeeklyScheduleBlock] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -698,11 +769,28 @@ def _apply_block_edit(
     field_name: str,
     raw_value: str,
 ) -> _BlockEditResult:
+    return _apply_blocks_edit(
+        state,
+        target=target,
+        block_ids=[block_id],
+        field_name=field_name,
+        raw_value=raw_value,
+    )
+
+
+def _apply_blocks_edit(
+    state: AgentState,
+    *,
+    target: ScheduleBlockType,
+    block_ids: list[str],
+    field_name: str,
+    raw_value: str,
+) -> _BlockEditResult:
     schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
     all_blocks = [ensure_weekly_block(block) for block in schedule_state.blocks]
     target_blocks = current_section_blocks(all_blocks, target)
-    selected_block = _find_selected_block(target_blocks, block_id)
-    if selected_block is None:
+    selected_blocks = _find_selected_blocks(target_blocks, block_ids)
+    if not selected_blocks:
         return _BlockEditResult(
             blocks=all_blocks,
             conflicts=list(schedule_state.conflicts),
@@ -710,6 +798,7 @@ def _apply_block_edit(
             scheduling_changes={},
             error_prompt=_build_item_selection_prompt(all_blocks, target),
         )
+    selected_block = selected_blocks[0]
 
     value_result = _parse_field_value(
         raw_value,
@@ -721,31 +810,38 @@ def _apply_block_edit(
             blocks=all_blocks,
             conflicts=list(schedule_state.conflicts),
             updated_block=selected_block,
+            updated_blocks=selected_blocks,
             scheduling_changes={},
             error_prompt=value_result.error_prompt,
         )
 
     updated_values = dict(value_result.updates)
-    preview_block = selected_block.model_copy(update=updated_values)
-    updated_block = selected_block.model_copy(
-        update={
-            **updated_values,
-            "source_text": _build_source_text(
-                target,
-                preview_block,
-            ),
-            "has_conflict": False,
-            "conflict_accepted": False,
-            "user_confirmed": False,
-        }
-    )
+    selected_ids = {block.block_id for block in selected_blocks}
+    updated_blocks_by_id: dict[str, WeeklyScheduleBlock] = {}
+    for block in selected_blocks:
+        preview_block = block.model_copy(update=updated_values)
+        updated_blocks_by_id[block.block_id] = block.model_copy(
+            update={
+                **updated_values,
+                "source_text": _build_source_text(
+                    target,
+                    preview_block,
+                ),
+                "has_conflict": False,
+                "conflict_accepted": False,
+                "user_confirmed": False,
+            }
+        )
     updated_target_blocks = [
-        updated_block if block.block_id == selected_block.block_id else block
+        updated_blocks_by_id[block.block_id] if block.block_id in selected_ids else block
         for block in target_blocks
     ]
     updated_schedule_blocks = replace_section_blocks(all_blocks, target, updated_target_blocks)
     updated_schedule_blocks, conflicts = detect_schedule_conflicts(updated_schedule_blocks)
-    refreshed_block = _find_selected_block(updated_schedule_blocks, updated_block.block_id)
+    refreshed_blocks = _find_selected_blocks(
+        updated_schedule_blocks,
+        [block.block_id for block in selected_blocks],
+    )
     scheduling_changes: dict[str, object] = {}
 
     if target in {"academic", "work"}:
@@ -767,7 +863,8 @@ def _apply_block_edit(
     return _BlockEditResult(
         blocks=updated_schedule_blocks,
         conflicts=conflicts,
-        updated_block=refreshed_block or updated_block,
+        updated_block=refreshed_blocks[0] if refreshed_blocks else selected_block,
+        updated_blocks=refreshed_blocks or list(updated_blocks_by_id.values()),
         scheduling_changes=scheduling_changes,
     )
 
@@ -778,11 +875,24 @@ def _apply_block_delete(
     target: ScheduleBlockType,
     block_id: str,
 ) -> _BlockDeleteResult:
+    return _apply_blocks_delete(
+        state,
+        target=target,
+        block_ids=[block_id],
+    )
+
+
+def _apply_blocks_delete(
+    state: AgentState,
+    *,
+    target: ScheduleBlockType,
+    block_ids: list[str],
+) -> _BlockDeleteResult:
     schedule_state = ensure_schedule_flow_state(state.get("schedule", {}))
     all_blocks = [ensure_weekly_block(block) for block in schedule_state.blocks]
     target_blocks = current_section_blocks(all_blocks, target)
-    selected_block = _find_selected_block(target_blocks, block_id)
-    if selected_block is None:
+    selected_blocks = _find_selected_blocks(target_blocks, block_ids)
+    if not selected_blocks:
         return _BlockDeleteResult(
             blocks=all_blocks,
             conflicts=list(schedule_state.conflicts),
@@ -790,8 +900,9 @@ def _apply_block_delete(
             error_prompt=_build_item_selection_prompt(all_blocks, target),
         )
 
+    selected_ids = {block.block_id for block in selected_blocks}
     updated_target_blocks = [
-        block for block in target_blocks if block.block_id != selected_block.block_id
+        block for block in target_blocks if block.block_id not in selected_ids
     ]
     updated_schedule_blocks = replace_section_blocks(all_blocks, target, updated_target_blocks)
     updated_schedule_blocks, conflicts = detect_schedule_conflicts(updated_schedule_blocks)
@@ -983,23 +1094,10 @@ def _build_section_review_update(
     message_content = prompt
     if isinstance(prompt, str) and render_preview_blocks:
         normalized_blocks = [ensure_weekly_block(block) for block in render_preview_blocks]
-        message_content, image_path = build_rendered_schedule_message_content(
+        message_content, _ = build_rendered_schedule_message_content(
             prompt,
             normalized_blocks,
             timezone_name=state.get("timezone", "America/Bogota"),
-        )
-        existing_preview = state.get("schedule_preview", {})
-        preview_text = (
-            existing_preview.get("text")
-            if hasattr(existing_preview, "get")
-            else getattr(existing_preview, "text", None)
-        )
-        scheduling_changes.setdefault(
-            "schedule_preview",
-            {
-                "text": preview_text,
-                "image_path": image_path,
-            },
         )
     if message_content:
         conversation_changes["messages"] = append_message(
@@ -1023,13 +1121,13 @@ def _build_section_confirmation_prompt(
 ) -> str:
     lines = [
         f"✅ Este es tu {_SECTION_LABELS[target]} actual:",
-        _OPTION_HINT,
     ]
     lines.extend(_format_block_lines(blocks, target, numbered=False))
     lines.extend(
         [
             "",
             "¿Está bien así?",
+            _OPTION_HINT,
             "1. Sí, está correcto",
             "2. No, quiero cambiar algo",
         ]
@@ -1071,10 +1169,21 @@ def _build_item_selection_prompt(
         [
             "",
             f"Elige el número de la {item_label if item_label != 'bloque' else 'actividad o bloque'} que quieres editar.",
-            f"Escribe 'Añadir' si deseas agregar más actividades {_ADD_TYPE_LABELS[target]}.",
+            "Para editar varias con el mismo cambio, escribe los números separados por coma o espacio. Ej: 1,2,3 o 1 2 3.",
+            f"Escribe 'Añadir' si deseas agregar más actividades {_ADD_TYPE_LABELS[target]} o escribe 'Cancelar' si no quieres modificar nada.",
         ]
     )
     return "\n".join(lines)
+
+
+def _build_cancel_selection_prompt(
+    blocks: list[WeeklyScheduleBlock] | list[dict],
+    target: ScheduleBlockType,
+) -> str:
+    return (
+        "De acuerdo, no hice cambios.\n\n"
+        f"{_build_section_confirmation_prompt(blocks, target)}"
+    )
 
 
 def _build_invalid_item_prompt(
@@ -1091,11 +1200,26 @@ def _build_field_selection_prompt(
     target: ScheduleBlockType,
     block: WeeklyScheduleBlock | None,
 ) -> str:
+    return _build_field_selection_prompt_for_selection(
+        target,
+        [block] if block is not None else [],
+    )
+
+
+def _build_field_selection_prompt_for_selection(
+    target: ScheduleBlockType,
+    blocks: list[WeeklyScheduleBlock],
+) -> str:
     item_label = _ITEM_LABELS[target]
     lines = []
-    if block is not None:
+    if len(blocks) == 1:
+        block = blocks[0]
         lines.append(f"{_HEADER_EMOJIS[target]} Vas a editar este {item_label}:")
         lines.append(_format_block_line(1, block))
+        lines.append("")
+    elif len(blocks) > 1:
+        lines.append(f"{_HEADER_EMOJIS[target]} Vas a editar estos {len(blocks)} registros:")
+        lines.extend(_format_selected_block_lines(blocks))
         lines.append("")
     lines.extend(
         [
@@ -1104,11 +1228,12 @@ def _build_field_selection_prompt(
             "1. Nombre",
             "2. Día",
             "3. Horario",
-            f"4. Eliminar {item_label if item_label != 'bloque' else 'registro'}",
-            "5. Cancelar edición",
-            "6. Reemplazar todos los datos",
+            f"4. Eliminar {_field_delete_label(item_label, len(blocks))}",
+            "5. Cancelar selección",
         ]
     )
+    if len(blocks) <= 1:
+        lines.append("6. Reemplazar todos los datos")
     return "\n".join(lines)
 
 
@@ -1116,9 +1241,19 @@ def _build_invalid_field_prompt(
     target: ScheduleBlockType,
     block: WeeklyScheduleBlock | None,
 ) -> str:
+    return _build_invalid_field_prompt_for_selection(
+        target,
+        [block] if block is not None else [],
+    )
+
+
+def _build_invalid_field_prompt_for_selection(
+    target: ScheduleBlockType,
+    blocks: list[WeeklyScheduleBlock],
+) -> str:
     return (
         "⚠️ Elige una opción válida.\n\n"
-        f"{_build_field_selection_prompt(target, block)}"
+        f"{_build_field_selection_prompt_for_selection(target, blocks)}"
     )
 
 
@@ -1127,16 +1262,29 @@ def _build_field_value_prompt(
     block: WeeklyScheduleBlock | None,
     field_name: str,
 ) -> str:
+    return _build_field_value_prompt_for_selection(
+        target,
+        [block] if block is not None else [],
+        field_name,
+    )
+
+
+def _build_field_value_prompt_for_selection(
+    target: ScheduleBlockType,
+    blocks: list[WeeklyScheduleBlock],
+    field_name: str,
+) -> str:
     item_label = _ITEM_LABELS[target]
-    current_line = _format_block_line(1, block) if block is not None else ""
+    current_line = _format_current_selection_lines(blocks)
+    plural = len(blocks) > 1
     if field_name == "title":
         return (
-            f"✏️ Escribe el nuevo nombre de la {item_label if item_label != 'bloque' else 'actividad o bloque'}.\n"
-            f"Actual: {current_line}"
+            f"✏️ Escribe el nuevo nombre para {'estos registros' if plural else 'la ' + (item_label if item_label != 'bloque' else 'actividad o bloque')}.\n"
+            f"{current_line}"
         )
     if field_name == "day_of_week":
         lines = [
-            "📅 Elige el nuevo día:",
+            f"📅 Elige el nuevo día para {'estos registros' if plural else 'este registro'}:",
             "1. Lunes",
             "2. Martes",
             "3. Miércoles",
@@ -1146,20 +1294,20 @@ def _build_field_value_prompt(
             "7. Domingo",
         ]
         if current_line:
-            lines.extend(["", f"Actual: {current_line}"])
+            lines.extend(["", current_line])
         return "\n".join(lines)
     if field_name in {"start_time", "end_time"}:
         label = "inicio" if field_name == "start_time" else "fin"
         return (
-            f"⏰ Escribe la nueva hora de {label}.\n"
+            f"⏰ Escribe la nueva hora de {label} para {'estos registros' if plural else 'este registro'}.\n"
             "Ejemplos válidos: 8:00 am, 2:30 pm o 14:30.\n"
-            f"Actual: {current_line}"
+            f"{current_line}"
         )
     return (
-        "⏰ Escribe el nuevo horario completo.\n"
+        f"⏰ Escribe el nuevo horario completo para {'estos registros' if plural else 'este registro'}.\n"
         "Envíame la hora de inicio y la hora de fin en un solo mensaje.\n"
         "Ejemplos válidos: 8:00 am a 10:00 am, 2:30 pm a 4:00 pm o 14:30 a 16:00.\n"
-        f"Actual: {current_line}"
+        f"{current_line}"
     )
 
 
@@ -1168,11 +1316,24 @@ def _build_item_confirmation_prompt(
     block: WeeklyScheduleBlock,
     conflicts: list,
 ) -> str:
+    return _build_item_confirmation_prompt_for_selection(target, [block], conflicts)
+
+
+def _build_item_confirmation_prompt_for_selection(
+    target: ScheduleBlockType,
+    blocks: list[WeeklyScheduleBlock],
+    conflicts: list,
+) -> str:
+    if not blocks:
+        return "⚠️ No encontré el registro actualizado. Volvamos a elegir uno."
     lines = [
-        "✅ Así quedó actualizado:",
-        _format_block_line(1, block),
+        "✅ Así quedó actualizado:" if len(blocks) == 1 else "✅ Así quedaron actualizados estos registros:",
     ]
-    conflict_warning = _build_related_conflict_warning(block.block_id, conflicts)
+    lines.extend(_format_selected_block_lines(blocks))
+    conflict_warning = _build_related_conflict_warning(
+        [block.block_id for block in blocks],
+        conflicts,
+    )
     if conflict_warning:
         lines.extend(["", conflict_warning])
     lines.extend(
@@ -1201,35 +1362,50 @@ def _build_invalid_item_confirmation_prompt(
     target: ScheduleBlockType,
     block: WeeklyScheduleBlock | None,
 ) -> str:
-    if block is None:
-        return "⚠️ Elige una opción válida.\n1. Sí, seguimos\n2. No, quiero cambiar algo más"
-    return (
-        "⚠️ Elige una opción válida.\n\n"
-        f"{_build_item_confirmation_prompt(target, block, [])}"
+    return _build_invalid_item_confirmation_prompt_for_selection(
+        target,
+        [block] if block is not None else [],
     )
 
 
-def _build_related_conflict_warning(block_id: str, conflicts: list) -> str:
+def _build_invalid_item_confirmation_prompt_for_selection(
+    target: ScheduleBlockType,
+    blocks: list[WeeklyScheduleBlock],
+) -> str:
+    if not blocks:
+        return "⚠️ Elige una opción válida.\n1. Sí, seguimos\n2. No, quiero cambiar algo más"
+    return (
+        "⚠️ Elige una opción válida.\n\n"
+        f"{_build_item_confirmation_prompt_for_selection(target, blocks, [])}"
+    )
+
+
+def _build_related_conflict_warning(block_ids: str | list[str], conflicts: list) -> str:
+    selected_ids = {block_ids} if isinstance(block_ids, str) else set(block_ids)
     related = [
         conflict
         for conflict in conflicts
-        if getattr(conflict, "left_block_id", None) == block_id
-        or getattr(conflict, "right_block_id", None) == block_id
+        if getattr(conflict, "left_block_id", None) in selected_ids
+        or getattr(conflict, "right_block_id", None) in selected_ids
     ]
     if not related:
         return ""
 
     lines = ["⚠️ Ojo, este cambio genera un cruce:"]
     for conflict in related:
-        is_left = getattr(conflict, "left_block_id", None) == block_id
-        other_title = conflict.right_title if is_left else conflict.left_title
-        other_type = conflict.right_type if is_left else conflict.left_type
+        left_selected = getattr(conflict, "left_block_id", None) in selected_ids
+        right_selected = getattr(conflict, "right_block_id", None) in selected_ids
+        other_title = conflict.right_title if left_selected else conflict.left_title
+        other_type = conflict.right_type if left_selected else conflict.left_type
+        if left_selected and right_selected:
+            other_title = conflict.right_title
+            other_type = conflict.right_type
         lines.append(
             f"- {DAY_LABELS[conflict.day_of_week]}: se cruza con {other_title} "
             f"({_TYPE_LABELS.get(other_type, other_type)}) entre "
             f"{_format_time_human(conflict.overlap_start)} y {_format_time_human(conflict.overlap_end)}."
         )
-    lines.append("Si quieres, puedes volver a ajustar este mismo registro antes de continuar.")
+    lines.append("Si quieres, puedes volver a ajustar esta selección antes de continuar.")
     return "\n".join(lines)
 
 
@@ -1262,6 +1438,23 @@ def _format_block_line(index: int, block: WeeklyScheduleBlock | None) -> str:
         f"{index}. {block.title} — {DAY_LABELS[block.day_of_week]} "
         f"de {_format_time_human(block.start_time)} a {_format_time_human(block.end_time)}"
     )
+
+
+def _format_selected_block_lines(blocks: list[WeeklyScheduleBlock]) -> list[str]:
+    return [_format_block_line(index, block) for index, block in enumerate(blocks, start=1)]
+
+
+def _format_current_selection_lines(blocks: list[WeeklyScheduleBlock]) -> str:
+    if not blocks:
+        return "Actual: registro no disponible."
+    label = "Actual" if len(blocks) == 1 else "Actuales"
+    return "\n".join([f"{label}:"] + _format_selected_block_lines(blocks))
+
+
+def _field_delete_label(item_label: str, count: int) -> str:
+    if count > 1:
+        return "estos registros"
+    return item_label if item_label != "bloque" else "registro"
 
 
 def _format_bullet_block_line(block: WeeklyScheduleBlock | None) -> str:
@@ -1303,19 +1496,72 @@ def _parse_selected_block(
     target: ScheduleBlockType,
     text: str | None,
 ) -> WeeklyScheduleBlock | None:
-    option = parse_numbered_option(text)
-    if option is None or option < 1:
+    selected = _parse_selected_blocks(blocks, target, text)
+    if len(selected) != 1:
         return None
+    return selected[0]
+
+
+def _parse_selected_blocks(
+    blocks: list[WeeklyScheduleBlock] | list[dict],
+    target: ScheduleBlockType,
+    text: str | None,
+) -> list[WeeklyScheduleBlock]:
     section_blocks = sorted(
         current_section_blocks(blocks, target),
         key=lambda item: (DAY_ORDER.index(item.day_of_week), item.start_time, item.title.lower()),
     )
-    if option > len(section_blocks):
-        return None
-    return section_blocks[option - 1]
+    options = _parse_selection_numbers(text)
+    if not options:
+        return []
+    if any(option < 1 or option > len(section_blocks) for option in options):
+        return []
+    selected: list[WeeklyScheduleBlock] = []
+    seen: set[int] = set()
+    for option in options:
+        if option in seen:
+            continue
+        seen.add(option)
+        selected.append(section_blocks[option - 1])
+    return selected
 
 
-def _parse_field_choice(text: str | None) -> str | None:
+def _parse_selection_numbers(text: str | None) -> list[int]:
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    first_line = raw.splitlines()[0].strip()
+    normalized = normalize_text(first_line)
+    if not re.search(r"\d", normalized):
+        return []
+
+    allowed_words = (
+        "la",
+        "las",
+        "opcion",
+        "opciones",
+        "registro",
+        "registros",
+        "actividad",
+        "actividades",
+        "materia",
+        "materias",
+        "bloque",
+        "bloques",
+        "numero",
+        "numeros",
+        "y",
+        "e",
+    )
+    residue = re.sub(r"\b(?:" + "|".join(allowed_words) + r")\b", " ", normalized)
+    residue = re.sub(r"\d+", " ", residue)
+    residue = re.sub(r"[\s,.;:()]+", " ", residue).strip()
+    if residue:
+        return []
+    return [int(match.group(0)) for match in re.finditer(r"\d+", normalized)]
+
+
+def _parse_field_choice(text: str | None, *, allow_replace_all: bool = True) -> str | None:
     option = parse_numbered_option(text)
     if option in _FIELD_OPTIONS:
         return _FIELD_OPTIONS[option]
@@ -1323,7 +1569,7 @@ def _parse_field_choice(text: str | None) -> str | None:
         return "delete"
     if option == 5:
         return "cancel"
-    if option == 6:
+    if option == 6 and allow_replace_all:
         return "replace_all"
 
     normalized = normalize_text(text or "")
@@ -1337,7 +1583,7 @@ def _parse_field_choice(text: str | None) -> str | None:
         return "delete"
     if any(token in normalized for token in ("cancelar", "volver")):
         return "cancel"
-    if any(token in normalized for token in ("reemplazar", "todos", "cambiar todo")):
+    if allow_replace_all and any(token in normalized for token in ("reemplazar", "todos", "cambiar todo")):
         return "replace_all"
     return None
 
@@ -1355,9 +1601,55 @@ def _find_selected_block(
     return None
 
 
+def _find_selected_blocks(
+    blocks: list[WeeklyScheduleBlock] | list[dict],
+    block_ids: list[str],
+) -> list[WeeklyScheduleBlock]:
+    if not block_ids:
+        return []
+    normalized_blocks = [ensure_weekly_block(block) for block in blocks]
+    by_id = {block.block_id: block for block in normalized_blocks}
+    selected: list[WeeklyScheduleBlock] = []
+    seen: set[str] = set()
+    for raw_id in block_ids:
+        block_id = str(raw_id or "").strip()
+        if not block_id or block_id in seen:
+            continue
+        block = by_id.get(block_id)
+        if block is None:
+            continue
+        seen.add(block_id)
+        selected.append(block)
+    return selected
+
+
+def _active_editing_block_ids(schedule_state: object) -> list[str]:
+    raw_ids = getattr(schedule_state, "editing_block_ids", []) or []
+    ids = [str(block_id) for block_id in raw_ids if str(block_id or "").strip()]
+    if ids:
+        return ids
+    single_id = str(getattr(schedule_state, "editing_block_id", "") or "").strip()
+    return [single_id] if single_id else []
+
+
 def _is_add_command(text: str | None) -> bool:
     normalized = normalize_text(text or "")
     return any(token in normalized for token in ("anadir", "añadir", "agregar", "nuevo", "nueva", "add"))
+
+
+def _is_cancel_command(text: str | None) -> bool:
+    normalized = normalize_text(text or "")
+    return any(
+        token in normalized
+        for token in (
+            "cancelar",
+            "volver",
+            "no quiero modificar",
+            "no modificar nada",
+            "no quiero cambiar",
+            "me equivoque",
+        )
+    )
 
 
 def _build_add_payload_prompt(target: ScheduleBlockType) -> str:

@@ -258,7 +258,8 @@ _EVALUATION_REJECTION_RESPONSE = (
     "o guiarte con preguntas para que tu construyas la respuesta."
 )
 _GENERAL_REJECTION_RESPONSE = (
-    "Eso esta fuera de lo que puedo ayudarte. Soy tu asistente academica. "
+    "Eso esta fuera de los temas academicos en los que puedo ayudarte. "
+    "Soy tu asistente academica. "
     "¿Hay algo de tu semana o tus materias en lo que te pueda apoyar?"
 )
 _HUMAN_SUPPORT_RESPONSE = (
@@ -311,12 +312,13 @@ def decide_scope(
     if _is_forbidden_evaluation_solution(normalized):
         return _decision(
             input_classification,
-            category="in_scope",
-            action="normal",
-            allowed=True,
-            domain="guided_academic_support",
-            intent="request_guided_academic_help",
-            reason="evaluation_solution_redirected_to_guided",
+            category="hard_out_of_scope",
+            action="reject",
+            allowed=False,
+            domain="out_of_scope",
+            intent="forbidden_evaluation_solution",
+            reason="evaluation_solution_request",
+            response_text=_EVALUATION_REJECTION_RESPONSE,
             confidence=0.93,
         )
 
@@ -643,11 +645,13 @@ def _domain_from_classification(classification: InputClassification) -> str:
         "activity_management",
         "session_tracking",
         "replanning",
-        "calendar_sync",
-        "todo_sync",
         "guided_academic_support",
     }:
         return signal
+    if signal == "calendar_sync":
+        return "calendar_action"
+    if signal == "todo_sync":
+        return "todo_action"
     if signal in {
         "prioritization",
         "study_method_recommendation",

@@ -103,6 +103,7 @@ def render_grounded_answer_prompt(
         "- Usa el CONTEXTO RAG como punto de partida si contiene informacion relevante "
         "para la pregunta. Si no la tiene o es insuficiente, responde con tu propio "
         "conocimiento academico sobre tecnicas y metodos de estudio.\n"
+        "- Trata los chunks como evidencia y contexto, no como respuesta directa.\n"
         "- Sintetiza y adapta, no copies chunks literalmente.\n"
         "- No menciones IDs de chunks ni nombres de archivos.\n"
         "- No inventes estudios ni fuentes citadas. Si puedes usar conocimiento general "

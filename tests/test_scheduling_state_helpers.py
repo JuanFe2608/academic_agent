@@ -60,6 +60,7 @@ def test_reset_schedule_review_state_clears_review_artifacts() -> None:
             "review_stage": "awaiting_correction_payload",
             "correction_target": "academic",
             "editing_block_id": block.block_id,
+            "editing_block_ids": [block.block_id],
             "editing_field": "start_time",
             "pending_correction_text": "nuevo horario",
             "conflicts_accepted": True,
@@ -72,6 +73,7 @@ def test_reset_schedule_review_state_clears_review_artifacts() -> None:
     assert update["review_stage"] == "idle"
     assert update["correction_target"] is None
     assert update["editing_block_id"] is None
+    assert update["editing_block_ids"] == []
     assert update["editing_field"] is None
     assert update["pending_correction_text"] is None
     assert update["conflicts"] == []

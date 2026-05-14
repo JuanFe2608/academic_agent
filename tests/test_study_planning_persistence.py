@@ -288,6 +288,7 @@ def test_postgres_study_planning_repository_persists_profiles_subjects_and_event
 
 def test_persist_study_profile_does_not_persist_initial_priorities_or_plan(monkeypatch) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", "1")
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),
@@ -347,7 +348,7 @@ def test_collect_priorities_skip_persists_skipped_snapshot() -> None:
 
         update = collect_priorities(state)
 
-        assert update["phase"] == "end"
+        assert update["phase"] == "running"
         assert update["priorities"]["status"] == "skipped"
         assert update["priorities"]["persisted_profile_id"] == 1
         assert update["study_plan"]["persisted_profile_id"] == 1
@@ -396,7 +397,7 @@ def test_build_study_plan_persists_recalculated_snapshot() -> None:
 
         update = build_study_plan(state)
 
-        assert update["phase"] == "end"
+        assert update["phase"] == "running"
         assert update["priorities"]["persisted_profile_id"] == 1
         assert update["study_plan"]["persisted_profile_id"] == 1
         assert update["study_plan"]["version_number"] == 1
@@ -518,7 +519,7 @@ def test_postgres_planning_snapshot_loader_accepts_dict_rows() -> None:
     assert snapshot.study_plan.persisted_profile_id == 9
 
 
-def test_phase_11_persists_only_generated_plan_after_priorities_completion(
+def test_post_radar_priorities_completion_persists_generated_plan(
     monkeypatch,
 ) -> None:
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", "1")
@@ -546,15 +547,8 @@ def test_phase_11_persists_only_generated_plan_after_priorities_completion(
         priorities_update = collect_priorities(state)
 
         assert priorities_update["phase"] == "running"
-        assert planning_repository._priority_profiles == {}
-        assert planning_repository._study_plan_profiles == {}
-
-        next_state = AgentState(**{**state.model_dump(), **priorities_update})
-        plan_update = build_study_plan(next_state)
-
-        assert plan_update["phase"] == "end"
-        assert plan_update["priorities"]["persisted_profile_id"] == 1
-        assert plan_update["study_plan"]["persisted_profile_id"] == 1
+        assert priorities_update["priorities"]["persisted_profile_id"] == 1
+        assert priorities_update["study_plan"]["persisted_profile_id"] == 1
         assert len(planning_repository._priority_profiles) == 1
         assert len(planning_repository._study_plan_profiles) == 1
         assert len(planning_repository._study_plan_profiles[15]["plan_events"]) >= 2
@@ -657,7 +651,7 @@ def test_phase_12_materializes_and_syncs_reminders_from_generated_plan(
         update = build_study_plan(state)
 
         instance_count = int(update["study_plan"]["materialized_instance_count"] or 0)
-        assert update["phase"] == "end"
+        assert update["phase"] == "running"
         assert update["study_plan"]["persisted_profile_id"] == 1
         assert instance_count >= 1
         assert update["study_plan"]["materialized_through_date"] == "2026-01-11"
@@ -673,10 +667,9 @@ def test_phase_12_materializes_and_syncs_reminders_from_generated_plan(
             "pending"
         }
         assistant_message = update["messages"][-1].content
-        assert "Plan guardado en tu perfil académico." in assistant_message
-        assert "Sesiones materializadas:" in assistant_message
-        assert "Recordatorios activados por canal interno" in assistant_message
-        assert "No he creado eventos en Outlook ni tareas en Microsoft To Do" in assistant_message
+        assert "sesión(es) programada(s)" in assistant_message
+        assert "recordatorio(s) activado(s) por canal interno" in assistant_message
+        assert "¿Quieres que sincronice este plan con tu Outlook Calendar?" in assistant_message
     finally:
         set_study_planning_persistence_service(None)
         set_study_plan_materialization_service(None)
@@ -719,7 +712,7 @@ def test_phase_12_repository_failures_do_not_break_conversation(
 
         update = build_study_plan(state)
 
-        assert update["phase"] == "end"
+        assert update["phase"] == "running"
         assert update["study_plan"]["persisted_profile_id"] == 1
         assert (
             update["study_plan"]["materialization_error"]
@@ -774,13 +767,13 @@ def test_phase_12_reminder_failure_keeps_materialized_plan(
 
         update = build_study_plan(state)
 
-        assert update["phase"] == "end"
+        assert update["phase"] == "running"
         assert update["study_plan"]["materialized_instance_count"] >= 1
         assert (
             update["reminders"]["last_dispatch_error"]
             == "study_plan_reminders_service_unavailable"
         )
-        assert "No pude activar recordatorios todavía" in update["messages"][-1].content
+        assert "No pude activar los recordatorios todavía" in update["messages"][-1].content
     finally:
         set_study_planning_persistence_service(None)
         set_study_plan_materialization_service(None)

@@ -208,6 +208,7 @@ def test_collect_study_profile_reprompts_on_invalid_answer(monkeypatch) -> None:
 
 def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     monkeypatch.setenv("ACADEMIC_AGENT_ENABLE_PERSONALIZATION_MODULE", "1")
     set_schedule_service(ScheduleService(repository=InMemoryScheduleRepository()))
     set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
@@ -249,11 +250,13 @@ def test_personalization_flow_collects_answers_and_persists_result(monkeypatch) 
 
         assert state.phase == "end"
         assert state.study_profile.persisted_profile_id == 1
-        final_message = state.messages[-1].content
-        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in final_message
-        assert "Iniciar tus sesiones con bloques claros" in final_message
-        assert "Tus técnicas más recomendadas en este momento son:" not in final_message
-        assert "Ahora voy a usar este resultado" not in final_message
+        summary_message = state.messages[-2].content
+        operational_message = state.messages[-1].content
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in summary_message
+        assert "Iniciar tus sesiones con bloques claros" in summary_message
+        assert "Tus técnicas más recomendadas en este momento son:" not in summary_message
+        assert "Ahora voy a usar este resultado" not in summary_message
+        assert "Desde ahora puedo apoyarte" in operational_message
         saved_profile = personalization_repository._profiles[15]
         assert saved_profile["questionnaire_version"] == "v3"
         assert saved_profile["scoring_version"] == "v3"
@@ -330,9 +333,12 @@ def test_personalization_flow_enters_tiebreaker_and_refines_result(monkeypatch) 
         state = _apply_update(state, persist_study_profile(state))
 
         assert state.phase == "end"
-        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in state.messages[-1].content
-        assert "Tus técnicas más recomendadas en este momento son:" not in state.messages[-1].content
-        assert "Con tus respuestas extra" not in state.messages[-1].content
+        summary_message = state.messages[-2].content
+        operational_message = state.messages[-1].content
+        assert "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva" in summary_message
+        assert "Tus técnicas más recomendadas en este momento son:" not in summary_message
+        assert "Con tus respuestas extra" not in summary_message
+        assert "Desde ahora puedo apoyarte" in operational_message
         saved_profile = personalization_repository._profiles[15]
         assert len(saved_profile["answers"]) == 13
         assert saved_profile["result_payload"]["tiebreaker"]["status"] == "completed"

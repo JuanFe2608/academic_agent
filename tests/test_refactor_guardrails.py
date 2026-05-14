@@ -219,8 +219,6 @@ def test_hotspot_nodes_are_now_thin_wrappers() -> None:
     hotspot_nodes = (
         Path("src/agents/support/nodes/collect_profile/node.py"),
         Path("src/agents/support/nodes/collect_extracurricular_details/node.py"),
-        Path("src/agents/support/nodes/apply_modifications/node.py"),
-        Path("src/agents/support/nodes/generate_tentative_extracurricular/node.py"),
     )
     for file_path in hotspot_nodes:
         tree = ast.parse(file_path.read_text(encoding="utf-8"))

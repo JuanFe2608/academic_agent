@@ -2,12 +2,36 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from langchain_core.messages import HumanMessage
 
 from agents.support.nodes.ask_extracurricular.node import ask_extracurricular
 from agents.support.nodes.collect_extracurricular_details.node import collect_extracurricular_details
 from agents.support.nodes.utils import parse_yes_no
 from agents.support.state import AgentState
+
+
+def _message_text(update: dict, idx: int = 0) -> str:
+    content = update["messages"][idx].content
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "text":
+                return str(block.get("text", ""))
+    return ""
+
+
+def _message_image_url(update: dict, idx: int = 0) -> str:
+    content = update["messages"][idx].content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "image_url":
+                image_url = block.get("image_url")
+                if isinstance(image_url, dict):
+                    return str(image_url.get("url") or "")
+    return ""
 
 
 def test_ask_extracurricular_yes_moves_to_type_stage() -> None:
@@ -217,10 +241,11 @@ def test_collect_extracurricular_opens_section_review_before_draft() -> None:
     assert update["phase"] == "extras"
     assert update["awaiting_user_input"] is True
     assert update["schedule"]["review_stage"] == "section_awaiting_confirmation"
-    prompt = update["messages"][0].content.lower()
+    prompt = _message_text(update).lower()
     assert "horario extracurricular actual" in prompt
     assert "está bien así" in prompt
     assert "escribe el número de la opción" in prompt
+    assert Path(_message_image_url(update)).exists()
 
 
 def test_collect_extracurricular_section_confirmation_yes_moves_to_draft() -> None:
@@ -262,6 +287,91 @@ def test_collect_extracurricular_section_confirmation_yes_moves_to_draft() -> No
     assert update["awaiting_user_input"] is False
     assert update["extras_collect_stage"] == "done"
     assert "resumen" in update["messages"][0].content.lower()
+
+
+def test_collect_extracurricular_multi_item_time_edit_updates_items_and_preview(
+    monkeypatch,
+    tmp_path,
+) -> None:
+    rendered_path = tmp_path / "schedule.png"
+    rendered_path.write_bytes(b"fake image")
+    monkeypatch.setattr(
+        "agents.support.flows.scheduling.section_confirmation_service.build_rendered_schedule_message_content",
+        lambda text, _blocks, **_kwargs: (
+            [
+                {"type": "text", "text": text},
+                {"type": "image_url", "image_url": {"url": str(rendered_path)}},
+            ],
+            str(rendered_path),
+        ),
+    )
+    state = AgentState(
+        phase="extras",
+        extras_collect_stage="awaiting_more",
+        extracurricular=[
+            {
+                "nombre": "Gimnasio",
+                "es_variable": False,
+                "detalle": "Martes 19:00-20:00",
+                "dias": ["Martes"],
+                "hora_inicio": "19:00",
+                "hora_fin": "20:00",
+            },
+            {
+                "nombre": "Gimnasio",
+                "es_variable": False,
+                "detalle": "Jueves 19:00-20:00",
+                "dias": ["Jueves"],
+                "hora_inicio": "19:00",
+                "hora_fin": "20:00",
+            },
+        ],
+        schedule={
+            "blocks": [
+                {
+                    "block_type": "extracurricular",
+                    "title": "Gimnasio",
+                    "day_of_week": "tuesday",
+                    "start_time": "19:00",
+                    "end_time": "20:00",
+                    "source_text": "Martes 19:00-20:00 Gimnasio",
+                    "block_id": "extra-1",
+                },
+                {
+                    "block_type": "extracurricular",
+                    "title": "Gimnasio",
+                    "day_of_week": "thursday",
+                    "start_time": "19:00",
+                    "end_time": "20:00",
+                    "source_text": "Jueves 19:00-20:00 Gimnasio",
+                    "block_id": "extra-2",
+                },
+            ],
+            "review_stage": "section_awaiting_field_value",
+            "correction_target": "extracurricular",
+            "editing_block_id": "extra-1",
+            "editing_block_ids": ["extra-1", "extra-2"],
+            "editing_field": "time_range",
+        },
+        awaiting_user_input=True,
+        user_message_count=0,
+        messages=[HumanMessage(content="8 pm a 9 pm")],
+    )
+
+    update = collect_extracurricular_details(state)
+
+    updated_blocks = {block.block_id: block for block in update["schedule"]["blocks"]}
+    assert updated_blocks["extra-1"].start_time == "20:00"
+    assert updated_blocks["extra-2"].start_time == "20:00"
+    assert updated_blocks["extra-1"].end_time == "21:00"
+    assert updated_blocks["extra-2"].end_time == "21:00"
+    assert len(update["extracurricular"]) == 1
+    assert update["extracurricular"][0].dias == ["Martes", "Jueves"]
+    assert update["extracurricular"][0].hora_inicio == "20:00"
+    assert update["extracurricular"][0].hora_fin == "21:00"
+    text = update["messages"][0].content[0]["text"].lower()
+    assert "así quedaron actualizados estos registros" in text
+    assert rendered_path.exists()
 
 
 def test_collect_extracurricular_details_keeps_valid_items_and_requests_only_missing_data() -> None:

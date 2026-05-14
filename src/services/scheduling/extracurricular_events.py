@@ -64,6 +64,7 @@ def generate_tentative_extracurricular(state: Mapping[str, object]) -> dict:
     timezone = str(state.get("timezone", "America/Bogota"))
     errors = list(state.get("errors", []))
     extracurricular_updated: list[ExtracurricularItem] = []
+    events: list[Event] = []
 
     for item in state.get("extracurricular", []):
         updated_item = ensure_extracurricular_item(item)
@@ -82,9 +83,11 @@ def generate_tentative_extracurricular(state: Mapping[str, object]) -> dict:
             valid_events.append(event)
         updated_item.tentativo = valid_events
         extracurricular_updated.append(updated_item)
+        events.extend(valid_events)
 
     return {
         "extracurricular": extracurricular_updated,
+        "events": events,
         "errors": errors,
         "phase": "draft",
     }
@@ -298,4 +301,3 @@ def normalize_text(value: str) -> str:
         .lower()
         .strip()
     )
-

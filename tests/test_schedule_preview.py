@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import agents.support.scheduling.render as schedule_rendering
 from agents.support.nodes.render_schedule_preview.node import render_schedule_preview
 from agents.support.scheduling.formatter import build_schedule_summary
 from agents.support.state import AgentState
@@ -158,3 +159,40 @@ def test_render_schedule_preview_inlines_image_for_debugger(monkeypatch) -> None
 
     rendered_image = update["messages"][0].content[1]["image_url"]["url"]
     assert rendered_image.startswith("data:image/")
+
+
+def test_render_schedule_preview_image_uses_unique_file_names(monkeypatch) -> None:
+    filenames: list[str] = []
+
+    def fake_render_recurring_schedule(_blocks, **kwargs) -> str:
+        filename = str(kwargs["filename"])
+        filenames.append(filename)
+        return f"/tmp/{filename}"
+
+    monkeypatch.setattr(
+        schedule_rendering,
+        "render_recurring_schedule",
+        fake_render_recurring_schedule,
+    )
+    monkeypatch.setattr(
+        schedule_rendering,
+        "materialize_image_reference",
+        lambda image_path: image_path,
+    )
+
+    block = WeeklyScheduleBlock(
+        block_type="academic",
+        title="Calculo",
+        day_of_week="monday",
+        start_time="06:00",
+        end_time="08:00",
+        source_text="Lunes cálculo de 6 a 8 am",
+    )
+
+    first = schedule_rendering.render_schedule_preview_image([block])
+    second = schedule_rendering.render_schedule_preview_image([block])
+
+    assert first.image_path != second.image_path
+    assert len(set(filenames)) == 2
+    assert all(filename.startswith("schedule-") for filename in filenames)
+    assert all(filename.endswith(".png") for filename in filenames)

@@ -1480,8 +1480,8 @@ def extract_tool_state_updates(result: dict) -> dict:
 
 def _llm_study_fallback(query: str) -> str | None:
     """Responde con LLM cuando el RAG no tiene fuentes suficientes para la consulta."""
-    from integrations.ai._llm_impl import maybe_get_llm
     from langchain_core.messages import HumanMessage, SystemMessage
+    from services.ai_runtime import maybe_get_llm
 
     llm = maybe_get_llm(temperature=0.3)
     if not llm:

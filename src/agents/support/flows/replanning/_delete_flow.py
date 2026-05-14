@@ -5,6 +5,7 @@ from __future__ import annotations
 from agents.support.nodes.utils import parse_yes_no
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
+    events_for_scheduling_update,
     get_all_schedule_events,
     schedule_flow_state_to_update,
 )
@@ -209,8 +210,19 @@ def _delete_selected_events(
         "errors": list(state.get("errors", [])),
     }
     if updated_blocks != list(schedule_state.blocks):
-        update["schedule"] = schedule_flow_state_to_update(
-            schedule_state.model_copy(update={"blocks": updated_blocks})
+        updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
+        update["schedule"] = schedule_flow_state_to_update(updated_schedule)
+        update["events"] = events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            extracurricular=updated_extracurricular,
+            exclude_event_ids=id_set,
+        )
+    else:
+        update["events"] = events_for_scheduling_update(
+            state,
+            extracurricular=updated_extracurricular,
+            exclude_event_ids=id_set,
         )
     return build_validate_update(ctx, replan=replan, awaiting_user_input=False, **update)
 

@@ -9,6 +9,7 @@ from agents.support.nodes.collect_extracurricular_details import (
 from agents.support.nodes.utils import has_time_range, normalize_text
 from agents.support.scheduling.state_helpers import (
     ensure_schedule_flow_state,
+    events_for_scheduling_update,
     schedule_flow_state_to_update,
 )
 from agents.support.state import AgentState
@@ -65,11 +66,13 @@ def apply_laboral_change(
     raw_inputs["horario_laboral_text"] = details
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(state, schedule=updated_schedule),
         errors=errors,
         raw_inputs=raw_inputs,
     )
@@ -106,11 +109,13 @@ def apply_academic_change(
     raw_inputs["horario_academico_text"] = details
 
     clear_replan_change_request(replan)
+    updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
     return build_validate_update(
         ctx,
         replan=replan,
         awaiting_user_input=False,
-        schedule=schedule_flow_state_to_update(schedule_state.model_copy(update={"blocks": updated_blocks})),
+        schedule=schedule_flow_state_to_update(updated_schedule),
+        events=events_for_scheduling_update(state, schedule=updated_schedule),
         errors=errors,
         raw_inputs=raw_inputs,
     )
@@ -171,6 +176,10 @@ def apply_extracurricular_change(
             awaiting_user_input=False,
             errors=list(state.get("errors", [])),
             extracurricular=updated_extracurricular,
+            events=events_for_scheduling_update(
+                state,
+                extracurricular=updated_extracurricular,
+            ),
         )
 
     if not details:
@@ -203,6 +212,10 @@ def apply_extracurricular_change(
             awaiting_user_input=False,
             errors=errors,
             extracurricular=extracurricular_items + items_with_events,
+            events=events_for_scheduling_update(
+                state,
+                extracurricular=extracurricular_items + items_with_events,
+            ),
         )
 
     reference_name = target_item.nombre if target_item else ""
@@ -244,6 +257,10 @@ def apply_extracurricular_change(
         awaiting_user_input=False,
         errors=errors,
         extracurricular=updated_extracurricular,
+        events=events_for_scheduling_update(
+            state,
+            extracurricular=updated_extracurricular,
+        ),
     )
 
 
@@ -296,8 +313,17 @@ def apply_activity_additions(
         + new_extra_items_with_events,
     }
     if updated_blocks != list(schedule_state.blocks):
-        update["schedule"] = schedule_flow_state_to_update(
-            schedule_state.model_copy(update={"blocks": updated_blocks})
+        updated_schedule = schedule_state.model_copy(update={"blocks": updated_blocks})
+        update["schedule"] = schedule_flow_state_to_update(updated_schedule)
+        update["events"] = events_for_scheduling_update(
+            state,
+            schedule=updated_schedule,
+            extracurricular=update["extracurricular"],
+        )
+    else:
+        update["events"] = events_for_scheduling_update(
+            state,
+            extracurricular=update["extracurricular"],
         )
     return build_validate_update(ctx, replan=replan, awaiting_user_input=False, **update)
 

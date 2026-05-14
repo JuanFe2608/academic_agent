@@ -249,6 +249,7 @@ def test_persist_study_profile_closes_without_generating_study_plan(
     monkeypatch,
 ) -> None:
     monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_PRIORITIES_MODULE", raising=False)
+    monkeypatch.delenv("ACADEMIC_AGENT_ENABLE_POST_RADAR_FLOW", raising=False)
     personalization_service = PersonalizationService(
         config=PersonalizationConfig(enabled=True),
         repository=InMemoryPersonalizationRepository(),

@@ -17,10 +17,14 @@ from services.planning import coerce_academic_activities, parse_academic_activit
 from services.priorities import (
     current_week_bounds,
     ensure_priorities_state,
+    parse_priority_command,
     resolve_prioritized_subjects,
     subject_items_to_update,
     update_priorities_state,
 )
+from schemas.planning import SubjectItem
+
+_PRIORITY_LABELS = {"alta", "media", "baja"}
 
 
 def handle_priorities_turn(state: AgentState) -> dict:
@@ -147,6 +151,19 @@ def _handle_context_input(
 ) -> dict:
     """Procesa la respuesta abierta del estudiante y avanza al plan semanal."""
 
+    if parse_priority_command(last_text) == "omitir":
+        return _skip(
+            state=state,
+            messages=messages,
+            current_count=current_count,
+            last_text=last_text,
+            subjects=subjects,
+            source=source,
+            prompt_version=prompt_version,
+            week_start=week_start,
+            week_end=week_end,
+        )
+
     # Respuesta de descarte explícita → proceder de inmediato
     if _looks_like_dismissal(last_text):
         return _complete(
@@ -156,6 +173,28 @@ def _handle_context_input(
             last_text=last_text,
             subjects=subjects,
             source=source,
+            prompt_version=prompt_version,
+            week_start=week_start,
+            week_end=week_end,
+        )
+
+    manual_subjects = _parse_manual_subject_rows(last_text)
+    if manual_subjects:
+        new_priorities = resolve_prioritized_subjects(
+            schedule_blocks=schedule_blocks,
+            subjects=manual_subjects,
+            academic_activities=list(state.get("academic_activities", [])),
+            primary_technique_id=_primary_technique_id(study_profile),
+            reference_date=reference_date,
+        )
+        updated_subjects = subject_items_to_update(new_priorities.subject_items)
+        return _complete(
+            state=state,
+            messages=messages,
+            current_count=current_count,
+            last_text=last_text,
+            subjects=updated_subjects,
+            source="manual_priority_input",
             prompt_version=prompt_version,
             week_start=week_start,
             week_end=week_end,
@@ -255,6 +294,45 @@ def _complete(
     }
 
 
+def _skip(
+    *,
+    state: AgentState,
+    messages: list,
+    current_count: int,
+    last_text: str | None,
+    subjects: list,
+    source: str,
+    prompt_version: str,
+    week_start: str,
+    week_end: str,
+) -> dict:
+    """Marca el snapshot como omitido sin recalcular prioridades nuevas."""
+
+    return {
+        "subjects": subjects,
+        "priorities": update_priorities_state(
+            state.get("priorities", {}),
+            status="skipped",
+            prompt_version=prompt_version,
+            source=source,
+            last_error=None,
+            capture_stage=None,
+            week_start=week_start,
+            week_end=week_end,
+            draft={"subject_names": [s.nombre for s in subjects]},
+        ),
+        "phase": "running",
+        "user_message_count": current_count,
+        "last_user_text": last_text,
+        "awaiting_user_input": False,
+        "messages": append_message(
+            messages,
+            "assistant",
+            "Listo, omití la actualización de prioridades por ahora.",
+        ),
+    }
+
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -314,6 +392,76 @@ def _looks_like_dismissal(text: str | None) -> bool:
         "ninguna",
         "ninguno",
     }
+
+
+def _parse_manual_subject_rows(text: str | None) -> list[SubjectItem]:
+    """Acepta filas tipo `Materia | alta | 5 | media | 4h` como corrección rápida."""
+
+    rows = [line.strip() for line in str(text or "").splitlines() if line.strip()]
+    if not rows or not any("|" in row for row in rows):
+        return []
+
+    subjects: list[SubjectItem] = []
+    for row in rows:
+        parts = [part.strip() for part in row.split("|")]
+        if len(parts) != 5:
+            return []
+        name, priority, difficulty, urgency, weekly_load = parts
+        priority = priority.lower()
+        urgency = urgency.lower()
+        if not name or priority not in _PRIORITY_LABELS:
+            return []
+        if urgency in {"", "no", "ninguna", "ninguno", "sin urgencia"}:
+            urgency_value = None
+        elif urgency in _PRIORITY_LABELS:
+            urgency_value = urgency
+        else:
+            return []
+        try:
+            difficulty_value = int(difficulty)
+        except ValueError:
+            return []
+        if difficulty_value < 1 or difficulty_value > 5:
+            return []
+        load_value = _parse_weekly_load_minutes(weekly_load)
+        if load_value is None:
+            return []
+        subjects.append(
+            SubjectItem(
+                nombre=name,
+                prioridad=priority,  # type: ignore[arg-type]
+                dificultad=difficulty_value,
+                urgencia=urgency_value,  # type: ignore[arg-type]
+                carga_semanal_min=load_value,
+                origen="manual_priority_input",
+                priority_source="manual_priority_input",
+                is_priority_confirmed=True,
+            )
+        )
+    return subjects
+
+
+def _parse_weekly_load_minutes(value: str) -> int | None:
+    normalized = " ".join(value.strip().lower().replace(",", ".").split())
+    if not normalized:
+        return None
+    number_text = ""
+    for character in normalized:
+        if character.isdigit() or character == ".":
+            number_text += character
+        elif number_text:
+            break
+    if not number_text:
+        return None
+    try:
+        amount = float(number_text)
+    except ValueError:
+        return None
+    if amount <= 0:
+        return None
+    if "h" in normalized or "hora" in normalized:
+        return max(1, int(round(amount * 60)))
+    return max(1, int(round(amount)))
 
 
 def _prompt_version(config_value: str) -> str:

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from datetime import date
+from pathlib import Path
 
 from langchain_core.messages import HumanMessage
 
@@ -22,6 +23,18 @@ def _message_text(update: dict, idx: int = 0) -> str:
         for block in content:
             if isinstance(block, dict) and block.get("type") == "text":
                 return str(block.get("text", ""))
+    return ""
+
+
+def _message_image_url(update: dict, idx: int = 0) -> str:
+    """Extrae la URL/path de imagen del mensaje del agente si existe."""
+    content = update["messages"][idx].content
+    if isinstance(content, list):
+        for block in content:
+            if isinstance(block, dict) and block.get("type") == "image_url":
+                image_url = block.get("image_url")
+                if isinstance(image_url, dict):
+                    return str(image_url.get("url", ""))
     return ""
 
 
@@ -207,6 +220,7 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_work()
     assert "trabajo" in prompt
     assert "elige el número" in prompt
     assert "envíame de nuevo solo tu horario laboral" not in prompt
+    assert Path(_message_image_url(update)).exists()
 
 
 def test_validate_schedule_correction_target_opens_shared_item_editor_for_extracurricular() -> None:
@@ -252,6 +266,7 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_extrac
     assert "gimnasio" in prompt
     assert "elige el número" in prompt
     assert "envíame de nuevo solo las actividades" not in prompt
+    assert Path(_message_image_url(update)).exists()
 
 
 def test_validate_schedule_no_input_emits_conflict_prompt_with_avatar() -> None:

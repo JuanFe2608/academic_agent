@@ -52,7 +52,7 @@ def test_parse_likert_answer_rejects_out_of_range_value() -> None:
 
 
 def test_likert_label_returns_human_readable_label() -> None:
-    assert likert_label(1) == "A veces"
+    assert likert_label(1) == "Pocas veces"
 
 
 def test_parse_choice_answer_accepts_plain_numeric_value() -> None:

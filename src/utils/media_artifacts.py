@@ -37,6 +37,23 @@ def _strip_image_dict(item: dict) -> dict:
     item_type = str(item.get("type") or "")
 
     if item_type in {"image", "input_image"}:
+        image_url = item.get("image_url")
+        if isinstance(image_url, dict):
+            url = str(image_url.get("url") or "")
+            if is_data_image_url(url) and not is_inline_preview_enabled():
+                return {
+                    **item,
+                    "image_url": {
+                        **image_url,
+                        "url": materialize_image_reference(url),
+                    },
+                }
+        elif (
+            isinstance(image_url, str)
+            and is_data_image_url(image_url)
+            and not is_inline_preview_enabled()
+        ):
+            return {**item, "image_url": materialize_image_reference(image_url)}
         if item.get("data") or item.get("base64"):
             return {"type": "text", "text": IMAGE_RECEIVED_MARKER}
         return item
