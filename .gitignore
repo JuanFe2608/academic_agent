@@ -33,3 +33,7 @@ knowledge_base/study_recommendations/processed/evals/reports/
 .claude/
 CLAUDE.md
 AGENTS.md
+INDICATIONS.md
+
+# Internal development docs (analysis notes, dated working documents)
+docs/
