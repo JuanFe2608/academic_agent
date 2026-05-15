@@ -969,6 +969,70 @@ def make_tools(state: AgentState) -> list:
     # ------------------------------------------------- Integración externa ---
 
     @tool
+    def add_one_time_event(
+        title: str,
+        date: str,
+        start_time: str,
+        end_time: str,
+        event_type: str = "extracurricular",
+    ) -> str:
+        """Agrega un evento puntual a Outlook Calendar para una fecha específica.
+        NO modifica el horario fijo semanal — el evento existe solo para ese día.
+        title: nombre del evento (ej: 'Partido U. La Sabana vs Católica').
+        date: fecha en formato YYYY-MM-DD (ej: '2026-05-24').
+        start_time: hora de inicio en HH:MM (ej: '15:00').
+        end_time: hora de fin en HH:MM (ej: '17:00').
+        event_type: extracurricular | academic | work.
+        Úsala cuando el estudiante quiera agendar algo para un día concreto
+        sin que se repita cada semana en su horario fijo."""
+        from datetime import date as _date, time as _time
+        from agents.support.dependencies import get_outlook_one_time_event_service
+
+        valid_types = {"extracurricular", "academic", "work"}
+        type_norm = event_type.strip().lower()
+        if type_norm not in valid_types:
+            return f"Tipo inválido: '{event_type}'. Acepta: extracurricular, academic, work."
+
+        try:
+            event_date = _date.fromisoformat(date.strip())
+        except ValueError:
+            return f"Fecha inválida: '{date}'. Usa formato YYYY-MM-DD (ej: '2026-05-24')."
+
+        try:
+            _start = _normalize_time(start_time)
+            _end = _normalize_time(end_time)
+            event_start = _time.fromisoformat(_start)
+            event_end = _time.fromisoformat(_end)
+        except Exception:
+            return f"Horario inválido: '{start_time}' o '{end_time}'. Usa formato HH:MM."
+
+        try:
+            result = get_outlook_one_time_event_service().create_event(
+                student_id=student_id,
+                calendar_state=state.calendar,
+                title=title.strip(),
+                event_date=event_date,
+                start_time=event_start,
+                end_time=event_end,
+                timezone=timezone_name,
+                event_type=type_norm,
+                calendar_id=state.calendar.calendar_id,
+            )
+            if result.created:
+                return (
+                    f"✅ Evento '{title}' agendado en Outlook para el "
+                    f"{event_date.strftime('%d/%m/%Y')} de {_start} a {_end}. "
+                    f"Solo aparece ese día — no afecta tu horario fijo."
+                )
+            err = result.detail or result.error_code or "error desconocido"
+            return (
+                f"No pude agendar '{title}' en Outlook: {err}. "
+                f"El evento no fue guardado."
+            )
+        except Exception as exc:
+            return f"Error inesperado al agendar el evento '{title}': {exc}"
+
+    @tool
     def sync_plan_to_calendar() -> str:
         """Sincroniza las SESIONES DEL PLAN DE ESTUDIO (bloques generados por el planificador)
         con Outlook Calendar. SOLO usar cuando el estudiante pida sincronizar su PLAN DE SESIONES
@@ -1070,6 +1134,7 @@ def make_tools(state: AgentState) -> list:
         add_schedule_block,
         update_schedule_block,
         delete_schedule_block,
+        add_one_time_event,
         sync_plan_to_calendar,
         sync_tasks_to_todo,
     ]

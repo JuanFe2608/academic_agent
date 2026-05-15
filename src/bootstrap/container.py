@@ -76,6 +76,10 @@ from services.sync.microsoft_todo_sync_service import (
     MicrosoftTodoSyncService,
     build_microsoft_todo_sync_service,
 )
+from services.sync.outlook_one_time_event_service import (
+    OutlookOneTimeEventService,
+    build_outlook_one_time_event_service,
+)
 
 from .settings import BootstrapSettings, database_url_from_env, load_bootstrap_settings
 
@@ -293,6 +297,18 @@ class AppContainer:
     ) -> None:
         self._set_override("microsoft_todo_sync_service", service)
 
+    def get_outlook_one_time_event_service(self) -> OutlookOneTimeEventService:
+        return self._get_or_build(
+            "outlook_one_time_event_service",
+            self._build_outlook_one_time_event_service,
+        )
+
+    def set_outlook_one_time_event_service(
+        self,
+        service: OutlookOneTimeEventService | None,
+    ) -> None:
+        self._set_override("outlook_one_time_event_service", service)
+
     def _build_study_plan_enrichment_service(self) -> StudyPlanEnrichmentService:
         return build_study_plan_enrichment_service(
             recommendation_service=self.get_study_recommendation_service()
@@ -353,6 +369,12 @@ class AppContainer:
     def _build_microsoft_todo_sync_service(self) -> MicrosoftTodoSyncService:
         return build_microsoft_todo_sync_service(
             instances_repository=None,
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
+
+    def _build_outlook_one_time_event_service(self) -> OutlookOneTimeEventService:
+        return build_outlook_one_time_event_service(
             state_repository=self.get_microsoft_graph_state_repository(),
             auth_client=self.get_microsoft_oauth_client(),
         )

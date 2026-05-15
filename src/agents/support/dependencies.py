@@ -262,6 +262,20 @@ def set_microsoft_todo_sync_service(
     get_app_container().set_microsoft_todo_sync_service(service)
 
 
+def get_outlook_one_time_event_service() -> OutlookOneTimeEventService:
+    """Retorna el servicio para crear eventos únicos en Outlook Calendar."""
+
+    return get_app_container().get_outlook_one_time_event_service()
+
+
+def set_outlook_one_time_event_service(
+    service: OutlookOneTimeEventService | None,
+) -> None:
+    """Permite inyectar el servicio de eventos únicos durante pruebas."""
+
+    get_app_container().set_outlook_one_time_event_service(service)
+
+
 __all__ = [
     "get_academic_activity_persistence_service",
     "get_microsoft_graph_state_repository",
@@ -272,6 +286,7 @@ __all__ = [
     "get_outlook_calendar_sync_service",
     "get_outlook_fixed_schedule_repair_service",
     "get_outlook_fixed_schedule_sync_service",
+    "get_outlook_one_time_event_service",
     "get_personalization_service",
     "get_reminders_service",
     "get_schedule_service",
@@ -289,6 +304,7 @@ __all__ = [
     "set_outlook_calendar_sync_service",
     "set_outlook_fixed_schedule_repair_service",
     "set_outlook_fixed_schedule_sync_service",
+    "set_outlook_one_time_event_service",
     "set_personalization_service",
     "set_reminders_service",
     "set_schedule_service",
