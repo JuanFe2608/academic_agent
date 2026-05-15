@@ -104,7 +104,6 @@ class AzureOpenAIAudioTranscriptionService:
                     model=self.deployment_name,
                     file=audio_file,
                     language=language,
-                    response_format="json",
                 )
         except Exception as exc:
             return AudioTranscriptionResult(

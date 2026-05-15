@@ -20,12 +20,12 @@ PROMPT_DETAILS = build_schedule_capture_prompt(
 
 PROMPT_FIXED_DETAILS = (
     "Comparte nombre y horario fijo de la actividad. "
-    "Ejemplo: Natacion, martes y jueves 18:00-19:00 o Gym todos los dias de 5 am a 6 am."
+    "Ejemplo: Natación, martes y jueves 18:00-19:00 o Gym todos los días de 5 am a 6 am."
 )
 
 PROMPT_FLEXIBLE_DETAILS = (
     "Comparte nombre y horario tentativo de la actividad. "
-    "Ejemplo: Futbol, tentativo martes o jueves 18:00-19:00."
+    "Ejemplo: Fútbol, tentativo martes o jueves 18:00-19:00."
 )
 
 PROMPT_MORE = (

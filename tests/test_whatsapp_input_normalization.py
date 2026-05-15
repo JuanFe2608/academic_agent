@@ -171,15 +171,15 @@ def test_normalizer_maps_confirmation_emojis_to_yes_no_text() -> None:
     assert no.human_message.content == "no"
 
 
-def test_normalizer_passes_non_confirmation_emoji_to_agent() -> None:
+def test_normalizer_returns_direct_response_for_non_confirmation_emoji() -> None:
     normalizer = WhatsAppInputNormalizer(whatsapp_service=_FakeWhatsAppService())  # type: ignore[arg-type]
 
     result = normalizer.normalize(_message(text="😊🎓"))
 
     assert result is not None
-    assert result.direct_response is None
-    assert result.human_message is not None
-    assert result.human_message.content == "😊🎓"
+    assert result.human_message is None
+    assert result.direct_response is not None
+    assert "sí" in result.direct_response or "no" in result.direct_response
 
 
 def test_normalizer_transcribes_audio_to_text_for_agent() -> None:

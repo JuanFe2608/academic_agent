@@ -29,36 +29,36 @@ FIELD_LABELS = {
 
 VALIDATION_ERROR_MESSAGES = {
     "full_name": (
-        "Ups, ese nombre no me quedo claro 😅 Por favor escribelo solo con "
+        "Ups, ese nombre no me quedó claro 😅 Por favor escríbelo solo con "
         "letras y espacios, por ejemplo: Maria Perez"
     ),
     "student_code": (
-        "Necesito tu codigo estudiantil solo en numeros 😊 "
+        "Necesito tu código estudiantil solo en números 😊 "
         "Por ejemplo: 67000912"
     ),
     "duplicate_student_code": (
-        "Ese codigo estudiantil ya esta registrado en otra cuenta 🆔 "
-        "Escribe un codigo diferente 😊"
+        "Ese código estudiantil ya está registrado en otra cuenta 🆔 "
+        "Escribe un código diferente 😊"
     ),
-    "age": "Necesito tu edad en numero 😊 Por ejemplo: 18 o 21",
+    "age": "Necesito tu edad en número 😊 Por ejemplo: 18 o 21",
     "institutional_email": (
-        "Ese correo no tiene un formato valido 😕 Por favor ingresa tu correo "
+        "Ese correo no tiene un formato válido 😕 Por favor ingresa tu correo "
         "Microsoft, por ejemplo: usuario@outlook.com"
     ),
     "duplicate_email": (
-        "Ese correo Microsoft ya esta registrado en otra cuenta de estudiante. "
+        "Ese correo Microsoft ya está registrado en otra cuenta de estudiante. "
         "Escribe otro correo Microsoft personal 📧 "
         f"Puedes usar {_MICROSOFT_PERSONAL_EXAMPLES}. "
         "Por ejemplo: usuario@outlook.com"
     ),
     "non_microsoft_personal_email": (
-        "Ese dominio no esta permitido 😕 Usa una cuenta Microsoft personal "
+        "Ese dominio no está permitido 😕 Usa una cuenta Microsoft personal "
         f"({_MICROSOFT_PERSONAL_EXAMPLES}, etc.)."
     ),
-    "supported_program": "Responde si o no, por favor 😊",
-    "semester": "Necesito el semestre en numero 😊 Por ejemplo: 1, 5 u 8",
+    "supported_program": "Responde sí o no, por favor 😊",
+    "semester": "Necesito el semestre en número 😊 Por ejemplo: 1, 5 u 8",
     "average_grade": (
-        "No pude entender ese promedio 😅 Escribelo en numero entero, por ejemplo: 76"
+        "No pude entender ese promedio 😅 Escríbelo en número entero, por ejemplo: 76"
     ),
 }
 
@@ -72,22 +72,22 @@ def build_field_prompt(
 
     if field == "full_name":
         return (
-            "¡Hola! 👋 Me alegra acompanarte en este proceso. Para empezar, "
-            "¿como te llamas? Puedes escribirme tu nombre y apellido, por "
+            "¡Hola! 👋 Me alegra acompañarte en este proceso. Para empezar, "
+            "¿cómo te llamas? Puedes escribirme tu nombre y apellido, por "
             "ejemplo: Juan Perez"
         )
 
     if field == "student_code":
         return (
-            "Ahora necesito tu codigo estudiantil 🆔 Escribelo solo en "
-            f"numeros de {config.student_code_length} digitos, por ejemplo: 67000912"
+            "Ahora necesito tu código estudiantil 🆔 Escríbelo solo en "
+            f"números de {config.student_code_length} dígitos, por ejemplo: 67000912"
         )
 
     if field == "age":
         name = first_name or "estudiante"
         return (
-            f"Perfecto, {name} 🙌 Ahora cuentame, ¿Que edad tienes? "
-            "Escribelo solo en numero, por ejemplo: 20"
+            f"Perfecto, {name} 🙌 Ahora cuéntame, ¿Qué edad tienes? "
+            "Escríbelo solo en número, por ejemplo: 20"
         )
 
     if field == "institutional_email":
@@ -110,22 +110,22 @@ def build_field_prompt(
         return (
             "Antes de seguir, quiero confirmar algo del alcance del proyecto. "
             f"¿Perteneces al programa de {config.supported_program_name}? "
-            "Responde si o no."
+            "Responde sí o no."
         )
 
     if field == "semester":
         return (
-            "¿En que semestre estas actualmente? 📚 Escribelo solo en numero, "
+            "¿En qué semestre estás actualmente? 📚 Escríbelo solo en número, "
             "por ejemplo: 4"
         )
 
     if field == "average_grade":
         return (
-            "Por ultimo, ¿cual es tu promedio academico acumulado? ⭐ "
-            "Escribelo en numero entero entre 0 y 100, por ejemplo: 76"
+            "Por último, ¿cuál es tu promedio académico acumulado? ⭐ "
+            "Escríbelo en número entero entre 0 y 100, por ejemplo: 76"
         )
 
-    return "Necesito un dato mas para continuar."
+    return "Necesito un dato más para continuar."
 
 
 def build_prompt_with_error(
@@ -168,7 +168,7 @@ def build_program_scope_note(config: OnboardingConfig) -> str:
 
     return (
         "Puedes continuar si lo deseas. Solo ten presente que el alcance "
-        "actual del MVP esta disenado para estudiantes de "
+        "actual del MVP está diseñado para estudiantes de "
         f"{config.supported_program_name}."
     )
 
@@ -177,9 +177,9 @@ def build_out_of_scope_program_message(config: OnboardingConfig) -> str:
     """Mensaje final cuando el codigo deja al usuario fuera del alcance."""
 
     return (
-        "Este agente ha sido disenado unicamente para estudiantes de "
+        "Este agente ha sido diseñado únicamente para estudiantes de "
         f"{config.supported_program_name}.\n"
-        "Actualmente no puedo ayudarte porque el alcance del proyecto esta "
+        "Actualmente no puedo ayudarte porque el alcance del proyecto está "
         "dirigido solo a este programa academico."
     )
 
@@ -188,9 +188,9 @@ def build_student_code_scope_prompt(config: OnboardingConfig) -> str:
     """Pregunta de confirmacion cuando el codigo no coincide con el programa objetivo."""
 
     return (
-        "Este codigo no corresponde a uno de Ingenieria de Sistemas. "
+        "Este código no corresponde a uno de Ingeniería de Sistemas. "
         f"¿Perteneces al programa de {config.supported_program_name}? "
-        "Responde si o no."
+        "Responde sí o no."
     )
 
 
@@ -198,7 +198,7 @@ def build_low_grade_confirmation_prompt(grade: int) -> str:
     """Pregunta de confirmacion cuando el promedio registrado es menor de 60."""
 
     return (
-        f"Hmm, registre que tu promedio es *{grade}* 🤔\n"
+        f"Hmm, registré que tu promedio es *{grade}* 🤔\n"
         "¿Seguro que ese es tu promedio?\n(Responde con el numero de tu opcion)\n"
         "1. Si\n"
         "2. No\n"   
@@ -209,10 +209,10 @@ def build_low_grade_motivation_message() -> str:
     """Mensaje motivacional cuando el estudiante confirma un promedio bajo."""
 
     return (
-        "¡Anotado! 📝 Un promedio bajo es un punto de partida, no un limite. 💪\n"
+        "¡Anotado! 📝 Un promedio bajo es un punto de partida, no un límite. 💪\n"
         "Cada dia es una nueva oportunidad para mejorar y superarte. "
-        "Estoy aqui para ayudarte a organizar mejor tu tiempo, estudiar con "
+        "Estoy aquí para ayudarte a organizar mejor tu tiempo, estudiar con "
         "estrategias efectivas y subir ese promedio paso a paso. 🚀\n"
-        "¡Tu puedes lograrlo! Con constancia y las herramientas correctas, "
+        "¡Tú puedes lograrlo! Con constancia y las herramientas correctas, "
         "los resultados van a llegar. Juntos vamos a trabajar en eso 🎯✨"
     )

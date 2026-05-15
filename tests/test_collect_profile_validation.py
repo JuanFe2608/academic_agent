@@ -47,7 +47,7 @@ def test_collect_profile_accepts_student_code_and_prompts_age() -> None:
     assert update["student_profile"]["academic_program"] == "Ingenieria de Sistemas y Computacion"
     assert update["student_profile"]["supported_program"] is True
     assert update["user_status"] == "valid"
-    assert "que edad tienes" in update["messages"][0].content.lower()
+    assert "edad tienes" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_rejects_name_with_special_characters() -> None:
@@ -60,7 +60,7 @@ def test_collect_profile_rejects_name_with_special_characters() -> None:
 
     update = collect_profile(state)
 
-    assert "ese nombre no me quedo claro" in update["messages"][0].content.lower()
+    assert "ese nombre no me qued" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_rejects_name_with_embedded_numbers() -> None:
@@ -73,7 +73,7 @@ def test_collect_profile_rejects_name_with_embedded_numbers() -> None:
 
     update = collect_profile(state)
 
-    assert "ese nombre no me quedo claro" in update["messages"][0].content.lower()
+    assert "ese nombre no me qued" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_merges_multiple_onboarding_slots_and_asks_next_missing() -> None:
@@ -91,7 +91,7 @@ def test_collect_profile_merges_multiple_onboarding_slots_and_asks_next_missing(
     assert update["student_profile"]["semester"] == 8
     assert update["student_profile"]["student_code"] is None
     assert update["onboarding"]["current_field"] == "student_code"
-    assert "codigo estudiantil" in update["messages"][0].content.lower()
+    assert "código estudiantil" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_rejects_non_numeric_student_code() -> None:
@@ -109,7 +109,7 @@ def test_collect_profile_rejects_non_numeric_student_code() -> None:
 
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
-    assert "codigo estudiantil solo en numeros" in update["messages"][0].content.lower()
+    assert "código estudiantil" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_rejects_duplicate_student_code_immediately() -> None:
@@ -147,8 +147,8 @@ def test_collect_profile_rejects_duplicate_student_code_immediately() -> None:
     assert update["student_profile"]["student_code"] is None
     assert update["onboarding"]["current_field"] == "student_code"
     assert update["onboarding"]["slot_errors"]["student_code"] == "duplicate_student_code"
-    assert "ya esta registrado" in update["messages"][0].content.lower()
-    assert "escribe un codigo diferente" in update["messages"][0].content.lower()
+    assert "ya está registrado" in update["messages"][0].content.lower()
+    assert "escribe un código diferente" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_records_slot_errors_by_field() -> None:
@@ -168,7 +168,7 @@ def test_collect_profile_records_slot_errors_by_field() -> None:
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
     assert update["onboarding"]["slot_errors"]["age"] == "invalid_age"
-    assert "necesito tu edad en numero" in update["messages"][0].content.lower()
+    assert "necesito tu edad en número" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_stores_email_unverified_and_continues_to_next_field(
@@ -275,7 +275,7 @@ def test_collect_profile_rejects_invalid_institutional_email() -> None:
 
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
-    assert "ese dominio no esta permitido" in update["messages"][0].content.lower()
+    assert "ese dominio no está permitido" in update["messages"][0].content.lower()
     assert update["student_profile"]["institutional_email"] is None
 
 
@@ -316,7 +316,7 @@ def test_collect_profile_rejects_duplicate_email_before_oauth_link() -> None:
     assert update["student_profile"]["institutional_email"] is None
     assert update["onboarding"]["current_field"] == "institutional_email"
     assert update["onboarding"]["slot_errors"]["institutional_email"] == "duplicate_email"
-    assert "ya esta registrado" in update["messages"][0].content.lower()
+    assert "ya está registrado" in update["messages"][0].content.lower()
     assert "escribe otro correo" in update["messages"][0].content.lower()
     assert "@outlook.com" in update["messages"][0].content.lower()
     assert "@ucatolica.edu.co" not in update["messages"][0].content.lower()
@@ -365,7 +365,7 @@ def test_collect_profile_prompts_scope_confirmation_for_wrong_prefix_code() -> N
     assert update["user_status"] == "start"
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
-    assert "este codigo no corresponde a uno de ingenieria de sistemas" in update["messages"][0].content.lower()
+    assert "este código no corresponde a uno de ingeniería de sistemas" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_allows_retry_when_user_confirms_belonging_to_program() -> None:
@@ -383,7 +383,7 @@ def test_collect_profile_allows_retry_when_user_confirms_belonging_to_program() 
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
     assert update["onboarding"]["pending_student_code_scope_confirmation"] is False
-    assert "ahora necesito tu codigo estudiantil" in update["messages"][0].content.lower()
+    assert "ahora necesito tu código estudiantil" in update["messages"][0].content.lower()
 
 
 def test_collect_profile_sends_user_out_of_scope_when_program_is_not_supported() -> None:

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 import re
 import unicodedata
 from dataclasses import dataclass, field
@@ -14,6 +15,8 @@ from schemas.channels import ChannelInboundMessage
 
 if TYPE_CHECKING:
     from services.channels.whatsapp_service import WhatsAppChannelService
+
+logger = logging.getLogger(__name__)
 
 
 _EMAIL_RE = re.compile(r"(?i)\b[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}\b")
@@ -67,7 +70,7 @@ class WhatsAppInputNormalizer:
         if emoji_confirmation:
             return NormalizedAgentInput(human_message=HumanMessage(content=emoji_confirmation))
         if _is_emoji_only(text):
-            return NormalizedAgentInput(human_message=HumanMessage(content=text))
+            return NormalizedAgentInput(direct_response=_emoji_context_message())
 
         if message.media is None:
             if not text:
@@ -91,7 +94,8 @@ class WhatsAppInputNormalizer:
             return NormalizedAgentInput(direct_response=_audio_not_available_message())
         try:
             downloaded = self.whatsapp_service.download_inbound(message)
-        except Exception:
+        except Exception as exc:
+            logger.warning("Audio download failed: %s", exc, exc_info=True)
             return NormalizedAgentInput(direct_response=_audio_download_failed_message())
 
         audio_path = _first_media_reference(downloaded)
@@ -100,6 +104,11 @@ class WhatsAppInputNormalizer:
 
         result = self.audio_transcriber.transcribe(audio_path, language="es")
         if not getattr(result, "ok", False):
+            logger.warning(
+                "Audio transcription failed [%s]: %s",
+                getattr(result, "error_code", "unknown"),
+                getattr(result, "detail", "no detail"),
+            )
             return NormalizedAgentInput(direct_response=_audio_transcription_failed_message())
 
         transcript = str(getattr(result, "text", "") or "").strip()

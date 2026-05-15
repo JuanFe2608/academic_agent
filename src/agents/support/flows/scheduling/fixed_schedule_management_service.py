@@ -201,7 +201,7 @@ def handle_fixed_schedule_management_turn(state: AgentState) -> dict:
         awaiting_user_input=False,
         prompt=(
             "Puedo mostrar, cambiar o eliminar bloques de tu horario fijo. "
-            "Por ejemplo: 'ver mi horario', 'cambiar Calculo a viernes 10:00-12:00' "
+            "Por ejemplo: 'ver mi horario', 'cambiar Cálculo a viernes 10:00-12:00' "
             "o 'eliminar Trabajo del lunes'."
         ),
         replan=_clear_change_request(replan),
@@ -234,7 +234,7 @@ def _handle_identifier_turn(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "No pude identificar cual bloque quieres usar. Elige el numero exacto:\n"
+                "No pude identificar cuál bloque quieres usar. Elige el número exacto:\n"
                 f"{format_fixed_schedule_block_options(candidates)}"
             ),
             replan=_store_change_request(replan, change_request),
@@ -271,7 +271,7 @@ def _handle_identifier_turn(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "Indica el nuevo dia y horario para este bloque:\n"
+                "Indica el nuevo día y horario para este bloque:\n"
                 f"{format_fixed_schedule_blocks([selected])}"
             ),
             replan=_store_change_request(replan, change_request),
@@ -316,7 +316,7 @@ def _handle_update_details_turn(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "No encontre el bloque seleccionado. Elige el numero del bloque a modificar:\n"
+                "No encontré el bloque seleccionado. Elige el número del bloque a modificar:\n"
                 f"{format_fixed_schedule_block_options(blocks)}"
             ),
             replan=_store_change_request(replan, change_request),
@@ -358,7 +358,7 @@ def _handle_confirmation_turn(
             current_count=current_count,
             last_text=text,
             awaiting_user_input=True,
-            prompt=str(replan.get("pending_prompt") or "Responde si o no para confirmar el cambio."),
+            prompt=str(replan.get("pending_prompt") or "Responde sí o no para confirmar el cambio."),
             replan=_store_change_request(replan, change_request),
             interaction=_confirmation_interaction(state, dict(change_request.get("confirmation_payload") or {})),
             **schedule_patch,
@@ -451,7 +451,7 @@ def _start_update_operation(
         change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_identifier")
         change_request["candidate_block_ids"] = [block.block_id for block in _target_blocks(blocks, operation.target)]
         _update_text = (
-            "Que bloque de tu horario fijo quieres modificar?\n"
+            "¿Qué bloque de tu horario fijo quieres modificar?\n"
             f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
         )
         return _prompt_update(
@@ -498,7 +498,7 @@ def _start_update_operation(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "Encontre varios bloques parecidos. Elige el numero exacto:\n"
+                "Encontré varios bloques parecidos. Elige el número exacto:\n"
                 f"{format_fixed_schedule_block_options(result.matches)}"
             ),
             replan=_store_change_request(dict(state.get("replan", {})), change_request),
@@ -522,7 +522,7 @@ def _start_update_operation(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "Indica el nuevo dia y horario para este bloque:\n"
+                "Indica el nuevo día y horario para este bloque:\n"
                 f"{format_fixed_schedule_blocks([selected])}"
             ),
             replan=_store_change_request(dict(state.get("replan", {})), change_request),
@@ -561,7 +561,7 @@ def _start_delete_operation(
         change_request = _base_change_request(operation, stage="awaiting_fixed_schedule_identifier")
         change_request["candidate_block_ids"] = [block.block_id for block in _target_blocks(blocks, operation.target)]
         _delete_text = (
-            "Que bloque de tu horario fijo quieres eliminar?\n"
+            "¿Qué bloque de tu horario fijo quieres eliminar?\n"
             f"{format_fixed_schedule_block_options(blocks, target=operation.target)}"
         )
         return _prompt_update(
@@ -607,7 +607,7 @@ def _start_delete_operation(
             last_text=text,
             awaiting_user_input=True,
             prompt=(
-                "Encontre varios bloques parecidos. Elige el numero exacto:\n"
+                "Encontré varios bloques parecidos. Elige el número exacto:\n"
                 f"{format_fixed_schedule_block_options(result.matches)}"
             ),
             replan=_store_change_request(dict(state.get("replan", {})), change_request),
@@ -789,7 +789,7 @@ def _queue_add_confirmation(
     prompt_text = (
         "Voy a agregar este bloque a tu horario fijo:\n\n"
         f"{format_fixed_schedule_blocks(new_blocks)}\n\n"
-        "Confirmas el cambio?"
+        "¿Confirmas el cambio?"
     )
     prompt = _try_render_schedule_content(
         blocks + new_blocks,
@@ -973,9 +973,9 @@ def _queue_update_confirmation(
         "Voy a modificar este bloque de tu horario fijo.\n\n"
         "Actual:\n"
         f"{format_fixed_schedule_blocks([selected])}\n\n"
-        "Quedara asi:\n"
+        "Quedará así:\n"
         f"{format_fixed_schedule_blocks(preview.replacement_blocks)}\n\n"
-        "Confirmas el cambio?"
+        "¿Confirmas el cambio?"
     )
     prompt = _try_render_schedule_content(
         blocks,
@@ -1026,7 +1026,7 @@ def _queue_delete_confirmation(
         "requires_outlook_sync": True,
     }
     prompt_text = (
-        "Estas seguro de que deseas eliminar este bloque de tu horario fijo?\n\n"
+        "¿Estás seguro de que deseas eliminar este bloque de tu horario fijo?\n\n"
         f"{format_fixed_schedule_blocks(selected)}"
     )
     prompt = _try_render_schedule_content(
@@ -1095,8 +1095,8 @@ def _persist_confirmed_schedule_change(
             last_text=last_text,
             awaiting_user_input=False,
             prompt=(
-                "No pude guardar el cambio del horario fijo, asi que no lo aplique.\n"
-                f"Detalle tecnico: {persist_result.detail or persist_result.error_code or 'desconocido'}"
+                "No pude guardar el cambio del horario fijo, así que no lo apliqué.\n"
+                f"Detalle técnico: {persist_result.detail or persist_result.error_code or 'desconocido'}"
             ),
             replan=_clear_change_request(replan),
             interaction=_clear_interaction(state),
@@ -1131,7 +1131,7 @@ def _persist_confirmed_schedule_change(
             "authorized": True,
             "synced_event_map": dict(getattr(sync_result, "synced_event_map", {})),
         }
-        sync_message = " Outlook quedo reconciliado."
+        sync_message = " Outlook quedó reconciliado."
     else:
         calendar_state = dict(state.get("calendar", {}))
         calendar_update = {
@@ -1139,9 +1139,9 @@ def _persist_confirmed_schedule_change(
             "synced_event_map": dict(getattr(sync_result, "synced_event_map", {})),
         }
         detail = getattr(sync_result, "detail", None) or getattr(sync_result, "error_code", None) or "desconocido"
-        sync_message = f" No pude reconciliar Outlook automaticamente: {detail}."
+        sync_message = f" No pude reconciliar Outlook automáticamente: {detail}."
 
-    success_text = f"Listo, deje tu horario fijo {success_label}.{sync_message}"
+    success_text = f"Listo, dejé tu horario fijo {success_label}.{sync_message}"
     timezone = str(state.get("timezone", "America/Bogota"))
     active_blocks = [b for b in updated_blocks if getattr(b, "is_active", True)]
     prompt = _try_render_schedule_content(active_blocks, success_text, timezone)
@@ -1265,7 +1265,7 @@ def _not_found_update(
     available_blocks: list[WeeklyScheduleBlock],
 ) -> dict:
     prompt = (
-        "No encontre un bloque claro con esa referencia. Estos son los bloques disponibles:\n"
+        "No encontré un bloque claro con esa referencia. Estos son los bloques disponibles:\n"
         f"{format_fixed_schedule_block_options(available_blocks, target=target)}"
     )
     return _prompt_update(
@@ -1297,7 +1297,7 @@ def _no_schedule_update(
         current_count=current_count,
         last_text=text,
         awaiting_user_input=False,
-        prompt="No encontre un horario fijo registrado para modificar.",
+        prompt="No encontré un horario fijo registrado para modificar.",
         replan=_clear_change_request(dict(state.get("replan", {}))),
         interaction={
             "active_intent": "manage_fixed_schedule",
