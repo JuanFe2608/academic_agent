@@ -107,7 +107,7 @@ class TestWebhookEndpoint:
         )
         assert response.status_code == 403
 
-    def test_sin_secret_configurado_acepta_sin_firma(self, monkeypatch: pytest.MonkeyPatch) -> None:
+    def test_sin_secret_configurado_retorna_503(self, monkeypatch: pytest.MonkeyPatch) -> None:
         monkeypatch.delenv("WHATSAPP_APP_SECRET", raising=False)
         client = _make_client(monkeypatch)
         response = client.post(
@@ -115,7 +115,7 @@ class TestWebhookEndpoint:
             content=_PAYLOAD,
             headers={"Content-Type": "application/json"},
         )
-        assert response.status_code == 200
+        assert response.status_code == 503
 
     def test_payload_invalido_con_firma_valida_retorna_200(
         self, monkeypatch: pytest.MonkeyPatch

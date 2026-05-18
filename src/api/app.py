@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import hmac
+import html
 import json
 import logging
 import os
@@ -11,7 +12,11 @@ from contextlib import asynccontextmanager
 from typing import TYPE_CHECKING, Any
 
 from fastapi import BackgroundTasks, FastAPI, HTTPException, Query, Request, Response
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
+from slowapi.util import get_remote_address
 
 from integrations.whatsapp import (
     extract_inbound_messages,
@@ -26,6 +31,8 @@ if TYPE_CHECKING:
 
 _runner: "AgentRunner | None" = None  # type: ignore[name-defined]
 
+limiter = Limiter(key_func=get_remote_address)
+
 
 def _check_startup_config() -> None:
     """Registra advertencias tempranas sobre variables de entorno criticas."""
@@ -39,6 +46,12 @@ def _check_startup_config() -> None:
             "MICROSOFT_REDIRECT_URI apunta a localhost (%s). "
             "En staging/produccion debe ser https://<dominio>/oauth/callback "
             "y estar registrado en Microsoft Entra.",
+            redirect_uri,
+        )
+    elif not redirect_uri.startswith("https://"):
+        logger.warning(
+            "MICROSOFT_REDIRECT_URI no usa HTTPS (%s). "
+            "Microsoft Entra rechaza URIs de redireccion HTTP en produccion.",
             redirect_uri,
         )
     else:
@@ -82,6 +95,25 @@ app = FastAPI(
     redoc_url=None,
 )
 
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+
+# CORS: este backend no tiene frontend web; se deniega todo origen cross-origin por defecto.
+# Para habilitar un origen especifico en el futuro, configurar ACADEMIC_AGENT_CORS_ORIGINS
+# con una lista separada por comas (ej: https://mi-admin.com).
+_cors_origins = [
+    o.strip()
+    for o in os.getenv("ACADEMIC_AGENT_CORS_ORIGINS", "").split(",")
+    if o.strip()
+]
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=_cors_origins,
+    allow_credentials=False,
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
+
 
 # ---------------------------------------------------------------------------
 # Helpers internos
@@ -110,10 +142,11 @@ def _verify_whatsapp_signature(raw_body: bytes, signature_header: str, secret: s
 @app.get("/health", tags=["infra"])
 def health() -> dict[str, str]:
     """Probe de disponibilidad para Azure y balanceadores."""
-    return {"status": "ok", "agent": "ready" if _runner is not None else "initializing"}
+    return {"status": "ok"}
 
 
 @app.post("/tasks/reminders/run", tags=["infra"])
+@limiter.limit("10/minute")
 async def run_due_reminders(
     request: Request,
     limit: int = Query(50, ge=1, le=500),
@@ -126,7 +159,7 @@ async def run_due_reminders(
         raise HTTPException(status_code=503, detail="Worker de recordatorios no configurado.")
 
     provided_token = (request.headers.get("x-reminder-worker-token") or "").strip()
-    if provided_token != expected_token:
+    if not hmac.compare_digest(provided_token, expected_token):
         logger.warning("Reminder worker rechazado: token ausente o invalido.")
         raise HTTPException(status_code=403, detail="Token de worker invalido.")
 
@@ -148,7 +181,7 @@ async def run_due_reminders(
         )
         raise HTTPException(
             status_code=500,
-            detail=result.detail or result.error_code or "No se pudieron procesar recordatorios.",
+            detail="No se pudieron procesar recordatorios.",
         )
     logger.info(
         "Reminder worker ejecutado: leased_count=%s sent_count=%s failed_count=%s "
@@ -188,7 +221,9 @@ def habeas_data_policy() -> HTMLResponse:
 
 
 @app.get("/webhook", tags=["whatsapp"])
+@limiter.limit("10/minute")
 def verify_webhook(
+    request: Request,
     hub_mode: str | None = Query(None, alias="hub.mode"),
     hub_verify_token: str | None = Query(None, alias="hub.verify_token"),
     hub_challenge: str | None = Query(None, alias="hub.challenge"),
@@ -211,6 +246,7 @@ def verify_webhook(
 
 
 @app.post("/webhook", tags=["whatsapp"])
+@limiter.limit("120/minute")
 async def receive_webhook(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -219,13 +255,17 @@ async def receive_webhook(
     raw_body = await request.body()
 
     app_secret = os.getenv("WHATSAPP_APP_SECRET", "").strip()
-    if app_secret:
-        signature = request.headers.get("X-Hub-Signature-256", "")
-        if not _verify_whatsapp_signature(raw_body, signature, app_secret):
-            logger.warning("Webhook POST rechazado: firma X-Hub-Signature-256 invalida.")
-            raise HTTPException(status_code=403, detail="Firma de webhook invalida.")
-    else:
-        logger.warning("WHATSAPP_APP_SECRET no configurado: webhook sin validacion de firma.")
+    if not app_secret:
+        logger.error(
+            "Webhook POST rechazado: WHATSAPP_APP_SECRET no configurado. "
+            "Configurar la variable de entorno antes de exponer el endpoint publicamente."
+        )
+        raise HTTPException(status_code=503, detail="Webhook no disponible: configuracion incompleta.")
+
+    signature = request.headers.get("X-Hub-Signature-256", "")
+    if not _verify_whatsapp_signature(raw_body, signature, app_secret):
+        logger.warning("Webhook POST rechazado: firma X-Hub-Signature-256 invalida.")
+        raise HTTPException(status_code=403, detail="Firma de webhook invalida.")
 
     body: dict[str, Any] = {}
     try:
@@ -252,6 +292,7 @@ async def receive_webhook(
 
 @app.get("/oauth/callback", tags=["microsoft"])
 @app.get("/auth/microsoft/callback", tags=["microsoft"], include_in_schema=False)
+@limiter.limit("10/minute")
 async def microsoft_oauth_callback(request: Request) -> HTMLResponse:
     """Completa el flujo OAuth de Microsoft y notifica al estudiante."""
     params = dict(request.query_params)
@@ -284,6 +325,7 @@ async def microsoft_oauth_callback(request: Request) -> HTMLResponse:
 def _oauth_result_page(*, success: bool, message: str) -> str:
     icon = "✅" if success else "❌"
     color = "#2ecc71" if success else "#e74c3c"
+    safe_message = html.escape(message)
     return f"""<!DOCTYPE html>
 <html lang="es">
 <head>
@@ -306,7 +348,7 @@ def _oauth_result_page(*, success: bool, message: str) -> str:
   <div class="card">
     <div class="icon">{icon}</div>
     <h2>{"Listo" if success else "Ocurrio un error"}</h2>
-    <p>{message}</p>
+    <p>{safe_message}</p>
   </div>
 </body>
 </html>"""

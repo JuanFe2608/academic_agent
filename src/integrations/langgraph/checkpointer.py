@@ -5,6 +5,7 @@ from __future__ import annotations
 import asyncio
 import os
 import random
+import re
 from collections.abc import AsyncIterator, Iterator, Sequence
 from typing import Any
 
@@ -31,6 +32,10 @@ from utils.message_sanitizer import sanitize_persisted_payload
 _CHECKPOINTS_TABLE = "langgraph_thread_checkpoints"
 _WRITES_TABLE = "langgraph_checkpoint_writes"
 _REQUIRED_TABLES = (_CHECKPOINTS_TABLE, _WRITES_TABLE)
+
+_SAFE_IDENTIFIER_RE = re.compile(r"^[a-z][a-z0-9_]{1,62}$")
+assert _SAFE_IDENTIFIER_RE.match(_CHECKPOINTS_TABLE), f"Nombre de tabla inseguro: {_CHECKPOINTS_TABLE}"
+assert _SAFE_IDENTIFIER_RE.match(_WRITES_TABLE), f"Nombre de tabla inseguro: {_WRITES_TABLE}"
 
 
 def checkpoint_database_url_from_env() -> str:
