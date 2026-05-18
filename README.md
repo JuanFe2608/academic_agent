@@ -76,7 +76,7 @@ El agente opera como un asistente personal académico que:
 |---|---|
 | **Outlook Calendar** | Sincroniza el horario fijo y el plan de estudio como eventos en el calendario |
 | **Microsoft To Do** | Refleja las actividades académicas como tareas con fechas de vencimiento |
-| **OAuth institucional** | Autenticación con cuentas universitarias Microsoft Entra ID |
+| **OAuth Microsoft** | Autenticación con cuentas personales de Microsoft para el piloto estudiantil |
 | **Reparación automática** | Detecta y corrige divergencias entre el plan y el estado del calendario |
 
 ### Recomendaciones de Estudio con IA
@@ -265,6 +265,8 @@ Pregunta del estudiante
 ---
 
 ## Integración con Microsoft 365
+
+> **Estado actual del piloto:** la integración con Outlook Calendar y Microsoft To Do está orientada a **cuentas personales de Microsoft** de los estudiantes. Inicialmente se intentó operar con las cuentas Outlook institucionales de la universidad, pero no fue posible completar esa implementación por gestión de permisos y aprobación administrativa sobre Microsoft Entra ID. Una vez la universidad tramite y apruebe los permisos necesarios, el mismo flujo OAuth podrá habilitarse para el correo universitario/institucional.
 
 ### Flujo de Autorización OAuth
 
