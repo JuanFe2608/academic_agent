@@ -59,18 +59,27 @@ _ITEM_LABELS = {
     "work": "bloque",
     "extracurricular": "actividad",
 }
+_SINGLE_EDIT_LABELS = {
+    "academic": "esta materia",
+    "work": "este bloque",
+    "extracurricular": "esta actividad",
+}
 _TYPE_LABELS = {
     "academic": "académico",
     "work": "laboral",
     "extracurricular": "extracurricular",
 }
 _OPTION_HINT = "(Escribe el número de la opción que quieres elegir)"
-_ITEM_HINT = "(Escribe el número del registro que quieres editar)"
 _FIELD_HINT = "(Escribe el número del cambio que quieres hacer)"
 _ADD_TYPE_LABELS = {
-    "academic": "académicas",
-    "work": "laborales",
-    "extracurricular": "extracurriculares",
+    "academic": "una materia",
+    "work": "un bloque laboral",
+    "extracurricular": "una actividad extracurricular",
+}
+_EDIT_ACTION_LABELS = {
+    "academic": "una materia",
+    "work": "un bloque laboral",
+    "extracurricular": "una actividad",
 }
 _DAY_OPTIONS: dict[int, str] = {
     1: "monday",
@@ -1159,18 +1168,19 @@ def _build_item_selection_prompt(
     blocks: list[WeeklyScheduleBlock] | list[dict],
     target: ScheduleBlockType,
 ) -> str:
-    item_label = _ITEM_LABELS[target]
+    edit_label = _EDIT_ACTION_LABELS[target]
     lines = [
         f"✏️ Este es tu {_SECTION_LABELS[target]} actual:",
-        _ITEM_HINT,
     ]
     lines.extend(_format_block_lines(blocks, target))
     lines.extend(
         [
             "",
-            f"Elige el número de la {item_label if item_label != 'bloque' else 'actividad o bloque'} que quieres editar.",
-            "Para editar varias con el mismo cambio, escribe los números separados por coma o espacio. Ej: 1,2,3 o 1 2 3.",
-            f"Escribe 'Añadir' si deseas agregar más actividades {_ADD_TYPE_LABELS[target]} o escribe 'Cancelar' si no quieres modificar nada.",
+            "¿Qué quieres hacer?",
+            f"- Editar {edit_label}: escribe su número. Ej: 1",
+            "- Editar varias con el mismo cambio: escribe los números separados por coma o espacio. Ej: 1,2,3 o 1 2 3.",
+            f"- Agregar {_ADD_TYPE_LABELS[target]}: escribe 'Añadir'.",
+            "- Salir sin modificar esta sección: escribe 'Cancelar'.",
         ]
     )
     return "\n".join(lines)
@@ -1214,7 +1224,7 @@ def _build_field_selection_prompt_for_selection(
     lines = []
     if len(blocks) == 1:
         block = blocks[0]
-        lines.append(f"{_HEADER_EMOJIS[target]} Vas a editar este {item_label}:")
+        lines.append(f"{_HEADER_EMOJIS[target]} Vas a editar {_SINGLE_EDIT_LABELS[target]}:")
         lines.append(_format_block_line(1, block))
         lines.append("")
     elif len(blocks) > 1:

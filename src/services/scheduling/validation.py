@@ -5,6 +5,7 @@ from __future__ import annotations
 import re
 import unicodedata
 import uuid
+from difflib import SequenceMatcher
 from typing import Any
 
 from schemas.common import Prioridad
@@ -52,6 +53,28 @@ DAY_ALIASES = {
     "domingo": "Domingo",
     "domingos": "Domingo",
 }
+_DAY_CANONICAL_KEYS = {
+    "lunes": "lunes",
+    "martes": "martes",
+    "miercoles": "miercoles",
+    "jueves": "jueves",
+    "viernes": "viernes",
+    "sabado": "sabado",
+    "domingo": "domingo",
+}
+_DAY_TYPO_ALIASES = {
+    "lune": "lunes",
+    "marts": "martes",
+    "marte": "martes",
+    "miercole": "miercoles",
+    "jueve": "jueves",
+    "juevs": "jueves",
+    "vierne": "viernes",
+    "sabdo": "sabado",
+    "dominog": "domingo",
+}
+_DAY_WORD_PATTERN = re.compile(r"\b[A-Za-zÁÉÍÓÚáéíóúÑñ]{4,10}\b")
+_DAY_TYPO_MIN_SCORE = 0.84
 
 EVENT_TYPES = {"confirmado", "tentativo"}
 EVENT_CATEGORIES = {"academico", "laboral", "extracurricular", "estudio"}
@@ -116,6 +139,23 @@ def normalize_day(value: str) -> str:
     if not normalized:
         raise ValueError(f"invalid day: {value!r}")
     return normalized
+
+
+def normalize_day_typos_in_text(value: str) -> str:
+    """Corrige errores leves de días dentro de texto de horarios."""
+
+    def replace(match: re.Match[str]) -> str:
+        token = match.group(0)
+        key = _normalize_day_key(token)
+        if not key or key in DAY_ALIASES:
+            return token
+
+        corrected = _DAY_TYPO_ALIASES.get(key) or _closest_day_key(key)
+        if not corrected or corrected == key:
+            return token
+        return corrected
+
+    return _DAY_WORD_PATTERN.sub(replace, str(value or ""))
 
 
 def validate_event(event: Event | dict[str, Any]) -> None:
@@ -189,3 +229,25 @@ def _event_value(event: Event | dict[str, Any], key: str, default: Any = None) -
     if isinstance(event, dict):
         return event.get(key, default)
     return getattr(event, key, default)
+
+
+def _closest_day_key(key: str) -> str:
+    best_day = ""
+    best_score = 0.0
+    for day_key in _DAY_CANONICAL_KEYS:
+        if not key or key[0] != day_key[0]:
+            continue
+        score = SequenceMatcher(None, key, day_key).ratio()
+        if score > best_score:
+            best_day = day_key
+            best_score = score
+    return best_day if best_score >= _DAY_TYPO_MIN_SCORE else ""
+
+
+def _normalize_day_key(value: str) -> str:
+    folded = (
+        unicodedata.normalize("NFKD", str(value or ""))
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+    return re.sub(r"[^a-z]", "", folded.lower())

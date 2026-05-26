@@ -7,7 +7,7 @@ from services.scheduling.text_parser import (
     parse_academic_schedule_text,
     parse_work_schedule_text,
 )
-from services.scheduling.validation import normalize_day
+from services.scheduling.validation import normalize_day, normalize_day_typos_in_text
 
 
 @pytest.mark.parametrize(
@@ -167,3 +167,8 @@ def test_parse_work_schedule_text_splits_overnight_ranges_into_two_days():
 def test_normalize_day_accepts_weekend_plurals():
     assert normalize_day("sabados") == "Sabado"
     assert normalize_day("domingos") == "Domingo"
+
+
+def test_normalize_day_typos_in_text_keeps_non_day_words() -> None:
+    assert normalize_day_typos_in_text("Marketing y laboratorio") == "Marketing y laboratorio"
+    assert normalize_day_typos_in_text("Marte y vierne") == "martes y viernes"

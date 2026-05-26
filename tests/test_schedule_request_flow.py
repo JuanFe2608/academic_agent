@@ -380,7 +380,8 @@ def test_request_schedules_section_change_prompt_includes_schedule_image() -> No
     assert update["schedule"]["review_stage"] == "section_awaiting_item_selection"
     prompt = _message_text(update).lower()
     assert "horario académico actual" in prompt
-    assert "elige el número" in prompt
+    assert "¿qué quieres hacer?" in prompt
+    assert "editar una materia" in prompt
     assert "añadir" in prompt
     assert "cancelar" in prompt
     assert Path(_message_image_url(update)).exists()

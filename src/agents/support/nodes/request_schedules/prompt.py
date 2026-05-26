@@ -3,12 +3,12 @@
 from agents.support.nodes.schedule_input_guidance import build_schedule_capture_prompt
 
 PROMPT_OCCUPATION = (
-    "Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
+    "🗓️ Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
     "(Escribe el número de la opción que quieres elegir)\n"
     "Elige una opción:\n"
-    "1. Solo estudio\n"
-    "2. Estudio y trabajo\n"
-    "3. Ninguna de las anteriores"
+    "1. 📚 Solo estudio\n"
+    "2. 📚💼 Estudio y trabajo\n"
+    "3. ✨ Ninguna de las anteriores"
 )
 PROMPT_ACADEMICO = build_schedule_capture_prompt(
     "📚 Ahora compárteme tu horario académico.\n\n"
@@ -48,12 +48,12 @@ PROMPT_NINGUNA = (
     "si actualmente estás en un proceso de estudio activo. "
     "Cuando empieces a estudiar, ¡estaré aquí para ayudarte a organizar tu agenda! 📚\n\n"
     "Si elegiste esta opción por error o tu situación cambió, selecciona de nuevo:\n"
-    "Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
+    "🗓️ Antes de organizar tu agenda, necesito saber cómo está distribuida tu rutina.\n"
     "(Escribe el número de la opción que quieres elegir)\n"
     "Elige una opción:\n"
-    "1. Solo estudio\n"
-    "2. Estudio y trabajo\n"
-    "3. Ninguna de las anteriores"
+    "1. 📚 Solo estudio\n"
+    "2. 📚💼 Estudio y trabajo\n"
+    "3. ✨ Ninguna de las anteriores"
 )
 PROMPT_MORE_ACADEMIC = (
     "📚 ¿Quieres agregar más materias o ya terminamos con esta parte?\n"

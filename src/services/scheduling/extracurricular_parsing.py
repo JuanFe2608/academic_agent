@@ -13,7 +13,11 @@ from services.scheduling.text_parser import (
     is_ambiguous_time_range,
 )
 from services.scheduling.title_normalization import normalize_schedule_title
-from services.scheduling.validation import DAY_ORDER, normalize_day
+from services.scheduling.validation import (
+    DAY_ORDER,
+    normalize_day,
+    normalize_day_typos_in_text,
+)
 
 _DAY_MARKER_PATTERN = re.compile(
     r"\b(lunes|martes|miercoles|miércoles|jueves|viernes|sabados|sabado|sábado|domingos|domingo|lun|mar|mie|jue|vie|sab|dom|todos\s+los\s+dias|todos\s+los\s+días|cada\s+dia|cada\s+día|diario|diariamente)\b"
@@ -288,7 +292,7 @@ def _extract_value(text: str, pattern: str) -> str:
 
 
 def _infer_nombre(text: str) -> str:
-    normalized = normalize_text(text)
+    normalized = normalize_day_typos_in_text(normalize_text(text))
     cleaned = _TIME_RANGE_PATTERN.sub(" ", normalized)
     cleaned = _DAY_MARKER_PATTERN.sub(" ", cleaned)
     cleaned = re.sub(
@@ -298,6 +302,12 @@ def _infer_nombre(text: str) -> str:
     )
     cleaned = re.sub(
         r"\b(?:voy|hago|hacer|asisto|practico|tengo|voy\s+a|voy\s+al|voy\s+a\s+la)\b",
+        " ",
+        cleaned,
+    )
+    cleaned = re.sub(r"\s*[-—–]\s*", " ", cleaned)
+    cleaned = re.sub(
+        r"\b(?:y|e)\b",
         " ",
         cleaned,
     )
@@ -438,7 +448,7 @@ def _parse_schedule_with_optional_inheritance(
     detail: str,
     inherited_days: list[str] | None = None,
 ) -> tuple[dict[str, object] | None, list[str]]:
-    raw = str(detail or "").strip()
+    raw = normalize_day_typos_in_text(str(detail or "")).strip()
     if not raw:
         return None, ["detalle"]
 
@@ -484,7 +494,7 @@ def _can_inherit_days(text: str, inherited_days: list[str] | None) -> bool:
 
 
 def _extract_explicit_days(text: str) -> list[str]:
-    normalized = normalize_text(text)
+    normalized = normalize_day_typos_in_text(normalize_text(text))
     if not normalized:
         return []
     if _ALL_DAYS_PATTERN.search(normalized):

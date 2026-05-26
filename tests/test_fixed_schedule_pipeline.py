@@ -34,6 +34,41 @@ def test_parse_fixed_schedule_section_handles_work_range_with_natural_language()
     assert all(block.end_time == "21:00" for block in result.blocks)
 
 
+def test_parse_fixed_schedule_section_tolerates_minor_day_typo_in_academic_text() -> None:
+    result = parse_fixed_schedule_section(
+        "Marte y viernes - Calculo - 15:00 a 19:30",
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ] == [
+        ("Calculo", "tuesday", "15:00", "19:30"),
+        ("Calculo", "friday", "15:00", "19:30"),
+    ]
+
+
+def test_parse_fixed_schedule_section_tolerates_minor_day_typo_in_work_exception() -> None:
+    result = parse_fixed_schedule_section(
+        "trabajo todos los dias menos vierne de 4 pm a 11 pm",
+        "work",
+    )
+
+    assert result.needs_clarification is False
+    assert [block.day_of_week for block in result.blocks] == [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "saturday",
+        "sunday",
+    ]
+    assert all(block.start_time == "16:00" for block in result.blocks)
+    assert all(block.end_time == "23:00" for block in result.blocks)
+
+
 def test_parse_fixed_schedule_section_splits_multiple_classes_with_same_day_context() -> None:
     result = parse_fixed_schedule_section(
         "Los lunes tengo cálculo de 7 a 9 y luego física de 10 a 12",
@@ -247,6 +282,64 @@ def test_parse_fixed_schedule_section_accepts_full_university_email_paste() -> N
     assert len(result.blocks) == 9
 
 
+def test_parse_fixed_schedule_section_accepts_current_university_email_format() -> None:
+    result = parse_fixed_schedule_section(
+        "\n".join(
+            [
+                "Código asignatura: CB01034",
+                "CÁLCULO VECTORIAL",
+                "3.0 créditos, Grupo D-265",
+                "MAR,JUE 07:00:00-09:00:00, MAR,JUE 07:00:00-09:00:00,",
+                "03-02-2026- 28-05-2026",
+                "BOGOTA | Bloque AA | Salón 801AA,",
+                "Código asignatura: CB03021",
+                "FÍSICA II",
+                "3.0 créditos, Grupo D-264",
+                "MAR,JUE 12:00:00-14:00:00, MAR,JUE 12:00:00-14:00:00,",
+                "03-02-2026- 28-05-2026",
+                "BOGOTA | Bloque AA | Salón 511AA,",
+                "Código asignatura: CT10029",
+                "BASES DE DATOS",
+                "3.0 créditos, Grupo D-1",
+                "LUN,MIE 09:00:00-11:00:00, LUN,MIE 09:00:00-11:00:00,",
+                "02-02-2026- 27-05-2026",
+                "BOGOTA | Bloque O | Sala de Cómputo No. 7,",
+                "Código asignatura: CT10040",
+                "SISTEMAS OPERATIVOS",
+                "3.0 créditos, Grupo D-5",
+                "LUN,VIE 07:00:00-09:00:00, LUN,VIE 07:00:00-09:00:00,",
+                "02-02-2026- 29-05-2026",
+                "BOGOTA | Bloque O | Sala de Cómputo No. 5,",
+                "Código asignatura: CH03001",
+                "ÉTICA GENERAL",
+                "2.0 créditos, Grupo D-284",
+                "LUN 13:00:00-15:00:00, LUN 13:00:00-15:00:00,",
+                "02-02-2026- 25-05-2026",
+                "BOGOTA | Bloque AA | Salón 701AA,",
+                "Código asignatura: CT10085",
+                "ANÁLISIS Y DISEÑO DE ALGORITMOS",
+                "3.0 créditos, Grupo D-3",
+                "MAR,JUE 09:00:00-11:00:00, MAR,JUE 09:00:00-11:00:00,",
+                "03-02-2026- 28-05-2026",
+                "BOGOTA | Bloque O | Sala de Cómputo No. 7,",
+            ]
+        ),
+        "academic",
+    )
+
+    assert result.needs_clarification is False
+    assert result.pending_schedule_items == []
+    assert len(result.blocks) == 11
+    assert ("Cálculo Vectorial", "tuesday", "07:00", "09:00") in [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ]
+    assert ("Análisis Y Diseño De Algoritmos", "thursday", "09:00", "11:00") in [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ]
+
+
 def test_parse_fixed_schedule_section_does_not_use_image_as_work_title() -> None:
     result = parse_fixed_schedule_section(
         "Lunes 06:00-07:00 Image",
@@ -280,6 +373,33 @@ def test_parse_extracurricular_section_generates_clear_short_title() -> None:
     assert [(block.title, block.day_of_week, block.start_time, block.end_time) for block in result.blocks] == [
         ("Compras con amigas", "saturday", "15:00", "18:00"),
     ]
+
+
+def test_parse_extracurricular_section_tolerates_minor_day_typo_and_keeps_title() -> None:
+    result = parse_extracurricular_section(
+        "Marte y viernes - curso frances - 15:00 a 19:30",
+    )
+
+    assert result.needs_clarification is False
+    assert [item.nombre for item in result.extracurricular_items] == ["Curso Frances"]
+    assert result.extracurricular_items[0].dias == ["Martes", "Viernes"]
+    assert [
+        (block.title, block.day_of_week, block.start_time, block.end_time)
+        for block in result.blocks
+    ] == [
+        ("Curso Frances", "tuesday", "15:00", "19:30"),
+        ("Curso Frances", "friday", "15:00", "19:30"),
+    ]
+
+
+def test_parse_extracurricular_section_strips_day_connector_from_title() -> None:
+    result = parse_extracurricular_section(
+        "Martes y viernes - curso frances - 15:00 a 19:30",
+    )
+
+    assert result.needs_clarification is False
+    assert [item.nombre for item in result.extracurricular_items] == ["Curso Frances"]
+    assert [block.day_of_week for block in result.blocks] == ["tuesday", "friday"]
 
 
 def test_parse_extracurricular_section_splits_overnight_midnight_ranges() -> None:

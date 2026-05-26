@@ -26,7 +26,11 @@ from services.scheduling.models import (
     WeeklyScheduleBlock,
     ensure_weekly_block,
 )
-from services.scheduling.validation import normalize_day, normalize_time
+from services.scheduling.validation import (
+    normalize_day,
+    normalize_day_typos_in_text,
+    normalize_time,
+)
 
 from .titles import is_placeholder_schedule_title, normalize_schedule_title
 
@@ -485,7 +489,7 @@ def _split_segments(text: str) -> list[str]:
 
 
 def _extract_days_from_text(text: str) -> list[str]:
-    raw = str(text or "").strip()
+    raw = normalize_day_typos_in_text(str(text or "")).strip()
     if not raw:
         return []
     except_match = _ALL_DAYS_EXCEPT_PATTERN.search(raw)
@@ -517,7 +521,7 @@ def _extract_time_range(text: str) -> tuple[str, str]:
 
 
 def _infer_title(text: str, default_title: str) -> str:
-    cleaned = str(text or "")
+    cleaned = normalize_day_typos_in_text(str(text or ""))
     cleaned = _strip_equivalent_time_expression(cleaned)
     cleaned = _DAY_RANGE_PATTERN.sub(" ", cleaned)
     cleaned = _ALL_DAYS_EXCEPT_PATTERN.sub(" ", cleaned)

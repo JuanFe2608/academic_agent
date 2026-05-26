@@ -11,6 +11,7 @@ from services.scheduling.validation import (
     DAY_ORDER,
     new_event_id,
     normalize_day,
+    normalize_day_typos_in_text,
     normalize_time,
 )
 
@@ -78,7 +79,9 @@ def extract_natural_schedule_components(text: str) -> dict[str, object]:
     if text is None or not str(text).strip():
         raise ValueError("schedule text is required")
 
-    normalized = strip_accents(normalize_parser_text(str(text)).lower())
+    normalized = normalize_day_typos_in_text(
+        strip_accents(normalize_parser_text(str(text)).lower())
+    )
     start_raw, end_raw = extract_time_range(normalized)
     start, end, overnight = normalize_time_range_info(start_raw, end_raw, normalized)
     days, is_all_days = extract_days_with_meta(normalized)
@@ -203,6 +206,9 @@ def extract_days(text: str) -> list[str]:
 def extract_days_with_meta(text: str) -> tuple[list[str], bool]:
     """Extrae días desde un rango o un día individual."""
 
+    text = normalize_day_typos_in_text(
+        strip_accents(normalize_parser_text(str(text)).lower())
+    )
     except_match = ALL_DAYS_EXCEPT_PATTERN.search(text)
     if except_match:
         excluded: list[str] = []
@@ -427,4 +433,3 @@ def score_time_pair(
 def minutes(value: str) -> int:
     normalized = normalize_time(value)
     return (int(normalized[:2]) * 60) + int(normalized[3:])
-

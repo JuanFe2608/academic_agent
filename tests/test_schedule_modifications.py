@@ -218,7 +218,8 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_work()
     prompt = _message_text(update).lower()
     assert "horario laboral actual" in prompt
     assert "trabajo" in prompt
-    assert "elige el número" in prompt
+    assert "¿qué quieres hacer?" in prompt
+    assert "editar un bloque laboral" in prompt
     assert "envíame de nuevo solo tu horario laboral" not in prompt
     assert Path(_message_image_url(update)).exists()
 
@@ -264,9 +265,43 @@ def test_validate_schedule_correction_target_opens_shared_item_editor_for_extrac
     prompt = _message_text(update).lower()
     assert "horario extracurricular actual" in prompt
     assert "gimnasio" in prompt
-    assert "elige el número" in prompt
+    assert "¿qué quieres hacer?" in prompt
+    assert "editar una actividad" in prompt
     assert "envíame de nuevo solo las actividades" not in prompt
     assert Path(_message_image_url(update)).exists()
+
+
+def test_validate_schedule_extracurricular_field_prompt_uses_feminine_label() -> None:
+    state = AgentState(
+        phase="validate",
+        awaiting_user_input=True,
+        user_message_count=0,
+        student_profile=StudentProfile(occupation="ambos"),
+        schedule={
+            "blocks": [
+                _academic_block(),
+                WeeklyScheduleBlock(
+                    block_id="extra-1",
+                    block_type="extracurricular",
+                    title="Curso Frances",
+                    day_of_week="friday",
+                    start_time="15:00",
+                    end_time="19:30",
+                    source_text="Viernes Curso Frances 15:00-19:30",
+                ),
+            ],
+            "review_stage": "section_awaiting_item_selection",
+            "correction_target": "extracurricular",
+        },
+        messages=[HumanMessage(content="1")],
+    )
+
+    update = validate_schedule(state)
+
+    prompt = _message_text(update).lower()
+    assert "vas a editar esta actividad" in prompt
+    assert "vas a editar este actividad" not in prompt
+    assert "eliminar actividad" in prompt
 
 
 def test_validate_schedule_no_input_emits_conflict_prompt_with_avatar() -> None:

@@ -41,6 +41,8 @@ _STOPWORDS = {
     "variables",
     "fijo",
     "fija",
+    "y",
+    "e",
 }
 
 _PLACEHOLDER_TITLE_VALUES = {

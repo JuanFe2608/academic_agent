@@ -6,7 +6,11 @@ import re
 
 from services.scheduling.constants import DAY_ORDER, SPANISH_TO_ENGLISH
 from services.scheduling.text_parser import extract_natural_schedule_components
-from services.scheduling.validation import normalize_day, normalize_time
+from services.scheduling.validation import (
+    normalize_day,
+    normalize_day_typos_in_text,
+    normalize_time,
+)
 
 _DAY_TOKEN_PATTERN = (
     r"(?:"
@@ -46,7 +50,7 @@ def split_segments(text: str) -> list[str]:
 
 
 def extract_days_from_text(text: str) -> list[str]:
-    raw = str(text or "").strip()
+    raw = normalize_day_typos_in_text(str(text or "")).strip()
     if not raw:
         return []
     except_match = _ALL_DAYS_EXCEPT_PATTERN.search(raw)
@@ -78,7 +82,7 @@ def extract_time_range(text: str) -> tuple[str, str]:
 
 
 def infer_title(text: str, default_title: str) -> str:
-    cleaned = str(text or "")
+    cleaned = normalize_day_typos_in_text(str(text or ""))
     cleaned = _strip_equivalent_time_expression(cleaned)
     cleaned = _DAY_RANGE_PATTERN.sub(" ", cleaned)
     cleaned = _ALL_DAYS_EXCEPT_PATTERN.sub(" ", cleaned)
