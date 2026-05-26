@@ -2,11 +2,11 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 
 from bootstrap.settings import RagSettings, load_rag_settings
 from integrations.embeddings import EmbeddingClient, EmbeddingClientError
-from repositories.rag import RagRepository
+from repositories.rag import RagChunkSearchResult, RagRepository
 from schemas.rag import StudyRecommendationQuery
 
 from .context import build_grounded_context_package
@@ -112,10 +112,15 @@ class HybridRagRetriever:
             understanding=understanding,
             top_k=top_k,
         )
+        selected, context_notes = _attach_neighbor_prompt_context(
+            repository=self.repository,
+            chunks=selected,
+        )
         notes = [
             *attempt_notes,
             f"filters:{_format_filters(used_filters)}",
             f"candidates:{len(candidates)}",
+            *context_notes,
         ]
         return build_grounded_context_package(
             query=query,
@@ -138,7 +143,11 @@ class HybridRagRetriever:
             filters=filters,
             limit=self.settings.top_k_lexical,
         )
+        lexical_results, lexical_filtered = _filter_normal_retrieval_results(
+            lexical_results
+        )
         vector_results = []
+        vector_filtered = 0
         if self.embedding_client is None:
             notes.append("vector:disabled")
         else:
@@ -153,6 +162,9 @@ class HybridRagRetriever:
                         filters=filters,
                         limit=self.settings.top_k_vector,
                     )
+                    vector_results, vector_filtered = _filter_normal_retrieval_results(
+                        vector_results
+                    )
                     notes.append("vector:ok")
                 else:
                     notes.append("vector:empty")
@@ -162,6 +174,9 @@ class HybridRagRetriever:
         )
         notes.append(f"lexical:{len(lexical_results)}")
         notes.append(f"vector:{len(vector_results)}")
+        filtered = lexical_filtered + vector_filtered
+        if filtered:
+            notes.append(f"filtered_non_retrievable:{filtered}")
         if not candidates and understanding.filters and filters == understanding.filters:
             notes.append("degrade:strict_filters_empty")
         return RetrievalAttempt(filters=filters, candidates=candidates, notes=notes)
@@ -222,6 +237,147 @@ def _select_diverse_chunks(
         if len(selected) >= top_k:
             break
     return selected
+
+
+def _attach_neighbor_prompt_context(
+    *,
+    repository: RagRepository,
+    chunks: list[RagRetrievedChunk],
+) -> tuple[list[RagRetrievedChunk], list[str]]:
+    """Attach immediate neighbor excerpts for prompt use without changing content."""
+
+    if not chunks:
+        return chunks, []
+    selected_ids = {chunk.chunk_id for chunk in chunks}
+    neighbor_ids = _unique(
+        [
+            neighbor_id
+            for chunk in chunks
+            for neighbor_id in (
+                _metadata_chunk_id(chunk.metadata.get("previous_chunk_id")),
+                _metadata_chunk_id(chunk.metadata.get("next_chunk_id")),
+            )
+            if neighbor_id and neighbor_id not in selected_ids
+        ]
+    )
+    if not neighbor_ids:
+        return chunks, []
+
+    neighbors = {
+        result.chunk_id: result
+        for result in repository.get_chunks_by_ids(chunk_ids=neighbor_ids)
+    }
+    attached = 0
+    expanded_chunks: list[RagRetrievedChunk] = []
+    for chunk in chunks:
+        metadata = dict(chunk.metadata)
+        previous_context = _neighbor_context_payload(
+            neighbors.get(_metadata_chunk_id(metadata.get("previous_chunk_id")) or "")
+        )
+        next_context = _neighbor_context_payload(
+            neighbors.get(_metadata_chunk_id(metadata.get("next_chunk_id")) or "")
+        )
+        if previous_context:
+            metadata["prompt_context_before"] = previous_context
+            attached += 1
+        if next_context:
+            metadata["prompt_context_after"] = next_context
+            attached += 1
+        expanded_chunks.append(
+            replace(
+                chunk,
+                metadata=metadata,
+                ranking_notes=(*chunk.ranking_notes, "prompt_context:neighbors"),
+            )
+            if previous_context or next_context
+            else chunk
+        )
+    return expanded_chunks, [f"context_neighbors:{attached}"] if attached else []
+
+
+def _neighbor_context_payload(result: RagChunkSearchResult | None) -> dict[str, object]:
+    if result is None:
+        return {}
+    if not _prompt_context_enabled(result):
+        return {}
+    return {
+        "chunk_id": result.chunk_id,
+        "section_title": result.section_title,
+        "chunk_kind": result.chunk_kind,
+        "retrieval_role": result.retrieval_role,
+        "content": result.content,
+    }
+
+
+def _metadata_chunk_id(value: object) -> str | None:
+    if not isinstance(value, str):
+        return None
+    stripped = value.strip()
+    return stripped or None
+
+
+def _unique(values: list[str]) -> list[str]:
+    seen: set[str] = set()
+    unique: list[str] = []
+    for value in values:
+        if value in seen:
+            continue
+        seen.add(value)
+        unique.append(value)
+    return unique
+
+
+def _filter_normal_retrieval_results(
+    results: list[RagChunkSearchResult],
+) -> tuple[list[RagChunkSearchResult], int]:
+    filtered = [result for result in results if _normal_retrieval_enabled(result)]
+    return filtered, len(results) - len(filtered)
+
+
+def _normal_retrieval_enabled(result: RagChunkSearchResult) -> bool:
+    if result.retrieval_role == "structured_metadata":
+        return False
+    if result.chunk_kind == "metadata":
+        return False
+    return _metadata_bool(result.metadata, "semantic_retrieval_enabled", default=True)
+
+
+def _prompt_context_enabled(result: RagChunkSearchResult) -> bool:
+    if result.retrieval_role == "structured_metadata":
+        return False
+    if result.chunk_kind == "metadata":
+        return False
+    if _is_structured_metadata_title(result.section_title):
+        return False
+    return _metadata_bool(result.metadata, "prompt_context_enabled", default=True)
+
+
+def _metadata_bool(
+    metadata: dict[str, object],
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    value = metadata.get(key)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"false", "0", "no"}:
+            return False
+        if normalized in {"true", "1", "yes"}:
+            return True
+    return bool(value)
+
+
+def _is_structured_metadata_title(section_title: str) -> bool:
+    normalized = section_title.lower()
+    return (
+        "metadatos de recuperación sugeridos" in normalized
+        or "metadatos de recuperacion sugeridos" in normalized
+    )
 
 
 __all__ = [

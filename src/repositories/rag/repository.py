@@ -9,7 +9,13 @@ from dataclasses import dataclass
 from typing import Any, Iterator, Protocol
 
 from repositories.common import RepositoryConfigurationError, postgres_connection, require_database_url
-from schemas.rag import NormalizedRagDocument, RagChunk, RagRelation
+from schemas.rag import (
+    DEFAULT_RAG_RETRIEVAL_ROLE,
+    RAG_RETRIEVAL_ROLES,
+    NormalizedRagDocument,
+    RagChunk,
+    RagRelation,
+)
 
 
 class RagRepositoryError(Exception):
@@ -65,6 +71,7 @@ class RagChunkSearchResult:
     content: str
     metadata: dict[str, object]
     token_estimate: int
+    retrieval_role: str = "answerable"
     semantic_score: float = 0.0
     lexical_score: float = 0.0
 
@@ -110,6 +117,12 @@ class RagRepository(Protocol):
         query_embedding: list[float],
         filters: dict[str, list[str]],
         limit: int,
+    ) -> list[RagChunkSearchResult]: ...
+
+    def get_chunks_by_ids(
+        self,
+        *,
+        chunk_ids: list[str],
     ) -> list[RagChunkSearchResult]: ...
 
     def list_relations_for_entities(
@@ -175,7 +188,11 @@ class InMemoryRagRepository:
                 ingestion_run_id=ingestion_run_id,
                 corpus_name=corpus_name,
             )
-            if previous and previous.get("checksum") == chunk.checksum:
+            if (
+                previous
+                and previous.get("checksum") == chunk.checksum
+                and _embedding_enabled_for_payload(payload)
+            ):
                 payload["embedding"] = previous.get("embedding")
             else:
                 payload["embedding"] = None
@@ -239,6 +256,8 @@ class InMemoryRagRepository:
     ) -> list[RagEmbeddingCandidate]:
         candidates: list[RagEmbeddingCandidate] = []
         for chunk in sorted(self._chunks.values(), key=lambda item: item["chunk_id"]):
+            if not _embedding_enabled_for_payload(chunk):
+                continue
             if chunk.get("embedding") is not None:
                 continue
             candidates.append(
@@ -260,7 +279,11 @@ class InMemoryRagRepository:
         updated = 0
         for update in updates:
             chunk = self._chunks.get(update.chunk_id)
-            if chunk is None or chunk.get("checksum") != update.checksum:
+            if (
+                chunk is None
+                or chunk.get("checksum") != update.checksum
+                or not _embedding_enabled_for_payload(chunk)
+            ):
                 continue
             if len(update.embedding) != update.dimensions:
                 raise RagRepositoryError(
@@ -291,6 +314,8 @@ class InMemoryRagRepository:
             return []
         results: list[RagChunkSearchResult] = []
         for chunk in self._chunks.values():
+            if not _normal_retrieval_enabled_for_payload(chunk):
+                continue
             if not _chunk_matches_filters(chunk, filters):
                 continue
             haystack = " ".join(
@@ -318,6 +343,8 @@ class InMemoryRagRepository:
     ) -> list[RagChunkSearchResult]:
         results: list[RagChunkSearchResult] = []
         for chunk in self._chunks.values():
+            if not _normal_retrieval_enabled_for_payload(chunk):
+                continue
             if not _chunk_matches_filters(chunk, filters):
                 continue
             embedding = chunk.get("embedding")
@@ -326,6 +353,19 @@ class InMemoryRagRepository:
             score = _cosine_similarity(query_embedding, [float(value) for value in embedding])
             results.append(_search_result_from_payload(chunk, semantic_score=score))
         return sorted(results, key=lambda item: item.semantic_score, reverse=True)[:limit]
+
+    def get_chunks_by_ids(
+        self,
+        *,
+        chunk_ids: list[str],
+    ) -> list[RagChunkSearchResult]:
+        results: list[RagChunkSearchResult] = []
+        for chunk_id in chunk_ids:
+            chunk = self._chunks.get(chunk_id)
+            if chunk is None:
+                continue
+            results.append(_search_result_from_payload(chunk))
+        return results
 
     def list_relations_for_entities(
         self,
@@ -472,6 +512,9 @@ class PostgresRagRepository:
                 SELECT chunk_id, content, checksum, token_estimate
                 FROM rag.chunks
                 WHERE embedding IS NULL
+                  AND COALESCE(metadata_json->>'embedding_enabled', 'true') <> 'false'
+                  AND COALESCE(metadata_json->>'retrieval_role', 'answerable') <> 'structured_metadata'
+                  AND chunk_kind <> 'metadata'
                 ORDER BY document_id, position_in_document
                 LIMIT %s
                 """,
@@ -507,6 +550,9 @@ class PostgresRagRepository:
                         updated_at = NOW()
                     WHERE chunk_id = %s
                       AND checksum = %s
+                      AND COALESCE(metadata_json->>'embedding_enabled', 'true') <> 'false'
+                      AND COALESCE(metadata_json->>'retrieval_role', 'answerable') <> 'structured_metadata'
+                      AND chunk_kind <> 'metadata'
                     """,
                     (
                         _embedding_literal(update.embedding),
@@ -624,6 +670,38 @@ class PostgresRagRepository:
                 ),
             ).fetchall()
         return [_search_result_from_row(row, semantic_score_key="semantic_score") for row in rows]
+
+    def get_chunks_by_ids(
+        self,
+        *,
+        chunk_ids: list[str],
+    ) -> list[RagChunkSearchResult]:
+        if not chunk_ids:
+            return []
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT
+                    c.chunk_id,
+                    c.document_id,
+                    c.knowledge_type,
+                    c.document_type,
+                    c.entity_id,
+                    c.section_title,
+                    c.chunk_kind,
+                    c.content,
+                    c.metadata_json,
+                    c.token_estimate
+                FROM rag.chunks c
+                WHERE c.chunk_id = ANY(%s)
+                """,
+                (chunk_ids,),
+            ).fetchall()
+        chunks_by_id = {
+            result.chunk_id: result
+            for result in [_search_result_from_row(row) for row in rows]
+        }
+        return [chunks_by_id[chunk_id] for chunk_id in chunk_ids if chunk_id in chunks_by_id]
 
     def list_relations_for_entities(
         self,
@@ -754,6 +832,10 @@ class PostgresRagRepository:
                 content = EXCLUDED.content,
                 metadata_json = EXCLUDED.metadata_json,
                 embedding = CASE
+                    WHEN COALESCE(EXCLUDED.metadata_json->>'embedding_enabled', 'true') = 'false'
+                         OR COALESCE(EXCLUDED.metadata_json->>'retrieval_role', 'answerable') = 'structured_metadata'
+                         OR EXCLUDED.chunk_kind = 'metadata'
+                    THEN NULL
                     WHEN rag.chunks.checksum = EXCLUDED.checksum
                     THEN rag.chunks.embedding
                     ELSE NULL
@@ -983,7 +1065,11 @@ def _build_chunk_filter_sql(
     *,
     require_embedding: bool = False,
 ) -> tuple[str, list[object]]:
-    clauses = ["TRUE"]
+    clauses = [
+        "COALESCE(c.metadata_json->>'retrieval_role', 'answerable') <> 'structured_metadata'",
+        "COALESCE(c.metadata_json->>'semantic_retrieval_enabled', 'true') <> 'false'",
+        "c.chunk_kind <> 'metadata'",
+    ]
     params: list[object] = []
     column_by_filter = {
         "knowledge_types": "c.knowledge_type",
@@ -1026,12 +1112,33 @@ def _chunk_matches_filters(chunk: dict[str, Any], filters: dict[str, list[str]])
     return True
 
 
+def _normal_retrieval_enabled_for_payload(chunk: dict[str, Any]) -> bool:
+    metadata = dict(chunk.get("metadata") or {})
+    retrieval_role = _retrieval_role_from_chunk_payload(chunk, metadata)
+    if retrieval_role == "structured_metadata":
+        return False
+    if str(chunk.get("chunk_kind") or "") == "metadata":
+        return False
+    return _metadata_bool(metadata, "semantic_retrieval_enabled", default=True)
+
+
+def _embedding_enabled_for_payload(chunk: dict[str, Any]) -> bool:
+    metadata = dict(chunk.get("metadata") or {})
+    retrieval_role = _retrieval_role_from_chunk_payload(chunk, metadata)
+    if retrieval_role == "structured_metadata":
+        return False
+    if str(chunk.get("chunk_kind") or "") == "metadata":
+        return False
+    return _metadata_bool(metadata, "embedding_enabled", default=True)
+
+
 def _search_result_from_payload(
     chunk: dict[str, Any],
     *,
     semantic_score: float = 0.0,
     lexical_score: float = 0.0,
 ) -> RagChunkSearchResult:
+    metadata = dict(chunk.get("metadata") or {})
     return RagChunkSearchResult(
         chunk_id=str(chunk["chunk_id"]),
         document_id=str(chunk["document_id"]),
@@ -1040,8 +1147,9 @@ def _search_result_from_payload(
         entity_id=str(chunk["entity_id"]),
         section_title=str(chunk["section_title"]),
         chunk_kind=str(chunk["chunk_kind"]),
+        retrieval_role=_retrieval_role_from_chunk_payload(chunk, metadata),
         content=str(chunk["content"]),
-        metadata=dict(chunk.get("metadata") or {}),
+        metadata=metadata,
         token_estimate=int(chunk["token_estimate"]),
         semantic_score=float(semantic_score),
         lexical_score=float(lexical_score),
@@ -1055,6 +1163,7 @@ def _search_result_from_row(
     lexical_score_key: str | None = None,
 ) -> RagChunkSearchResult:
     metadata = _row_value(row, "metadata_json", {}) or {}
+    metadata = dict(metadata)
     return RagChunkSearchResult(
         chunk_id=str(_row_value(row, "chunk_id")),
         document_id=str(_row_value(row, "document_id")),
@@ -1063,12 +1172,53 @@ def _search_result_from_row(
         entity_id=str(_row_value(row, "entity_id")),
         section_title=str(_row_value(row, "section_title")),
         chunk_kind=str(_row_value(row, "chunk_kind")),
+        retrieval_role=_retrieval_role_from_metadata(metadata),
         content=str(_row_value(row, "content")),
-        metadata=dict(metadata),
+        metadata=metadata,
         token_estimate=int(_row_value(row, "token_estimate", 0)),
         semantic_score=float(_row_value(row, semantic_score_key or "", 0.0) or 0.0),
         lexical_score=float(_row_value(row, lexical_score_key or "", 0.0) or 0.0),
     )
+
+
+def _retrieval_role_from_chunk_payload(
+    chunk: dict[str, Any],
+    metadata: dict[str, object],
+) -> str:
+    return _retrieval_role_from_metadata(metadata, fallback=chunk.get("retrieval_role"))
+
+
+def _retrieval_role_from_metadata(
+    metadata: dict[str, object],
+    *,
+    fallback: object = None,
+) -> str:
+    value = str(
+        metadata.get("retrieval_role") or fallback or DEFAULT_RAG_RETRIEVAL_ROLE
+    ).strip()
+    if value in RAG_RETRIEVAL_ROLES:
+        return value
+    return DEFAULT_RAG_RETRIEVAL_ROLE
+
+
+def _metadata_bool(
+    metadata: dict[str, object],
+    key: str,
+    *,
+    default: bool,
+) -> bool:
+    value = metadata.get(key)
+    if value is None:
+        return default
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, str):
+        normalized = value.strip().lower()
+        if normalized in {"false", "0", "no"}:
+            return False
+        if normalized in {"true", "1", "yes"}:
+            return True
+    return bool(value)
 
 
 def _relation_from_payload(relation: dict[str, Any]) -> RagRelation:

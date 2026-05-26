@@ -14,6 +14,7 @@ from .context_package import (
     GroundedPromptContext,
     clean_chunk_text,
     format_entity_name,
+    summarize_chunk_for_prompt,
 )
 
 
@@ -158,7 +159,7 @@ def render_no_sources_prompt(package: GroundedContextPackage) -> str:
 def _context_blocks(chunks: list[RagRetrievedChunk]) -> list[str]:
     blocks: list[str] = []
     for index, chunk in enumerate(chunks, start=1):
-        text = clean_chunk_text(chunk.content, max_chars=900)
+        text = summarize_chunk_for_prompt(chunk, max_chars=900)
         blocks.append(
             f"[{index}] chunk_id={chunk.chunk_id}; entidad={format_entity_name(chunk.entity_id)}; "
             f"tipo={chunk.chunk_kind}; score={chunk.final_score:.3f}\n{text}"

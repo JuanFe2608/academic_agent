@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from rag.prompting import build_grounded_study_recommendation_result
-from rag.prompting.context_package import clean_chunk_text
+from rag.prompting.context_package import clean_chunk_text, summarize_chunk_for_prompt
 from rag.retrieval.models import (
     GroundedContextPackage,
     QueryUnderstanding,
@@ -330,6 +330,37 @@ def test_clean_chunk_text_removes_markdown_heading_and_limits_text() -> None:
     assert "##" not in text
     assert "**" not in text
     assert text.startswith("Pomodoro organiza")
+
+
+def test_summarize_chunk_for_prompt_includes_runtime_neighbor_context() -> None:
+    chunk = _chunk(
+        chunk_id="technique.pomodoro::s004-4_para_que_sirve",
+        entity_id="pomodoro",
+        chunk_kind="use_case",
+        content="## 4. Para qué sirve\nSirve para iniciar sesiones cortas.",
+        metadata={
+            "confidence_level": "alto",
+            "evidence_level": "alto",
+            "source_path": "raw/pomodoro.md",
+            "prompt_context_before": {
+                "chunk_id": "technique.pomodoro::s003-3_que_desarrolla",
+                "section_title": "3. Qué desarrolla",
+                "content": "## 3. Qué desarrolla\n- Concentracion\n- Gestion del tiempo",
+            },
+            "prompt_context_after": {
+                "chunk_id": "technique.pomodoro::s005-5_para_que_no_sirve_tanto",
+                "section_title": "5. Para qué no sirve tanto",
+                "content": "## 5. Para qué no sirve tanto\nNo resuelve vacios conceptuales.",
+            },
+        },
+    )
+
+    text = summarize_chunk_for_prompt(chunk, max_chars=420)
+
+    assert "Contexto anterior" in text
+    assert "Seccion principal" in text
+    assert "Contexto siguiente" in text
+    assert "Sirve para iniciar sesiones cortas" in text
 
 
 def _package(

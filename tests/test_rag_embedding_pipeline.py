@@ -87,6 +87,43 @@ def test_embed_changed_chunks_respects_limit() -> None:
     assert len(repository.list_chunks_missing_embeddings(limit=10)) == 1
 
 
+def test_embed_changed_chunks_skips_structured_metadata_chunks() -> None:
+    result = build_rag_corpus()
+    metadata_chunk = next(
+        chunk
+        for chunk in result.chunks
+        if "metadatos_de_recuperacion_sugeridos" in chunk.chunk_id
+    )
+    document = next(
+        document
+        for document in result.documents
+        if document.document_id == metadata_chunk.document_id
+    )
+    repository = InMemoryRagRepository()
+    repository.sync_corpus_snapshot(
+        corpus_name=CORPUS_NAME,
+        corpus_version=CORPUS_VERSION,
+        source_root="knowledge_base/study_recommendations",
+        documents=[document],
+        chunks=[metadata_chunk],
+        relations=[],
+        run_id="metadata-embedding-test",
+    )
+    client = _FakeEmbeddingClient(dimensions=3)
+
+    result = embed_changed_chunks(
+        repository=repository,
+        embedding_client=client,
+        batch_size=2,
+    )
+
+    assert result.requested_chunks == 0
+    assert result.embedded_chunks == 0
+    assert result.updated_chunks == 0
+    assert result.skipped_chunks == 0
+    assert client.calls == []
+
+
 def test_embed_changed_chunks_rejects_dimension_mismatch() -> None:
     repository = _repository_with_three_chunks()
     client = _FakeEmbeddingClient(dimensions=3, mismatch=True)

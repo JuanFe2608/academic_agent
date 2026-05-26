@@ -48,8 +48,7 @@ not_ideal_for_subject_types:
   - numerica
   - practica
 
-not_ideal_for_student_profiles:
-  - no especificado
+not_ideal_for_student_profiles: []
 
 not_ideal_for_signals:
   - confunde_tipos_de_ejercicio
@@ -125,37 +124,37 @@ confidence_level: medio
 primary_sources:
   - title: "Técnicas de estudio: SQ3R, lectura, repaso y síntesis"
     author: "UNED"
-    year: no especificado
+    year: null
     source_type: guia_universitaria
     url_or_reference: "Material universitario sobre SQ3R, lectura comprensiva, repaso y técnicas de síntesis."
 
   - title: "Método de estudio por etapas"
     author: "UNED"
-    year: no especificado
+    year: null
     source_type: guia_universitaria
     url_or_reference: "Secuencia prelectura, lectura-comprensión y sintetización."
 
   - title: "Metacognición y técnicas eficaces de estudio"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Síntesis en español sobre práctica distribuida, evaluación de la práctica y utilidad relativa de relectura y subrayado."
 
   - title: "Aprendizaje potenciado por la evaluación"
     author: "UNAM"
-    year: no especificado
+    year: null
     source_type: capitulo_universitario
     url_or_reference: "Relación entre pruebas de práctica, recuperación y retención."
 
   - title: "Método Cornell"
     author: "Universidad de Chile"
-    year: no especificado
+    year: null
     source_type: recurso_universitario
     url_or_reference: "Descripción operativa de Cornell con columna de ideas/preguntas y resumen."
 
   - title: "Técnica Feynman"
     author: "UnADM"
-    year: no especificado
+    year: null
     source_type: fasciculo_didactico
     url_or_reference: "Explicación simple y breve para comprender mejor mediante autoexplicación."
 

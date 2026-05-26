@@ -49,6 +49,67 @@ def test_hybrid_retriever_returns_grounded_context_for_explicit_technique() -> N
     assert any("vector:ok" in note for note in package.groundedness_notes)
 
 
+def test_hybrid_retriever_attaches_neighbor_context_for_prompt_only() -> None:
+    repository = _repository_with_embeddings()
+    retriever = HybridRagRetriever(
+        repository=repository,
+        embedding_client=_FakeEmbeddingClient(),
+        settings=_settings(),
+    )
+
+    package = retriever.retrieve(
+        StudyRecommendationQuery(
+            query_text="Que es Pomodoro y cuando conviene?",
+            max_chunks=3,
+        )
+    )
+
+    chunk = package.selected_chunks[0]
+
+    assert "prompt_context_before" in chunk.metadata
+    assert chunk.metadata["prompt_context_before"]["chunk_id"] == chunk.metadata["previous_chunk_id"]
+    next_chunk_id = str(chunk.metadata.get("next_chunk_id") or "")
+    if _is_metadata_chunk_id(next_chunk_id):
+        assert "prompt_context_after" not in chunk.metadata
+    else:
+        assert chunk.metadata["prompt_context_after"]["chunk_id"] == next_chunk_id
+    assert chunk.content.startswith(f"## {chunk.section_title}")
+    assert any("context_neighbors:" in note for note in package.groundedness_notes)
+    for selected_chunk in package.selected_chunks:
+        for key in ("prompt_context_before", "prompt_context_after"):
+            context = selected_chunk.metadata.get(key)
+            if not isinstance(context, dict):
+                continue
+            assert context.get("retrieval_role") != "structured_metadata"
+            assert context.get("chunk_kind") != "metadata"
+            assert "Metadatos de recuperación sugeridos" not in str(
+                context.get("section_title") or ""
+            )
+
+
+def test_hybrid_retriever_excludes_structured_metadata_from_selection() -> None:
+    repository = _repository_with_embeddings()
+    retriever = HybridRagRetriever(
+        repository=repository,
+        embedding_client=_FakeEmbeddingClient(),
+        settings=_settings(),
+    )
+
+    package = retriever.retrieve(
+        StudyRecommendationQuery(
+            query_text="Pomodoro technique_id objective_types",
+            max_chunks=5,
+        )
+    )
+
+    assert package.has_sufficient_sources is True
+    assert all(
+        chunk.retrieval_role != "structured_metadata"
+        and chunk.chunk_kind != "metadata"
+        for chunk in package.selected_chunks
+    )
+
+
 def test_hybrid_retriever_expands_relations_for_combination_query() -> None:
     repository = _repository_with_embeddings()
     retriever = HybridRagRetriever(
@@ -126,6 +187,10 @@ def _repository_with_embeddings() -> InMemoryRagRepository:
         else:
             payload["embedding"] = [0.0, 0.0, 1.0]
     return repository
+
+
+def _is_metadata_chunk_id(chunk_id: str) -> bool:
+    return "metadatos_de_recuperacion_sugeridos" in chunk_id
 
 
 def _settings() -> RagSettings:

@@ -1,0 +1,203 @@
+{
+  "baseline_id": "pre_metadata_only_exclusion_2026-05-22",
+  "purpose": "Linea base antes de separar las secciones de metadata estructurada del retrieval semantico normal.",
+  "scope": {
+    "corpus": "study_recommendations",
+    "phase": "post_chunk_contract_and_placeholder_cleanup",
+    "next_phase": "metadata_only_retrieval_exclusion"
+  },
+  "reproduction_commands": {
+    "build_artifacts": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run python scripts/dev/build_rag_corpus.py --write-artifacts",
+    "local_eval": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run python scripts/dev/evaluate_rag.py --backend local --output /tmp/rag_eval_placeholder_cleanup_local.json --check-disabled-fallback --fail-on-forbidden",
+    "postgres_eval": "PYTHONDONTWRITEBYTECODE=1 PYTHONPATH=src uv run python scripts/dev/evaluate_rag.py --backend postgres --output /tmp/rag_eval_placeholder_cleanup_postgres.json --check-disabled-fallback --fail-on-forbidden"
+  },
+  "corpus_metrics": {
+    "chunk_count": 468,
+    "total_token_estimate": 43318,
+    "metadata_chunk_count": 15,
+    "metadata_chunk_token_estimate": 1675,
+    "metadata_chunk_token_share": 0.038668,
+    "bad_content_start_count": 0,
+    "multi_section_content_count": 0,
+    "placeholder_chunk_hits_case_insensitive": 1,
+    "metadata_chunk_kinds": {
+      "agent_guidance": 14,
+      "matrix": 1
+    }
+  },
+  "known_quality_issues": [
+    {
+      "id": "metadata_sections_are_retrievable",
+      "severity": "medium",
+      "description": "Las secciones 'Metadatos de recuperacion sugeridos' siguen compitiendo en retrieval normal como agent_guidance o matrix.",
+      "target_after_fix": {
+        "metadata_chunk_selections": 0,
+        "metadata_terms_in_answers": 0
+      }
+    },
+    {
+      "id": "metadata_sections_enter_prompt_as_neighbor_context",
+      "severity": "medium",
+      "description": "Aunque no sean seleccionadas directamente, las secciones de metadata pueden entrar como contexto vecino del chunk anterior.",
+      "target_after_fix": {
+        "metadata_neighbor_context_injections": 0
+      }
+    },
+    {
+      "id": "residual_placeholder_phrase",
+      "severity": "low",
+      "description": "Queda una frase residual 'No especificado como uso principal.' en el contenido de metodo_evaluacion_numerica_breve::s023.",
+      "target_after_fix": {
+        "placeholder_chunk_hits_case_insensitive": 0
+      }
+    }
+  ],
+  "eval_baselines": {
+    "local": {
+      "report_path": "/tmp/rag_eval_placeholder_cleanup_local.json",
+      "cases": 70,
+      "passed_cases": 70,
+      "pass_rate": 1.0,
+      "entity_recall_at_k": 1.0,
+      "entity_precision_at_k": 0.674831,
+      "mrr": 1.0,
+      "chunk_kind_recall": 0.695238,
+      "groundedness_rate": 1.0,
+      "forbidden_entity_violations": 0,
+      "forbidden_answer_term_violations": 0,
+      "metadata_chunk_selections": 28,
+      "unique_metadata_chunks_selected": 10,
+      "cases_with_metadata_terms_in_answer": 36,
+      "metadata_answer_term_counts": {
+        "metadatos de recuper": 25,
+        "method_id": 12,
+        "objective_types": 35,
+        "student_profile": 11,
+        "technique_id": 24
+      },
+      "metadata_selection_position_counts": {
+        "1": 6,
+        "2": 7,
+        "3": 3,
+        "4": 6,
+        "5": 6
+      }
+    },
+    "postgres": {
+      "report_path": "/tmp/rag_eval_placeholder_cleanup_postgres.json",
+      "cases": 70,
+      "passed_cases": 70,
+      "pass_rate": 1.0,
+      "entity_recall_at_k": 1.0,
+      "entity_precision_at_k": 0.675181,
+      "mrr": 0.985294,
+      "chunk_kind_recall": 0.717857,
+      "groundedness_rate": 1.0,
+      "forbidden_entity_violations": 0,
+      "forbidden_answer_term_violations": 0,
+      "metadata_chunk_selections": 22,
+      "unique_metadata_chunks_selected": 8,
+      "cases_with_metadata_terms_in_answer": 33,
+      "metadata_answer_term_counts": {
+        "metadatos de recuper": 28,
+        "method_id": 14,
+        "objective_types": 24,
+        "student_profile": 5,
+        "technique_id": 19
+      },
+      "metadata_selection_position_counts": {
+        "2": 2,
+        "3": 4,
+        "4": 11,
+        "5": 5
+      }
+    }
+  },
+  "acceptance_targets_for_next_phase": {
+    "pass_rate_min": 1.0,
+    "entity_recall_at_k_min": 1.0,
+    "groundedness_rate_min": 1.0,
+    "forbidden_entity_violations": 0,
+    "forbidden_answer_term_violations": 0,
+    "metadata_chunk_selections": 0,
+    "cases_with_metadata_terms_in_answer": 0,
+    "placeholder_chunk_hits_case_insensitive": 0
+  },
+  "metadata_chunks": [
+    {
+      "chunk_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio::s031-31_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 228
+    },
+    {
+      "chunk_id": "study_framework.marco_decision_tecnica_vs_metodo::s031-31_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 92
+    },
+    {
+      "chunk_id": "study_method.metodo_evaluacion_numerica_breve::s040-40_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 84
+    },
+    {
+      "chunk_id": "study_method.metodo_lectura_y_sintesis::s040-40_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 92
+    },
+    {
+      "chunk_id": "study_method.metodo_parcial_teorico::s040-40_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 98
+    },
+    {
+      "chunk_id": "study_method.metodo_repaso_semanal::s040-40_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 88
+    },
+    {
+      "chunk_id": "technique.active_recall::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 99
+    },
+    {
+      "chunk_id": "technique.cornell::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 96
+    },
+    {
+      "chunk_id": "technique.feynman::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 88
+    },
+    {
+      "chunk_id": "technique.interleaving::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 96
+    },
+    {
+      "chunk_id": "technique.mapas_conceptuales::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 86
+    },
+    {
+      "chunk_id": "technique.mnemotecnia::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 88
+    },
+    {
+      "chunk_id": "technique.pomodoro::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 91
+    },
+    {
+      "chunk_id": "technique.repeticion_espaciada::s026-26_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "agent_guidance",
+      "token_estimate": 94
+    },
+    {
+      "chunk_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio::s038-38_metadatos_de_recuperacion_sugeridos",
+      "chunk_kind": "matrix",
+      "token_estimate": 255
+    }
+  ]
+}

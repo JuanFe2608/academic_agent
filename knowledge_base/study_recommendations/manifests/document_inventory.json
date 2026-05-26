@@ -5,7 +5,7 @@
     {
       "aliases": [],
       "aliases_normalized": [],
-      "checksum": "358ce9c8d02862964a196e9390f7f198ce4737e57235c1a8bae123b58ed66e04",
+      "checksum": "18854ad2c58f3fb2bb06eb97a1c533fa335aa8b39bea3c7691ddef23fd38e332",
       "document_id": "study_framework.marco_conceptual_tecnica_vs_metodo_de_estudio",
       "document_type": "marco_conceptual",
       "entity_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
@@ -44,9 +44,7 @@
         ],
         "component_techniques_normalized": [],
         "confidence_level": "medio",
-        "contraindicated_combinations_normalized": [
-          []
-        ],
+        "contraindicated_combinations_normalized": [],
         "core_concepts": [
           "tecnica_de_estudio",
           "metodo_de_estudio",
@@ -93,28 +91,28 @@
             "source_type": "diccionario",
             "title": "Diccionario académico: técnica",
             "url_or_reference": "Definición general de técnica como conjunto de reglas y procedimientos.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Real Academia Española",
             "source_type": "diccionario",
             "title": "Diccionario académico: método",
             "url_or_reference": "Definición general de método como modo ordenado de actuar.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Centro Virtual Cervantes",
             "source_type": "marco_didactico",
             "title": "Definición didáctica de método y técnica",
             "url_or_reference": "Método como conjunto de procedimientos desde un enfoque; técnica como uso de procedimientos para un objetivo preciso.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "COIE-UNED",
             "source_type": "guia_institucional",
             "title": "Técnicas de estudio",
             "url_or_reference": "Guía institucional sobre selección y adaptación de técnicas de estudio; incluye técnicas de síntesis y referencia a SQ3R.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Antioquia",
@@ -128,21 +126,21 @@
             "source_type": "material_academico",
             "title": "Documento académico sobre técnicas, estrategias y método de estudio",
             "url_or_reference": "Relación entre técnicas, estrategias y definición de un método propio de estudio.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía sobre práctica espaciada",
             "url_or_reference": "Definición operativa de práctica espaciada frente a práctica masiva.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Recuperación mediante pruebas y su relación con retención a largo plazo.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "raw_entity_id": "marco_conceptual_tecnica_vs_metodo_de_estudio",
@@ -224,9 +222,7 @@
         ],
         "component_techniques": [],
         "confidence_level": "medio",
-        "contraindicated_combinations": [
-          "no especificado"
-        ],
+        "contraindicated_combinations": [],
         "core_concepts": [
           "tecnica_de_estudio",
           "metodo_de_estudio",
@@ -270,28 +266,28 @@
             "source_type": "diccionario",
             "title": "Diccionario académico: técnica",
             "url_or_reference": "Definición general de técnica como conjunto de reglas y procedimientos.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Real Academia Española",
             "source_type": "diccionario",
             "title": "Diccionario académico: método",
             "url_or_reference": "Definición general de método como modo ordenado de actuar.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Centro Virtual Cervantes",
             "source_type": "marco_didactico",
             "title": "Definición didáctica de método y técnica",
             "url_or_reference": "Método como conjunto de procedimientos desde un enfoque; técnica como uso de procedimientos para un objetivo preciso.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "COIE-UNED",
             "source_type": "guia_institucional",
             "title": "Técnicas de estudio",
             "url_or_reference": "Guía institucional sobre selección y adaptación de técnicas de estudio; incluye técnicas de síntesis y referencia a SQ3R.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Antioquia",
@@ -305,21 +301,21 @@
             "source_type": "material_academico",
             "title": "Documento académico sobre técnicas, estrategias y método de estudio",
             "url_or_reference": "Relación entre técnicas, estrategias y definición de un método propio de estudio.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía sobre práctica espaciada",
             "url_or_reference": "Definición operativa de práctica espaciada frente a práctica masiva.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Recuperación mediante pruebas y su relación con retención a largo plazo.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "recommended_combinations": [
@@ -681,7 +677,7 @@
     {
       "aliases": [],
       "aliases_normalized": [],
-      "checksum": "aa90020838c219df0d284e9172f5173c9032beea0689614d0ea53c7b4370f352",
+      "checksum": "940ac019454199803b60b4a0f19e37dbc1cd38d87d12e7619c6e3cb29b0580b4",
       "document_id": "technique_combination_matrix.matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
       "document_type": "matriz_de_combinacion",
       "entity_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
@@ -858,49 +854,49 @@
             "source_type": "guia_institucional",
             "title": "Guía de repaso y preparación de exámenes",
             "url_or_reference": "Tipos de repaso, advertencias sobre empollar y valor de los repasos intermedios.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía de metacognición sobre práctica espaciada y utilidad de técnicas",
             "url_or_reference": "Definición de práctica espaciada, diferencias frente a estudio masivo y síntesis comparativa de utilidad de técnicas.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción Aptus",
             "source_type": "guia_educativa",
             "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
             "url_or_reference": "Definición de práctica de recuperación, rol de la retroalimentación y metacognición.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción Aptus",
             "source_type": "guia_educativa",
             "title": "Cómo usar la práctica de recuperación espaciada para potenciar el aprendizaje",
             "url_or_reference": "Relación explícita entre repetición espaciada y práctica de recuperación.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "material_academico",
             "title": "Fascículo sobre técnica Feynman",
             "url_or_reference": "Explicación de la técnica Feynman y aclaración de que se usa para comprender, no para memorizar.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "material_academico",
             "title": "Fascículo sobre estudio intercalado",
             "url_or_reference": "Definición de interleaving, prerrequisitos y necesidad de revisión.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UAEH",
             "source_type": "guia_institucional",
             "title": "Técnica Pomodoro",
             "url_or_reference": "Definición, pasos, ventajas y límites de Pomodoro.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Francesco Cirillo",
@@ -914,28 +910,28 @@
             "source_type": "documento_academico",
             "title": "Concept maps",
             "url_or_reference": "Características de mapas conceptuales: conceptos, enlaces, jerarquía y pregunta de enfoque.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED Costa Rica",
             "source_type": "guia_institucional",
             "title": "Estrategia: mapa conceptual",
             "url_or_reference": "Pasos y rasgos de mapas conceptuales.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Chile",
             "source_type": "guia_institucional",
             "title": "Método Cornell",
             "url_or_reference": "Definición de Cornell y sus tres secciones.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "RAE y ANUIES",
             "source_type": "definicion_y_guia",
             "title": "Mnemotecnia",
             "url_or_reference": "Definición normativa y ejemplo de uso como estrategia de memoria.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "raw_entity_id": "matriz_de_combinacion_de_tecnicas_para_metodos_de_estudio",
@@ -1122,49 +1118,49 @@
             "source_type": "guia_institucional",
             "title": "Guía de repaso y preparación de exámenes",
             "url_or_reference": "Tipos de repaso, advertencias sobre empollar y valor de los repasos intermedios.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía de metacognición sobre práctica espaciada y utilidad de técnicas",
             "url_or_reference": "Definición de práctica espaciada, diferencias frente a estudio masivo y síntesis comparativa de utilidad de técnicas.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción Aptus",
             "source_type": "guia_educativa",
             "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
             "url_or_reference": "Definición de práctica de recuperación, rol de la retroalimentación y metacognición.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción Aptus",
             "source_type": "guia_educativa",
             "title": "Cómo usar la práctica de recuperación espaciada para potenciar el aprendizaje",
             "url_or_reference": "Relación explícita entre repetición espaciada y práctica de recuperación.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "material_academico",
             "title": "Fascículo sobre técnica Feynman",
             "url_or_reference": "Explicación de la técnica Feynman y aclaración de que se usa para comprender, no para memorizar.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "material_academico",
             "title": "Fascículo sobre estudio intercalado",
             "url_or_reference": "Definición de interleaving, prerrequisitos y necesidad de revisión.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UAEH",
             "source_type": "guia_institucional",
             "title": "Técnica Pomodoro",
             "url_or_reference": "Definición, pasos, ventajas y límites de Pomodoro.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Francesco Cirillo",
@@ -1178,28 +1174,28 @@
             "source_type": "documento_academico",
             "title": "Concept maps",
             "url_or_reference": "Características de mapas conceptuales: conceptos, enlaces, jerarquía y pregunta de enfoque.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED Costa Rica",
             "source_type": "guia_institucional",
             "title": "Estrategia: mapa conceptual",
             "url_or_reference": "Pasos y rasgos de mapas conceptuales.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Chile",
             "source_type": "guia_institucional",
             "title": "Método Cornell",
             "url_or_reference": "Definición de Cornell y sus tres secciones.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "RAE y ANUIES",
             "source_type": "definicion_y_guia",
             "title": "Mnemotecnia",
             "url_or_reference": "Definición normativa y ejemplo de uso como estrategia de memoria.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "recommended_combinations": [
@@ -1251,7 +1247,7 @@
         "evaluacion_numerica_breve",
         "metodo_para_quiz_numerico"
       ],
-      "checksum": "eed20956cdb48f3764eb6fa7230b0deb323338cda8f8cb6b33b6985821ae73fd",
+      "checksum": "868aea1aeea2d0c2f02e608b9d1cd0a9b1aaff5178b13e3a537d1fed56087a07",
       "document_id": "study_method.metodo_evaluacion_numerica_breve",
       "document_type": "study_method",
       "entity_id": "metodo_evaluacion_numerica_breve",
@@ -1281,9 +1277,7 @@
           "procrastination",
           "note_organization"
         ],
-        "best_for_student_profiles": [
-          "no especificado"
-        ],
+        "best_for_student_profiles": [],
         "best_for_subject_types": [
           "numerica",
           "practica",
@@ -1343,9 +1337,7 @@
         "estimated_session_minutes_max": 60,
         "estimated_session_minutes_min": 30,
         "evidence_level": "moderado",
-        "excluded_techniques_normalized": [
-          []
-        ],
+        "excluded_techniques_normalized": [],
         "id_key": "method_id",
         "knowledge_type": "study_method",
         "method_id": "metodo_evaluacion_numerica_breve",
@@ -1355,12 +1347,8 @@
           "toma_de_apuntes",
           "exposicion"
         ],
-        "not_ideal_for_signals_normalized": [
-          "no_especificado"
-        ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_signals_normalized": [],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "teorica",
           "conceptual"
@@ -1389,42 +1377,42 @@
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Pruebas de práctica, retroalimentación, frecuencia, ansiedad y aprendizaje por recuperación.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED",
             "source_type": "guia_universitaria",
             "title": "Guía de preparación de exámenes",
             "url_or_reference": "Repaso inicial, intermedio y final; control del tiempo; familiarización con exámenes anteriores.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía de metacognición",
             "url_or_reference": "Práctica distribuida y evaluación de la práctica como técnicas de alta utilidad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción al español",
             "source_type": "guia_basada_en_investigacion",
             "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
             "url_or_reference": "Recuperación como estrategia de aprendizaje y necesidad de retroalimentación.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "articulo_academico",
             "title": "Artículo en español sobre efecto del ejemplo resuelto y teoría de carga cognitiva",
             "url_or_reference": "Ejemplos resueltos para reducir carga cognitiva en tareas procedimentales.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "guia_didactica",
             "title": "Guía didáctica sobre estudio intercalado",
             "url_or_reference": "Intercalado, discriminación entre tipos de ejercicios y revisión obligatoria.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "raw_entity_id": "metodo_evaluacion_numerica_breve",
@@ -1503,9 +1491,7 @@
           "siente_familiaridad_pero_no_recuerda",
           "necesita_estructura"
         ],
-        "best_for_student_profiles": [
-          "no especificado"
-        ],
+        "best_for_student_profiles": [],
         "best_for_subject_types": [
           "numerica",
           "practica",
@@ -1540,9 +1526,7 @@
         "estimated_session_minutes_max": 60,
         "estimated_session_minutes_min": 30,
         "evidence_level": "moderado",
-        "excluded_techniques": [
-          "no especificado"
-        ],
+        "excluded_techniques": [],
         "knowledge_type": "study_method",
         "method_id": "metodo_evaluacion_numerica_breve",
         "name": "Método de estudio para evaluación numérica breve",
@@ -1551,12 +1535,8 @@
           "toma_de_apuntes",
           "exposicion"
         ],
-        "not_ideal_for_signals": [
-          "no especificado"
-        ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_signals": [],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "teorica",
           "conceptual"
@@ -1579,42 +1559,42 @@
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Pruebas de práctica, retroalimentación, frecuencia, ansiedad y aprendizaje por recuperación.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED",
             "source_type": "guia_universitaria",
             "title": "Guía de preparación de exámenes",
             "url_or_reference": "Repaso inicial, intermedio y final; control del tiempo; familiarización con exámenes anteriores.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Guía de metacognición",
             "url_or_reference": "Práctica distribuida y evaluación de la práctica como técnicas de alta utilidad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "retrievalpractice.org / traducción al español",
             "source_type": "guia_basada_en_investigacion",
             "title": "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje",
             "url_or_reference": "Recuperación como estrategia de aprendizaje y necesidad de retroalimentación.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "articulo_academico",
             "title": "Artículo en español sobre efecto del ejemplo resuelto y teoría de carga cognitiva",
             "url_or_reference": "Ejemplos resueltos para reducir carga cognitiva en tareas procedimentales.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "guia_didactica",
             "title": "Guía didáctica sobre estudio intercalado",
             "url_or_reference": "Intercalado, discriminación entre tipos de ejercicios y revisión obligatoria.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "recommended_combinations": [
@@ -1664,7 +1644,7 @@
         "lectura_y_sintesis",
         "metodo_de_lectura_activa_y_sintesis"
       ],
-      "checksum": "e4115013c68f860885192cd6bd6bfa5e90220490ac8b22dc8c23a94a0f20a07f",
+      "checksum": "24de9279fd72a9a578bba41f7b1820b45441f333cbad26cd127ce31a6081b3f4",
       "document_id": "study_method.metodo_lectura_y_sintesis",
       "document_type": "study_method",
       "entity_id": "metodo_lectura_y_sintesis",
@@ -1771,9 +1751,7 @@
         "not_ideal_for_signals_normalized": [
           "difficulty_switching_topics"
         ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "numerica",
           "practica"
@@ -1808,42 +1786,42 @@
             "source_type": "guia_universitaria",
             "title": "Técnicas de estudio: SQ3R, lectura, repaso y síntesis",
             "url_or_reference": "Material universitario sobre SQ3R, lectura comprensiva, repaso y técnicas de síntesis.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED",
             "source_type": "guia_universitaria",
             "title": "Método de estudio por etapas",
             "url_or_reference": "Secuencia prelectura, lectura-comprensión y sintetización.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y técnicas eficaces de estudio",
             "url_or_reference": "Síntesis en español sobre práctica distribuida, evaluación de la práctica y utilidad relativa de relectura y subrayado.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Relación entre pruebas de práctica, recuperación y retención.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Chile",
             "source_type": "recurso_universitario",
             "title": "Método Cornell",
             "url_or_reference": "Descripción operativa de Cornell con columna de ideas/preguntas y resumen.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "fasciculo_didactico",
             "title": "Técnica Feynman",
             "url_or_reference": "Explicación simple y breve para comprender mejor mediante autoexplicación.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "raw_entity_id": "metodo_lectura_y_sintesis",
@@ -1970,9 +1948,7 @@
         "not_ideal_for_signals": [
           "confunde_tipos_de_ejercicio"
         ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "numerica",
           "practica"
@@ -1997,42 +1973,42 @@
             "source_type": "guia_universitaria",
             "title": "Técnicas de estudio: SQ3R, lectura, repaso y síntesis",
             "url_or_reference": "Material universitario sobre SQ3R, lectura comprensiva, repaso y técnicas de síntesis.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNED",
             "source_type": "guia_universitaria",
             "title": "Método de estudio por etapas",
             "url_or_reference": "Secuencia prelectura, lectura-comprensión y sintetización.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y técnicas eficaces de estudio",
             "url_or_reference": "Síntesis en español sobre práctica distribuida, evaluación de la práctica y utilidad relativa de relectura y subrayado.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Relación entre pruebas de práctica, recuperación y retención.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Universidad de Chile",
             "source_type": "recurso_universitario",
             "title": "Método Cornell",
             "url_or_reference": "Descripción operativa de Cornell con columna de ideas/preguntas y resumen.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "fasciculo_didactico",
             "title": "Técnica Feynman",
             "url_or_reference": "Explicación simple y breve para comprender mejor mediante autoexplicación.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "recommended_combinations": [
@@ -2082,7 +2058,7 @@
         "parcial_teorico",
         "metodo_de_estudio_para_parcial_teorico"
       ],
-      "checksum": "20290e6bae50e8e28bc6b629f93b17c8a5b10636a4dd2151b2e38529ed24b7ea",
+      "checksum": "9ed2808fb362cdae9b77a0f9b68f6d6e2065ec96ea7f00bb44bb6b295a96c0a0",
       "document_id": "study_method.metodo_parcial_teorico",
       "document_type": "study_method",
       "entity_id": "metodo_parcial_teorico",
@@ -2206,12 +2182,8 @@
           "proyecto",
           "resolucion_de_problemas"
         ],
-        "not_ideal_for_signals_normalized": [
-          "no_especificado"
-        ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_signals_normalized": [],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "numerica",
           "practica"
@@ -2247,35 +2219,35 @@
             "source_type": "guia_universitaria",
             "title": "Preparación de exámenes en la UNED",
             "url_or_reference": "Guía universitaria sobre análisis de exámenes anteriores, calendario de repaso y diferencias entre repaso sistemático y empolle.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Capítulo universitario sobre recuperación activa, retroalimentación, práctica distribuida, cuestionarios y reducción de ansiedad con pruebas de bajo riesgo.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y aprendizaje",
             "url_or_reference": "Síntesis en español donde evaluación de la práctica y práctica distribuida se clasifican como estrategias de alta utilidad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Centro Virtual Cervantes y RAE",
             "source_type": "referencia_conceptual",
             "title": "Definiciones de método y técnica",
             "url_or_reference": "Definiciones didácticas y lingüísticas usadas para distinguir método de técnica.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "fasciculos_didacticos",
             "title": "Técnica Feynman e intercalado",
             "url_or_reference": "Materiales sobre explicación simple para comprender e intercalado para discriminación entre temas similares.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Ayala, Moro y Germain",
@@ -2430,12 +2402,8 @@
           "proyecto",
           "resolucion_de_problemas"
         ],
-        "not_ideal_for_signals": [
-          "no especificado"
-        ],
-        "not_ideal_for_student_profiles": [
-          "no especificado"
-        ],
+        "not_ideal_for_signals": [],
+        "not_ideal_for_student_profiles": [],
         "not_ideal_for_subject_types": [
           "numerica",
           "practica"
@@ -2461,35 +2429,35 @@
             "source_type": "guia_universitaria",
             "title": "Preparación de exámenes en la UNED",
             "url_or_reference": "Guía universitaria sobre análisis de exámenes anteriores, calendario de repaso y diferencias entre repaso sistemático y empolle.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Capítulo universitario sobre recuperación activa, retroalimentación, práctica distribuida, cuestionarios y reducción de ansiedad con pruebas de bajo riesgo.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y aprendizaje",
             "url_or_reference": "Síntesis en español donde evaluación de la práctica y práctica distribuida se clasifican como estrategias de alta utilidad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Centro Virtual Cervantes y RAE",
             "source_type": "referencia_conceptual",
             "title": "Definiciones de método y técnica",
             "url_or_reference": "Definiciones didácticas y lingüísticas usadas para distinguir método de técnica.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UnADM",
             "source_type": "fasciculos_didacticos",
             "title": "Técnica Feynman e intercalado",
             "url_or_reference": "Materiales sobre explicación simple para comprender e intercalado para discriminación entre temas similares.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "Ayala, Moro y Germain",
@@ -2545,7 +2513,7 @@
     {
       "aliases": [],
       "aliases_normalized": [],
-      "checksum": "c13342ce12821c88170ba868aaeb9d5138e29e6cbb98661e851a996530d6fa4b",
+      "checksum": "18e5d4f2bbc0e187f443321f2281e5d112e6df0281d3939ad4646caee3fb52ec",
       "document_id": "study_method.metodo_repaso_semanal",
       "document_type": "study_method",
       "entity_id": "metodo_repaso_semanal",
@@ -2672,35 +2640,35 @@
             "source_type": "guia_universitaria",
             "title": "Guías de técnicas de estudio sobre repaso planificado",
             "url_or_reference": "Repaso espaciado, curva del olvido, calendario de repaso y función del repaso planificado.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y aprendizaje",
             "url_or_reference": "Práctica distribuida y evaluación de la práctica como estrategias de alta efectividad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Recuperación activa, quizzes y retroalimentación para favorecer retención.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "estudio_piloto",
             "title": "Estudio piloto sobre repetición espaciada con Anki",
             "url_or_reference": "Mejora de calificaciones en usuarios de sistemas de repetición espaciada.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "RAE",
             "source_type": "diccionario",
             "title": "Definiciones de método y técnica",
             "url_or_reference": "Diferenciación entre método como modo ordenado de actuar y técnica como procedimiento puntual.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "raw_entity_id": "metodo_repaso_semanal",
@@ -2835,35 +2803,35 @@
             "source_type": "guia_universitaria",
             "title": "Guías de técnicas de estudio sobre repaso planificado",
             "url_or_reference": "Repaso espaciado, curva del olvido, calendario de repaso y función del repaso planificado.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "EduCaixa",
             "source_type": "guia_educativa",
             "title": "Metacognición y aprendizaje",
             "url_or_reference": "Práctica distribuida y evaluación de la práctica como estrategias de alta efectividad.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "UNAM",
             "source_type": "capitulo_universitario",
             "title": "Aprendizaje potenciado por la evaluación",
             "url_or_reference": "Recuperación activa, quizzes y retroalimentación para favorecer retención.",
-            "year": "no especificado"
+            "year": null
           },
           {
-            "author": "no especificado",
+            "author": null,
             "source_type": "estudio_piloto",
             "title": "Estudio piloto sobre repetición espaciada con Anki",
             "url_or_reference": "Mejora de calificaciones en usuarios de sistemas de repetición espaciada.",
-            "year": "no especificado"
+            "year": null
           },
           {
             "author": "RAE",
             "source_type": "diccionario",
             "title": "Definiciones de método y técnica",
             "url_or_reference": "Diferenciación entre método como modo ordenado de actuar y técnica como procedimiento puntual.",
-            "year": "no especificado"
+            "year": null
           }
         ],
         "recommended_combinations": [

@@ -150,43 +150,43 @@ confidence_level: medio
 primary_sources:
   - title: "Guía de repaso y preparación de exámenes"
     author: "COIE-UNED"
-    year: no especificado
+    year: null
     source_type: guia_institucional
     url_or_reference: "Tipos de repaso, advertencias sobre empollar y valor de los repasos intermedios."
 
   - title: "Guía de metacognición sobre práctica espaciada y utilidad de técnicas"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Definición de práctica espaciada, diferencias frente a estudio masivo y síntesis comparativa de utilidad de técnicas."
 
   - title: "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje"
     author: "retrievalpractice.org / traducción Aptus"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Definición de práctica de recuperación, rol de la retroalimentación y metacognición."
 
   - title: "Cómo usar la práctica de recuperación espaciada para potenciar el aprendizaje"
     author: "retrievalpractice.org / traducción Aptus"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Relación explícita entre repetición espaciada y práctica de recuperación."
 
   - title: "Fascículo sobre técnica Feynman"
     author: "UnADM"
-    year: no especificado
+    year: null
     source_type: material_academico
     url_or_reference: "Explicación de la técnica Feynman y aclaración de que se usa para comprender, no para memorizar."
 
   - title: "Fascículo sobre estudio intercalado"
     author: "UnADM"
-    year: no especificado
+    year: null
     source_type: material_academico
     url_or_reference: "Definición de interleaving, prerrequisitos y necesidad de revisión."
 
   - title: "Técnica Pomodoro"
     author: "UAEH"
-    year: no especificado
+    year: null
     source_type: guia_institucional
     url_or_reference: "Definición, pasos, ventajas y límites de Pomodoro."
 
@@ -198,25 +198,25 @@ primary_sources:
 
   - title: "Concept maps"
     author: "IHMC"
-    year: no especificado
+    year: null
     source_type: documento_academico
     url_or_reference: "Características de mapas conceptuales: conceptos, enlaces, jerarquía y pregunta de enfoque."
 
   - title: "Estrategia: mapa conceptual"
     author: "UNED Costa Rica"
-    year: no especificado
+    year: null
     source_type: guia_institucional
     url_or_reference: "Pasos y rasgos de mapas conceptuales."
 
   - title: "Método Cornell"
     author: "Universidad de Chile"
-    year: no especificado
+    year: null
     source_type: guia_institucional
     url_or_reference: "Definición de Cornell y sus tres secciones."
 
   - title: "Mnemotecnia"
     author: "RAE y ANUIES"
-    year: no especificado
+    year: null
     source_type: definicion_y_guia
     url_or_reference: "Definición normativa y ejemplo de uso como estrategia de memoria."
 
@@ -301,7 +301,7 @@ Antes de usar esta matriz conviene tener:
 - Solo hay un cuello de botella muy puntual y claro.
 - No hay información mínima sobre la actividad o el objetivo.
 - Se necesita ejecución inmediata de una sola técnica ya seleccionada.
-- Contextos específicos de no uso por actividad, materia o perfil: no especificado.
+- No se registran contextos específicos adicionales de no uso por actividad, materia o perfil.
 
 ## 10. Tipo de estudiante o contexto al que más ayuda
 Esta matriz ayuda más cuando el estudiante o contexto muestra:
@@ -464,7 +464,7 @@ Priorizar:
 - añadir **Interleaving** si hay temas similares o procedimientos que se confunden.
 
 ### Si es proyecto
-- no especificado.
+- La matriz no define una combinación por defecto; seleccionar según objetivo, materia y entregable.
 
 ### Si es lectura
 - **Feynman + Mapas conceptuales** o **Cornell**
@@ -488,7 +488,7 @@ Priorizar:
 - especialmente útil para distinguir formas normales o clasificar casos similares.
 
 ### Programación
-- no especificado.
+- La matriz no define una combinación por defecto; elegir según si predomina comprensión conceptual, práctica de problemas o repaso.
 
 ### Sistemas operativos
 - **Feynman + Mapas conceptuales o Cornell + Active Recall + Repetición espaciada + Interleaving**
@@ -682,7 +682,7 @@ pero:
 - **included_techniques:** mapas_conceptuales, cornell, feynman, active_recall, repeticion_espaciada, interleaving, pomodoro, mnemotecnia
 - **component_techniques:** mapas_conceptuales, cornell, feynman, active_recall, repeticion_espaciada, interleaving, pomodoro, mnemotecnia
 - **optional_techniques:** pomodoro, mnemotecnia
-- **excluded_techniques:** no especificado
+- **excluded_techniques:** []
 - **primary_functions_covered:** comprension, sintesis, recuperacion, consolidacion, gestion_de_sesion, discriminacion, transferencia
 - **develops:** comprension_profunda, memorizacion, autoevaluacion, organizacion, gestion_del_tiempo, repaso, transferencia, resolucion_de_problemas, preparacion_de_examen
 - **requires_prior_knowledge:** true

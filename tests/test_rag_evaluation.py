@@ -56,6 +56,44 @@ def test_local_evaluation_runner_produces_grounded_metrics() -> None:
     assert all(case.source_chunks for case in report.cases)
 
 
+def test_local_evaluation_excludes_structured_metadata_noise() -> None:
+    cases = load_eval_cases(DEFAULT_EVAL_DATASET_PATH)
+    target = build_local_evaluation_target(
+        settings=RagSettings(
+            enabled=True,
+            embedding_provider="local_eval",
+            embedding_model="hash-bow",
+            embedding_dimensions=64,
+            top_k_vector=6,
+            top_k_lexical=6,
+            top_k_final=5,
+            min_score=0.0,
+        )
+    )
+
+    report = evaluate_cases(cases, target=target, dataset_path=Path("evals.jsonl"))
+
+    assert not [
+        chunk_id
+        for case in report.cases
+        for chunk_id in case.selected_chunk_ids
+        if "metadatos_de_recuperacion_sugeridos" in chunk_id
+    ]
+    metadata_terms = (
+        "metadatos de recuper",
+        "technique_id",
+        "method_id",
+        "matrix_id",
+        "objective_types",
+        "student_profile",
+    )
+    assert not [
+        case.eval_id
+        for case in report.cases
+        if any(term in case.answer.lower() for term in metadata_terms)
+    ]
+
+
 def test_disabled_fallback_check_uses_service_boundary() -> None:
     cases = load_eval_cases(DEFAULT_EVAL_DATASET_PATH)[:2]
 

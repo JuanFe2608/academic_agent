@@ -5,6 +5,7 @@ from .context_package import (
     build_grounded_prompt_context,
     clean_chunk_text,
     format_entity_name,
+    summarize_chunk_for_prompt,
 )
 from .grounded_answer import build_grounded_study_recommendation_result
 from .llm_answer import (
@@ -27,4 +28,5 @@ __all__ = [
     "render_grounded_answer_prompt",
     "render_fallback_answer",
     "render_grounded_answer",
+    "summarize_chunk_for_prompt",
 ]

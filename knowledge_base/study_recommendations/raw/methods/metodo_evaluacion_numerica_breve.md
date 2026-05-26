@@ -25,8 +25,7 @@ best_for_subject_types:
   - practica
   - mixta
 
-best_for_student_profiles:
-  - no especificado
+best_for_student_profiles: []
 
 best_for_signals:
   - relee_mucho
@@ -45,11 +44,9 @@ not_ideal_for_subject_types:
   - teorica
   - conceptual
 
-not_ideal_for_student_profiles:
-  - no especificado
+not_ideal_for_student_profiles: []
 
-not_ideal_for_signals:
-  - no especificado
+not_ideal_for_signals: []
 
 component_techniques:
   - ejemplos_resueltos
@@ -64,8 +61,7 @@ optional_techniques:
   - mnemotecnia
   - feynman
 
-excluded_techniques:
-  - no especificado
+excluded_techniques: []
 
 develops:
   - resolucion_de_problemas
@@ -120,37 +116,37 @@ confidence_level: medio
 primary_sources:
   - title: "Aprendizaje potenciado por la evaluación"
     author: "UNAM"
-    year: no especificado
+    year: null
     source_type: capitulo_universitario
     url_or_reference: "Pruebas de práctica, retroalimentación, frecuencia, ansiedad y aprendizaje por recuperación."
 
   - title: "Guía de preparación de exámenes"
     author: "UNED"
-    year: no especificado
+    year: null
     source_type: guia_universitaria
     url_or_reference: "Repaso inicial, intermedio y final; control del tiempo; familiarización con exámenes anteriores."
 
   - title: "Guía de metacognición"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Práctica distribuida y evaluación de la práctica como técnicas de alta utilidad."
 
   - title: "Cómo utilizar la práctica de recuperación para mejorar el aprendizaje"
     author: "retrievalpractice.org / traducción al español"
-    year: no especificado
+    year: null
     source_type: guia_basada_en_investigacion
     url_or_reference: "Recuperación como estrategia de aprendizaje y necesidad de retroalimentación."
 
   - title: "Artículo en español sobre efecto del ejemplo resuelto y teoría de carga cognitiva"
-    author: "no especificado"
-    year: no especificado
+    author: null
+    year: null
     source_type: articulo_academico
     url_or_reference: "Ejemplos resueltos para reducir carga cognitiva en tareas procedimentales."
 
   - title: "Guía didáctica sobre estudio intercalado"
-    author: "no especificado"
-    year: no especificado
+    author: null
+    year: null
     source_type: guia_didactica
     url_or_reference: "Intercalado, discriminación entre tipos de ejercicios y revisión obligatoria."
 
@@ -229,10 +225,10 @@ Antes de aplicar el método conviene contar con:
 - El contenido no depende de cálculo, procedimiento o selección rápida de estrategia.
 - No hay problemas tipo ni posibilidad de corregir.
 - La necesidad principal no es ejecutar, sino comprender desde cero un tema no procedural.
-- Perfil de señal no ideal: **no especificado**.
+- No se define una señal no ideal adicional; la decisión depende de actividad, tipo de contenido y disponibilidad de problemas corregibles.
 
 ## 10. Tipo de estudiante al que suele ayudar
-Perfil ideal en vocabulario controlado: **no especificado**.
+No hay un perfil ideal cerrado en vocabulario controlado.
 
 En términos descriptivos, suele ayudar a estudiantes que:
 - fallan al pasar de observar a ejecutar,
@@ -375,7 +371,7 @@ Con **14+ días**:
 - Mezclar tipos de ejercicio si el parcial lo exige.
 
 ### Si es proyecto
-- No especificado como uso principal.
+- No es un uso principal del método; solo aplicaría si el proyecto exige resolver ejercicios numéricos o procedimentales.
 
 ### Si es lectura
 - No es el encaje principal del método.
@@ -501,7 +497,7 @@ La confianza es **medio** porque:
 - el núcleo del método está bien respaldado,
 - varias piezas convergen en la misma lógica,
 - pero la aplicación exacta a “evaluación numérica breve” en ingeniería de sistemas no aparece como protocolo cerrado único en las fuentes,
-- y algunas adaptaciones específicas quedan como **no especificado**.
+- y algunas adaptaciones específicas quedan como inferencias contextuales, no como reglas cerradas.
 
 ## 37. Recomendación operativa para el agente
 Usar este método cuando el estudiante tenga un **quiz** o **parcial** breve con ejercicios **numerica**, **practica** o **mixta**, disponga de problemas tipo y feedback, y muestre señales como **relee_mucho**, **no_se_autoevalua**, **olvida_rapido**, **confunde_tipos_de_ejercicio** o **siente_familiaridad_pero_no_recuerda**.
@@ -517,7 +513,7 @@ El método de evaluación numérica breve está diseñado para estudiantes que e
 - **objective_types:** resolucion_de_problemas, preparacion_de_examen, autoevaluacion, repaso, gestion_del_tiempo
 - **activity_types:** quiz, parcial, resolucion_de_problemas
 - **subject_types:** numerica, practica, mixta
-- **student_profiles:** no especificado
+- **student_profiles:** []
 - **signals:** relee_mucho, no_se_autoevalua, olvida_rapido, confunde_tipos_de_ejercicio, siente_familiaridad_pero_no_recuerda, necesita_estructura
 - **component_techniques:** ejemplos_resueltos, practica_de_recuperacion, repeticion_espaciada, interleaving, simulacion_cronometrada, revision_de_examenes_anteriores
 - **optional_techniques:** pomodoro, mnemotecnia, feynman

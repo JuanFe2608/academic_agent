@@ -6,11 +6,18 @@ import hashlib
 import re
 from dataclasses import dataclass
 
-from schemas.rag import NormalizedRagDocument, RagChunk, RagChunkKind
+from schemas.rag import (
+    DEFAULT_RAG_RETRIEVAL_ROLE,
+    NormalizedRagDocument,
+    RagChunk,
+    RagChunkKind,
+    RagRetrievalRole,
+)
 
 from .normalization import slugify_identifier
 
 _SECTION_RE = re.compile(r"^##\s+(?P<title>.+)$", re.MULTILINE)
+_STRUCTURED_METADATA_SECTION = "metadatos_de_recuperacion_sugeridos"
 
 
 @dataclass(frozen=True)
@@ -25,17 +32,22 @@ class MarkdownSection:
 def chunk_document(document: NormalizedRagDocument) -> list[RagChunk]:
     """Build stable section-level chunks from a normalized document."""
 
+    sections = [
+        section
+        for section in split_h2_sections(document.body)
+        if section.content.strip()
+    ]
+    chunk_ids = [
+        _build_chunk_id(document.document_id, section.position, section.title)
+        for section in sections
+    ]
+    document_section_count = len(sections)
     chunks: list[RagChunk] = []
-    for idx, section in enumerate(split_h2_sections(document.body)):
+    for idx, section in enumerate(sections):
         content = section.content.strip()
-        if not content:
-            continue
-        if idx > 0 and chunks:
-            overlap = _last_sentences(chunks[-1].content, n=2)
-            if overlap:
-                content = overlap + "\n\n" + content
         chunk_kind = infer_chunk_kind(section.title, document.knowledge_type, content)
-        chunk_id = _build_chunk_id(document.document_id, section.position, section.title)
+        retrieval_role = infer_retrieval_role(section.title, chunk_kind)
+        chunk_id = chunk_ids[idx]
         chunks.append(
             RagChunk(
                 chunk_id=chunk_id,
@@ -46,8 +58,10 @@ def chunk_document(document: NormalizedRagDocument) -> list[RagChunk]:
                 section_title=section.title,
                 heading_path=[document.title, section.title],
                 chunk_kind=chunk_kind,
+                retrieval_role=retrieval_role,
                 content=content,
                 metadata={
+                    **_retrieval_role_metadata(retrieval_role),
                     "source_path": document.metadata.source_path,
                     "evidence_level": document.metadata.normalized_metadata.get(
                         "evidence_level"
@@ -73,6 +87,14 @@ def chunk_document(document: NormalizedRagDocument) -> list[RagChunk]:
                     "not_ideal_for_signals": document.metadata.normalized_metadata.get(
                         "not_ideal_for_signals_normalized", []
                     ),
+                    "previous_chunk_id": chunk_ids[idx - 1] if idx > 0 else None,
+                    "next_chunk_id": (
+                        chunk_ids[idx + 1]
+                        if idx + 1 < document_section_count
+                        else None
+                    ),
+                    "section_index": idx + 1,
+                    "document_section_count": document_section_count,
                 },
                 position_in_document=section.position,
                 token_estimate=estimate_tokens(content),
@@ -115,6 +137,8 @@ def infer_chunk_kind(
     title = slugify_identifier(section_title)
     body_has_table = any(line.lstrip().startswith("|") for line in content.splitlines())
 
+    if _is_structured_metadata_section(title):
+        return "metadata"
     if "respuesta_corta_reusable_para_rag" in title or "respuesta_larga_reusable_para_rag" in title:
         return "answer_ready"
     if "definicion" in title:
@@ -159,17 +183,33 @@ def infer_chunk_kind(
     return "agent_guidance"
 
 
+def infer_retrieval_role(
+    section_title: str,
+    chunk_kind: RagChunkKind,
+) -> RagRetrievalRole:
+    title = slugify_identifier(section_title)
+    if chunk_kind == "metadata" or _is_structured_metadata_section(title):
+        return "structured_metadata"
+    return DEFAULT_RAG_RETRIEVAL_ROLE
+
+
 def estimate_tokens(text: str) -> int:
     """Estimate tokens cheaply for deterministic manifests."""
 
     return max(1, round(len(re.findall(r"\S+", text)) * 1.3))
 
 
-def _last_sentences(text: str, *, n: int = 2) -> str:
-    """Extrae las últimas n oraciones de un bloque de texto para usar como overlap."""
+def _retrieval_role_metadata(role: RagRetrievalRole) -> dict[str, object]:
+    return {
+        "retrieval_role": role,
+        "semantic_retrieval_enabled": role == "answerable",
+        "prompt_context_enabled": role in {"answerable", "supporting_context"},
+        "embedding_enabled": role == "answerable",
+    }
 
-    sentences = [s.strip() for s in re.split(r"(?<=[.!?])\s+", text.strip()) if s.strip()]
-    return " ".join(sentences[-n:]) if sentences else ""
+
+def _is_structured_metadata_section(slugified_title: str) -> bool:
+    return _STRUCTURED_METADATA_SECTION in slugified_title
 
 
 def _build_chunk_id(document_id: str, position: int, section_title: str) -> str:
@@ -182,5 +222,6 @@ __all__ = [
     "chunk_document",
     "estimate_tokens",
     "infer_chunk_kind",
+    "infer_retrieval_role",
     "split_h2_sections",
 ]

@@ -111,31 +111,31 @@ confidence_level: medio
 primary_sources:
   - title: "Guías de técnicas de estudio sobre repaso planificado"
     author: "Universidad de Extremadura y COIE-UNED"
-    year: no especificado
+    year: null
     source_type: guia_universitaria
     url_or_reference: "Repaso espaciado, curva del olvido, calendario de repaso y función del repaso planificado."
 
   - title: "Metacognición y aprendizaje"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Práctica distribuida y evaluación de la práctica como estrategias de alta efectividad."
 
   - title: "Aprendizaje potenciado por la evaluación"
     author: "UNAM"
-    year: no especificado
+    year: null
     source_type: capitulo_universitario
     url_or_reference: "Recuperación activa, quizzes y retroalimentación para favorecer retención."
 
   - title: "Estudio piloto sobre repetición espaciada con Anki"
-    author: "no especificado"
-    year: no especificado
+    author: null
+    year: null
     source_type: estudio_piloto
     url_or_reference: "Mejora de calificaciones en usuarios de sistemas de repetición espaciada."
 
   - title: "Definiciones de método y técnica"
     author: "RAE"
-    year: no especificado
+    year: null
     source_type: diccionario
     url_or_reference: "Diferenciación entre método como modo ordenado de actuar y técnica como procedimiento puntual."
 

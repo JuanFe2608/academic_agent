@@ -227,6 +227,8 @@ def normalize_signals(values: Iterable[object]) -> list[str]:
 
     normalized: list[str] = []
     for value in values:
+        if _is_placeholder_value(value):
+            continue
         slug = slugify_identifier(str(value))
         normalized.extend(SIGNAL_ALIASES.get(slug, [slug]))
     return _unique_strings(normalized)
@@ -281,12 +283,18 @@ def _as_list(value: object) -> list[object]:
     if value is None:
         return []
     if isinstance(value, list):
-        return list(value)
+        return [item for item in value if not _is_placeholder_value(item)]
     if isinstance(value, tuple):
-        return list(value)
-    if str(value).strip() in {"", "no especificado", "no aplica"}:
+        return [item for item in value if not _is_placeholder_value(item)]
+    if _is_placeholder_value(value):
         return []
     return [value]
+
+
+def _is_placeholder_value(value: object) -> bool:
+    if not isinstance(value, str):
+        return False
+    return slugify_identifier(value) in {"", "no_especificado", "no_aplica"}
 
 
 def _unique_strings(values: Iterable[str]) -> list[str]:

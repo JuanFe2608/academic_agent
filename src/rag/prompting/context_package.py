@@ -149,6 +149,38 @@ def clean_chunk_text(text: str, *, max_chars: int = 900) -> str:
     return _shorten(cleaned, max_chars=max_chars)
 
 
+def summarize_chunk_for_prompt(chunk: RagRetrievedChunk, *, max_chars: int = 900) -> str:
+    """Return chunk text plus runtime neighbor context for prompt assembly."""
+
+    context_budget = max(40, min(140, max_chars // 5))
+    before = _runtime_context_excerpt(
+        chunk.metadata.get("prompt_context_before"),
+        max_chars=context_budget,
+    )
+    after = _runtime_context_excerpt(
+        chunk.metadata.get("prompt_context_after"),
+        max_chars=context_budget,
+    )
+    section_budget = max(
+        120,
+        max_chars
+        - len(before)
+        - len(after)
+        - (80 if before or after else 0),
+    )
+    section = clean_chunk_text(chunk.content, max_chars=section_budget)
+    if not before and not after:
+        return section
+
+    parts: list[str] = []
+    if before:
+        parts.append(f"Contexto anterior: {before}")
+    parts.append(f"Seccion principal: {section}")
+    if after:
+        parts.append(f"Contexto siguiente: {after}")
+    return _shorten(" ".join(parts), max_chars=max_chars)
+
+
 def _select_primary_chunk(package: GroundedContextPackage) -> RagRetrievedChunk | None:
     chunks = package.selected_chunks
     if not chunks:
@@ -206,7 +238,20 @@ def _supporting_facts(
 def _chunk_summary(chunk: RagRetrievedChunk | None, *, max_chars: int) -> str:
     if chunk is None:
         return ""
-    return clean_chunk_text(chunk.content, max_chars=max_chars)
+    return summarize_chunk_for_prompt(chunk, max_chars=max_chars)
+
+
+def _runtime_context_excerpt(value: object, *, max_chars: int) -> str:
+    if not isinstance(value, dict):
+        return ""
+    content = str(value.get("content") or "").strip()
+    if not content:
+        return ""
+    title = str(value.get("section_title") or "").strip()
+    excerpt = clean_chunk_text(content, max_chars=max_chars)
+    if title:
+        return _shorten(f"{title}: {excerpt}", max_chars=max_chars)
+    return excerpt
 
 
 def _extract_cautions(
@@ -438,4 +483,5 @@ __all__ = [
     "build_grounded_prompt_context",
     "clean_chunk_text",
     "format_entity_name",
+    "summarize_chunk_for_prompt",
 ]

@@ -62,6 +62,7 @@ class RagRetrievedChunk:
     content: str
     metadata: dict[str, object]
     token_estimate: int
+    retrieval_role: str = "answerable"
     semantic_score: float = 0.0
     lexical_score: float = 0.0
     metadata_score: float = 0.0

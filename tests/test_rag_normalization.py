@@ -43,8 +43,29 @@ def test_signal_aliases_are_normalized_to_radar_weakness_tags() -> None:
     ]
 
 
+def test_placeholder_signals_are_removed_instead_of_indexed() -> None:
+    assert normalize_signals(["no especificado", "no aplica", ""]) == []
+
+
 def test_combination_entries_normalize_known_technique_aliases() -> None:
     assert normalize_technique_id("practica_de_recuperacion") == "active_recall"
     assert normalize_combination_entry(
         "practica_de_recuperacion + repeticion_espaciada"
     ) == ["active_recall", "repeticion_espaciada"]
+
+
+def test_corpus_metadata_does_not_index_placeholder_signals() -> None:
+    result = build_rag_corpus()
+
+    for document in result.documents:
+        normalized = document.metadata.normalized_metadata
+        assert "no_especificado" not in normalized.get("best_for_signals_normalized", [])
+        assert "no_especificado" not in normalized.get("not_ideal_for_signals_normalized", [])
+
+
+def test_corpus_chunks_do_not_contain_placeholder_phrases() -> None:
+    result = build_rag_corpus()
+
+    for chunk in result.chunks:
+        assert "no especificado" not in chunk.content.lower()
+        assert "no_especificado" not in chunk.content.lower()

@@ -97,8 +97,7 @@ recommended_combinations:
   - reglas de recomendacion del agente
   - ejemplos aplicados por materia
 
-contraindicated_combinations:
-  - no especificado
+contraindicated_combinations: []
 
 evidence_level: mixto
 confidence_level: medio
@@ -106,25 +105,25 @@ confidence_level: medio
 primary_sources:
   - title: "Diccionario académico: técnica"
     author: "Real Academia Española"
-    year: no especificado
+    year: null
     source_type: diccionario
     url_or_reference: "Definición general de técnica como conjunto de reglas y procedimientos."
 
   - title: "Diccionario académico: método"
     author: "Real Academia Española"
-    year: no especificado
+    year: null
     source_type: diccionario
     url_or_reference: "Definición general de método como modo ordenado de actuar."
 
   - title: "Definición didáctica de método y técnica"
     author: "Centro Virtual Cervantes"
-    year: no especificado
+    year: null
     source_type: marco_didactico
     url_or_reference: "Método como conjunto de procedimientos desde un enfoque; técnica como uso de procedimientos para un objetivo preciso."
 
   - title: "Técnicas de estudio"
     author: "COIE-UNED"
-    year: no especificado
+    year: null
     source_type: guia_institucional
     url_or_reference: "Guía institucional sobre selección y adaptación de técnicas de estudio; incluye técnicas de síntesis y referencia a SQ3R."
 
@@ -136,19 +135,19 @@ primary_sources:
 
   - title: "Documento académico sobre técnicas, estrategias y método de estudio"
     author: "UNAD"
-    year: no especificado
+    year: null
     source_type: material_academico
     url_or_reference: "Relación entre técnicas, estrategias y definición de un método propio de estudio."
 
   - title: "Guía sobre práctica espaciada"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Definición operativa de práctica espaciada frente a práctica masiva."
 
   - title: "Aprendizaje potenciado por la evaluación"
     author: "UNAM"
-    year: no especificado
+    year: null
     source_type: capitulo_universitario
     url_or_reference: "Recuperación mediante pruebas y su relación con retención a largo plazo."
 
@@ -229,7 +228,7 @@ Para aprovechar este marco conviene contar con:
 - Cuando ya existe un método operativo definido y solo falta ejecutarlo.
 - Cuando la tarea requiere un paso a paso práctico inmediato.
 - Cuando la necesidad no es conceptual sino de implementación concreta.
-- Contraindicaciones específicas adicionales: no especificado.
+- No se definen contraindicaciones adicionales más allá de los límites conceptuales anteriores.
 
 ## 10. Tipo de estudiante o contexto al que más ayuda indirectamente
 Ayuda indirectamente sobre todo cuando el agente atiende casos de:
@@ -418,19 +417,19 @@ pero:
 - **best_for_subject_types:** teorica, conceptual, mixta
 - **best_for_student_profiles:** desorganizado, procrastinador, orientado_a_memoria, orientado_a_comprension
 - **best_for_signals:** olvida_rapido, se_distrae_facil, no_puede_explicar, procrastina, necesita_estructura
-- **not_ideal_for_activity_types:** no especificado
-- **not_ideal_for_subject_types:** no especificado
-- **not_ideal_for_student_profiles:** no especificado
-- **not_ideal_for_signals:** no especificado
+- **not_ideal_for_activity_types:** []
+- **not_ideal_for_subject_types:** []
+- **not_ideal_for_student_profiles:** []
+- **not_ideal_for_signals:** []
 - **requires_prior_knowledge:** true
 - **requires_feedback:** false
 - **requires_schedule_planning:** false
-- **requires_materials:** no especificado
+- **requires_materials:** []
 - **adaptation_variables:** alcance_del_problema, necesidad_de_secuencia, numero_de_tecnicas_implicadas, necesidad_de_planificacion, grado_de_desorganizacion_del_estudiante
 - **works_best_alone:** false
 - **works_best_combined:** true
 - **recommended_combinations:** tecnicas documentadas por separado, metodos documentados por separado, reglas de recomendacion del agente, ejemplos aplicados por materia
-- **contraindicated_combinations:** no especificado
+- **contraindicated_combinations:** []
 - **component_techniques:** no aplica
 - **optional_techniques:** no aplica
 - **excluded_techniques:** no aplica

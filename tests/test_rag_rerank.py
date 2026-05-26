@@ -23,6 +23,27 @@ def test_merge_search_results_combines_vector_and_lexical_hits() -> None:
     assert merged[0].retrieval_sources == ("vector", "lexical")
 
 
+def test_rerank_preserves_retrieval_role_from_search_result() -> None:
+    candidates = merge_search_results(
+        vector_results=[],
+        lexical_results=[
+            _search_result(
+                "chunk-context",
+                retrieval_role="supporting_context",
+            )
+        ],
+    )
+    query = StudyRecommendationQuery(query_text="Como estudio mejor?")
+
+    ranked = rerank_candidates(
+        candidates=candidates,
+        query=query,
+        understanding=understand_query(query),
+    )
+
+    assert ranked[0].retrieval_role == "supporting_context"
+
+
 def test_rerank_boosts_entity_signal_activity_and_answer_ready_chunks() -> None:
     query = StudyRecommendationQuery(
         query_text="Me distraigo y procrastino, que tecnica me conviene?",
@@ -104,6 +125,7 @@ def _search_result(
     *,
     entity_id: str = "pomodoro",
     chunk_kind: str = "answer_ready",
+    retrieval_role: str = "answerable",
     semantic_score: float = 0.0,
     lexical_score: float = 0.0,
     metadata: dict[str, object] | None = None,
@@ -116,6 +138,7 @@ def _search_result(
         entity_id=entity_id,
         section_title="Respuesta corta reusable para RAG",
         chunk_kind=chunk_kind,
+        retrieval_role=retrieval_role,
         content="Contenido de prueba",
         metadata=metadata or {},
         token_estimate=20,

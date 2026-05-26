@@ -3,6 +3,8 @@
 Este directorio contiene evaluaciones curadas para el RAG de recomendaciones de estudio.
 
 - `study_recommendation_eval_dataset.jsonl`: dataset versionable con casos esperados.
+- `baselines/`: lineas base versionables para comparar cambios grandes de
+  retrieval, chunking o prompting.
 - `reports/`: salidas generadas por `scripts/evaluate_rag.py`; no debe versionarse.
 
 Comandos utiles:

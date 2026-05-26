@@ -29,7 +29,23 @@ RagChunkKind = Literal[
     "answer_ready",
     "comparison",
     "matrix",
+    "metadata",
 ]
+
+RagRetrievalRole = Literal[
+    "answerable",
+    "supporting_context",
+    "structured_metadata",
+]
+
+DEFAULT_RAG_RETRIEVAL_ROLE: RagRetrievalRole = "answerable"
+RAG_RETRIEVAL_ROLES = frozenset(
+    {
+        "answerable",
+        "supporting_context",
+        "structured_metadata",
+    }
+)
 
 RagRelationType = Literal[
     "recommended_with",
@@ -97,6 +113,7 @@ class RagChunk(BaseSchemaModel):
     section_title: str
     heading_path: list[str] = Field(default_factory=list)
     chunk_kind: RagChunkKind
+    retrieval_role: RagRetrievalRole = "answerable"
     content: str
     metadata: dict[str, object] = Field(default_factory=dict)
     position_in_document: int
@@ -165,7 +182,9 @@ class StudyRecommendationResult(BaseSchemaModel):
 
 
 __all__ = [
+    "DEFAULT_RAG_RETRIEVAL_ROLE",
     "NormalizedRagDocument",
+    "RAG_RETRIEVAL_ROLES",
     "RagChunk",
     "RagChunkKind",
     "RagCorpusBuildResult",
@@ -174,6 +193,7 @@ __all__ = [
     "RagKnowledgeType",
     "RagRelation",
     "RagRelationType",
+    "RagRetrievalRole",
     "RagValidationIssue",
     "StudyRecommendationQuery",
     "StudyRecommendationResult",

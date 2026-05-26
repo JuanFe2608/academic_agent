@@ -11,6 +11,7 @@ from schemas.rag import (
     RagCorpusBuildResult,
     RagDocumentMetadata,
     RagRelation,
+    RagRetrievalRole,
     RagValidationIssue,
 )
 
@@ -33,5 +34,6 @@ __all__ = [
     "RagCorpusBuildResult",
     "RagDocumentMetadata",
     "RagRelation",
+    "RagRetrievalRole",
     "RagValidationIssue",
 ]

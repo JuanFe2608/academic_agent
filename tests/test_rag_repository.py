@@ -115,6 +115,100 @@ def test_in_memory_rag_repository_clears_embedding_when_chunk_changes() -> None:
     assert repository._chunks[chunk.chunk_id]["embedding"] is None
 
 
+def test_in_memory_rag_repository_clears_and_skips_disabled_chunk_embeddings() -> None:
+    result = build_rag_corpus()
+    metadata_chunk = next(
+        chunk
+        for chunk in result.chunks
+        if "metadatos_de_recuperacion_sugeridos" in chunk.chunk_id
+    )
+    document = next(
+        document
+        for document in result.documents
+        if document.document_id == metadata_chunk.document_id
+    )
+    repository = InMemoryRagRepository()
+    repository.sync_corpus_snapshot(
+        corpus_name=CORPUS_NAME,
+        corpus_version=CORPUS_VERSION,
+        source_root="knowledge_base/study_recommendations",
+        documents=[document],
+        chunks=[metadata_chunk],
+        relations=[],
+        run_id="disabled-embedding-before",
+    )
+    repository._chunks[metadata_chunk.chunk_id]["embedding"] = [0.1, 0.2, 0.3]
+
+    repository.sync_corpus_snapshot(
+        corpus_name=CORPUS_NAME,
+        corpus_version=CORPUS_VERSION,
+        source_root="knowledge_base/study_recommendations",
+        documents=[document],
+        chunks=[metadata_chunk],
+        relations=[],
+        run_id="disabled-embedding-after",
+    )
+    updated = repository.update_chunk_embeddings(
+        [
+            RagEmbeddingUpdate(
+                chunk_id=metadata_chunk.chunk_id,
+                checksum=metadata_chunk.checksum,
+                embedding=[0.1, 0.2, 0.3],
+                provider="fake",
+                model="fake-model",
+                dimensions=3,
+            )
+        ]
+    )
+
+    assert repository._chunks[metadata_chunk.chunk_id]["embedding"] is None
+    assert repository.list_chunks_missing_embeddings(limit=10) == []
+    assert updated == 0
+
+
+def test_in_memory_rag_repository_excludes_structured_metadata_from_normal_search() -> None:
+    result = build_rag_corpus()
+    metadata_chunk = next(
+        chunk
+        for chunk in result.chunks
+        if "metadatos_de_recuperacion_sugeridos" in chunk.chunk_id
+    )
+    document = next(
+        document
+        for document in result.documents
+        if document.document_id == metadata_chunk.document_id
+    )
+    repository = InMemoryRagRepository()
+    repository.sync_corpus_snapshot(
+        corpus_name=CORPUS_NAME,
+        corpus_version=CORPUS_VERSION,
+        source_root="knowledge_base/study_recommendations",
+        documents=[document],
+        chunks=[metadata_chunk],
+        relations=[],
+        run_id="metadata-search-test",
+    )
+    repository._chunks[metadata_chunk.chunk_id]["embedding"] = [1.0, 0.0, 0.0]
+
+    lexical_results = repository.search_chunks_lexical(
+        query_text="technique_id objective_types",
+        filters={"document_ids": [metadata_chunk.document_id]},
+        limit=10,
+    )
+    vector_results = repository.search_chunks_vector(
+        query_embedding=[1.0, 0.0, 0.0],
+        filters={"document_ids": [metadata_chunk.document_id]},
+        limit=10,
+    )
+
+    assert lexical_results == []
+    assert vector_results == []
+    assert (
+        repository.get_chunks_by_ids(chunk_ids=[metadata_chunk.chunk_id])[0].chunk_id
+        == metadata_chunk.chunk_id
+    )
+
+
 class _FakeResult:
     def __init__(self, row=None, *, rows=None, rowcount=0):
         self._row = row
@@ -190,6 +284,11 @@ def test_postgres_rag_repository_upserts_documents_chunks_and_relations() -> Non
         for query, _ in connection.executed
     )
     assert any(
+        "metadata_json->>'embedding_enabled'" in query
+        and "EXCLUDED.chunk_kind = 'metadata'" in query
+        for query, _ in connection.executed
+    )
+    assert any(
         "DELETE FROM rag.documents" in query for query, _ in connection.executed
     )
     assert any(
@@ -224,14 +323,29 @@ def test_postgres_rag_repository_lists_and_updates_missing_embeddings() -> None:
     assert any(
         "WHERE embedding IS NULL" in query for query, _ in connection.executed
     )
+    assert any(
+        "metadata_json->>'embedding_enabled'" in query
+        and "metadata_json->>'retrieval_role'" in query
+        and "chunk_kind <> 'metadata'" in query
+        for query, _ in connection.executed
+        if "SELECT chunk_id, content, checksum, token_estimate" in query
+    )
     update_params = [
         params
         for query, params in connection.executed
         if "UPDATE rag.chunks" in query and "SET embedding" in query
     ][0]
+    update_query = [
+        query
+        for query, _ in connection.executed
+        if "UPDATE rag.chunks" in query and "SET embedding" in query
+    ][0]
     assert update_params[0] == "[0.1,0.2,0.3]"
     assert update_params[2] == "chunk-1"
     assert update_params[3] == "b" * 64
+    assert "metadata_json->>'embedding_enabled'" in update_query
+    assert "metadata_json->>'retrieval_role'" in update_query
+    assert "chunk_kind <> 'metadata'" in update_query
 
 
 def test_postgres_rag_repository_orders_lexical_filter_params_after_select_params() -> None:
@@ -250,6 +364,11 @@ def test_postgres_rag_repository_orders_lexical_filter_params_after_select_param
         for query, params in connection.executed
         if "websearch_to_tsquery" in query
     ][0]
+    lexical_query = [
+        query
+        for query, _ in connection.executed
+        if "websearch_to_tsquery" in query
+    ][0]
     assert lexical_params == (
         "Pomodoro",
         "%Pomodoro%",
@@ -260,6 +379,9 @@ def test_postgres_rag_repository_orders_lexical_filter_params_after_select_param
         "%Pomodoro%",
         5,
     )
+    assert "metadata_json->>'retrieval_role'" in lexical_query
+    assert "metadata_json->>'semantic_retrieval_enabled'" in lexical_query
+    assert "c.chunk_kind <> 'metadata'" in lexical_query
 
 
 def test_rag_migration_defines_schema_tables_fts_and_vector_index() -> None:

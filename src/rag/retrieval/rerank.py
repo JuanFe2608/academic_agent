@@ -340,6 +340,7 @@ def _from_search_result(
         content=result.content,
         metadata=dict(result.metadata),
         token_estimate=result.token_estimate,
+        retrieval_role=result.retrieval_role,
         semantic_score=semantic_score,
         lexical_score=lexical_score,
         retrieval_sources=(source,),

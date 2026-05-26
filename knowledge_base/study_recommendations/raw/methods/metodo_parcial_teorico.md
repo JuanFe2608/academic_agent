@@ -53,11 +53,9 @@ not_ideal_for_subject_types:
   - numerica
   - practica
 
-not_ideal_for_student_profiles:
-  - no especificado
+not_ideal_for_student_profiles: []
 
-not_ideal_for_signals:
-  - no especificado
+not_ideal_for_signals: []
 
 component_techniques:
   - analisis_de_examenes_anteriores
@@ -139,31 +137,31 @@ confidence_level: medio
 primary_sources:
   - title: "Preparación de exámenes en la UNED"
     author: "UNED"
-    year: no especificado
+    year: null
     source_type: guia_universitaria
     url_or_reference: "Guía universitaria sobre análisis de exámenes anteriores, calendario de repaso y diferencias entre repaso sistemático y empolle."
 
   - title: "Aprendizaje potenciado por la evaluación"
     author: "UNAM"
-    year: no especificado
+    year: null
     source_type: capitulo_universitario
     url_or_reference: "Capítulo universitario sobre recuperación activa, retroalimentación, práctica distribuida, cuestionarios y reducción de ansiedad con pruebas de bajo riesgo."
 
   - title: "Metacognición y aprendizaje"
     author: "EduCaixa"
-    year: no especificado
+    year: null
     source_type: guia_educativa
     url_or_reference: "Síntesis en español donde evaluación de la práctica y práctica distribuida se clasifican como estrategias de alta utilidad."
 
   - title: "Definiciones de método y técnica"
     author: "Centro Virtual Cervantes y RAE"
-    year: no especificado
+    year: null
     source_type: referencia_conceptual
     url_or_reference: "Definiciones didácticas y lingüísticas usadas para distinguir método de técnica."
 
   - title: "Técnica Feynman e intercalado"
     author: "UnADM"
-    year: no especificado
+    year: null
     source_type: fasciculos_didacticos
     url_or_reference: "Materiales sobre explicación simple para comprender e intercalado para discriminación entre temas similares."
 
@@ -242,7 +240,7 @@ Antes de aplicar el método conviene contar con:
 - **siente_familiaridad_pero_no_recuerda**.
 
 ## 9. Señales de que no conviene
-- **no especificado**.
+- No hay señales no ideales adicionales definidas; los límites principales están en tipo de actividad y materia.
 
 ## 10. Tipo de estudiante al que suele ayudar
 Suele ayudar especialmente a:
