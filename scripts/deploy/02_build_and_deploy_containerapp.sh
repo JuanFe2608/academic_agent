@@ -53,6 +53,7 @@ command -v az >/dev/null 2>&1 || fail "Azure CLI no esta instalado o no esta en 
 az account show >/dev/null 2>&1 || fail "Azure CLI no tiene sesion activa. Ejecuta: az login"
 
 IMAGE_REF="$AZ_ACR_NAME.azurecr.io/$AZ_IMAGE_NAME:$AZ_IMAGE_TAG"
+AZ_BUILD_MODE="${AZ_BUILD_MODE:-acr}"
 
 info "== Preparando extensiones Azure CLI =="
 az extension add --name containerapp --upgrade >/dev/null
@@ -84,11 +85,33 @@ az containerapp env create \
   --location "$AZ_LOCATION" \
   >/dev/null
 
-info "== Construyendo imagen en ACR: $IMAGE_REF =="
-az acr build \
-  --registry "$AZ_ACR_NAME" \
-  --image "$AZ_IMAGE_NAME:$AZ_IMAGE_TAG" \
-  "$ROOT_DIR"
+case "${AZ_BUILD_MODE,,}" in
+  acr|cloud|remote)
+    info "== Construyendo imagen en ACR: $IMAGE_REF =="
+    az acr build \
+      --registry "$AZ_ACR_NAME" \
+      --image "$AZ_IMAGE_NAME:$AZ_IMAGE_TAG" \
+      "$ROOT_DIR"
+    ;;
+  local|docker)
+    command -v docker >/dev/null 2>&1 || fail "Docker no esta instalado o no esta en PATH"
+
+    info "== Autenticando Docker contra ACR: $AZ_ACR_NAME =="
+    az acr login --name "$AZ_ACR_NAME" >/dev/null
+
+    info "== Construyendo imagen local: $IMAGE_REF =="
+    docker build -t "$IMAGE_REF" "$ROOT_DIR"
+
+    info "== Subiendo imagen a ACR: $IMAGE_REF =="
+    docker push "$IMAGE_REF"
+    ;;
+  skip|existing)
+    info "== Usando imagen existente en ACR: $IMAGE_REF =="
+    ;;
+  *)
+    fail "AZ_BUILD_MODE debe ser acr, cloud, remote, local, docker, skip o existing"
+    ;;
+esac
 
 info "== Obteniendo credenciales ACR =="
 ACR_PASSWORD="$(az acr credential show --name "$AZ_ACR_NAME" --query 'passwords[0].value' -o tsv)"
