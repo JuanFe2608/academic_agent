@@ -36,6 +36,12 @@ from .outlook_fixed_schedule_reconciliation_service import (
     OutlookFixedScheduleReconciliationService,
     build_outlook_fixed_schedule_reconciliation_service,
 )
+from .outlook_study_calendar_reconciliation_service import (
+    OutlookStudyCalendarReconciliationFinding,
+    OutlookStudyCalendarReconciliationResult,
+    OutlookStudyCalendarReconciliationService,
+    build_outlook_study_calendar_reconciliation_service,
+)
 from .outlook_fixed_schedule_repair_service import (
     OutlookFixedScheduleRepairResult,
     OutlookFixedScheduleRepairService,
@@ -56,6 +62,9 @@ __all__ = [
     "OutlookFixedScheduleReconciliationFinding",
     "OutlookFixedScheduleReconciliationResult",
     "OutlookFixedScheduleReconciliationService",
+    "OutlookStudyCalendarReconciliationFinding",
+    "OutlookStudyCalendarReconciliationResult",
+    "OutlookStudyCalendarReconciliationService",
     "OutlookFixedScheduleRepairResult",
     "OutlookFixedScheduleRepairService",
     "OutlookFixedScheduleSyncResult",
@@ -67,6 +76,7 @@ __all__ = [
     "is_study_todo_sync_message",
     "build_outlook_calendar_sync_service",
     "build_outlook_fixed_schedule_reconciliation_service",
+    "build_outlook_study_calendar_reconciliation_service",
     "build_outlook_fixed_schedule_repair_service",
     "build_outlook_fixed_schedule_sync_service",
     "is_microsoft_oauth_required",

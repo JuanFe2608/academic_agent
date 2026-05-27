@@ -87,6 +87,29 @@ class OutlookCalendarSyncService:
         )
         self.client = client or GraphOutlookCalendarClient()
 
+    def reconcile_student_calendar(
+        self,
+        *,
+        student_id: int | None,
+        calendar_id: str | None = None,
+        study_plan_profile_id: int | None = None,
+    ):
+        """Detecta cambios manuales en Outlook sin sobrescribirlos."""
+        from services.sync.outlook_study_calendar_reconciliation_service import (
+            OutlookStudyCalendarReconciliationService,
+        )
+
+        return OutlookStudyCalendarReconciliationService(
+            repository=self.repository,
+            state_repository=self.state_repository,
+            auth_client=self.auth_client,
+            client=self.client,
+        ).reconcile_student_calendar(
+            student_id=student_id,
+            calendar_id=calendar_id,
+            study_plan_profile_id=study_plan_profile_id,
+        )
+
     def preview_student_calendar_sync(
         self,
         *,

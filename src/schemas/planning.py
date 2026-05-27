@@ -119,6 +119,15 @@ class ReplanState(BaseSchemaModel):
     return_to_menu: Optional[bool] = None
 
 
+class UnavailableWindow(BaseSchemaModel):
+    """Franja semanal en la que el estudiante no puede estudiar."""
+
+    day: str
+    start_time: str
+    end_time: str
+    reason: Optional[str] = None
+
+
 class Constraints(BaseSchemaModel):
     """Restricciones duras para agenda y plan de estudio."""
 
@@ -129,6 +138,7 @@ class Constraints(BaseSchemaModel):
     max_study_per_day_min: int = 180
     preferred_study_start: Optional[str] = None
     preferred_study_end: Optional[str] = None
+    unavailable_windows: list[UnavailableWindow] = Field(default_factory=list)
 
 
 __all__ = [
@@ -140,4 +150,5 @@ __all__ = [
     "ReplanState",
     "StudyPlanState",
     "SubjectItem",
+    "UnavailableWindow",
 ]

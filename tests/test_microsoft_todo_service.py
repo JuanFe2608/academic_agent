@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from datetime import datetime as real_datetime
+from datetime import datetime as real_datetime, timezone
 
 from integrations.microsoft_graph.auth_client import (
     MicrosoftGraphStateTokenStore,
@@ -11,6 +11,7 @@ from integrations.microsoft_graph.auth_client import (
 )
 from integrations.microsoft_graph.models import (
     MicrosoftTodoTaskList,
+    MicrosoftTodoTaskSnapshot,
     MicrosoftTodoTaskUpsert,
     UpsertedMicrosoftTodoTask,
 )
@@ -43,11 +44,15 @@ class _FakeMicrosoftTodoClient:
         self,
         *,
         task_lists: list[MicrosoftTodoTaskList] | None = None,
+        tasks: list[MicrosoftTodoTaskSnapshot] | None = None,
         expected_task_list_id: str = "todo-list-1",
     ) -> None:
         self.upserts: list[MicrosoftTodoTaskUpsert] = []
         self.deletes: list[str] = []
+        self.listed_task_lists = 0
+        self.listed_tasks = 0
         self.task_lists = list(task_lists or [])
+        self.tasks = list(tasks or [])
         self.expected_task_list_id = expected_task_list_id
 
     def list_task_lists(
@@ -56,7 +61,19 @@ class _FakeMicrosoftTodoClient:
         access_token: str,
     ) -> list[MicrosoftTodoTaskList]:
         assert access_token.startswith("access-token")
+        self.listed_task_lists += 1
         return list(self.task_lists)
+
+    def list_tasks(
+        self,
+        *,
+        access_token: str,
+        task_list_id: str,
+    ) -> list[MicrosoftTodoTaskSnapshot]:
+        assert access_token.startswith("access-token")
+        assert task_list_id == self.expected_task_list_id
+        self.listed_tasks += 1
+        return list(self.tasks)
 
     def upsert_tasks(
         self,
@@ -451,3 +468,170 @@ def test_microsoft_todo_activity_sync_updates_completed_and_deletes_removed() ->
     assert updated_by_id["act-pending"].todo_task_id == "todo:act-pending"
     assert updated_by_id["act-completed"].todo_task_id == "todo:act-completed"
     assert updated_by_id["act-deleted"].todo_task_id is None
+
+
+def test_microsoft_todo_activity_sync_imports_completed_task_before_upsert() -> None:
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    activity = AcademicActivity(
+        activity_id="act-fisica",
+        activity_type="tarea",
+        subject_name="Fisica",
+        activity_title="Tarea 1",
+        due_date="2026-05-02",
+        status="pending",
+        todo_task_id="todo-act-fisica",
+    )
+    client = _FakeMicrosoftTodoClient(
+        tasks=[
+            MicrosoftTodoTaskSnapshot(
+                external_task_id="todo-act-fisica",
+                title="[tarea] Fisica: Tarea 1",
+                due_at=real_datetime(2026, 5, 2, 23, 59, tzinfo=timezone.utc),
+                is_completed=True,
+            )
+        ]
+    )
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    result = service.sync_academic_activities_to_todo(
+        student_id=7,
+        task_list_id="todo-list-1",
+        activities=[activity],
+    )
+
+    assert result.synced is True
+    assert result.imported_completed_count == 1
+    assert result.synced_activities[0].status == "completed"
+    assert client.listed_tasks == 1
+    assert client.upserts[0].is_completed is True
+
+
+def test_microsoft_todo_activity_sync_blocks_manual_title_or_due_change() -> None:
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    activity = AcademicActivity(
+        activity_id="act-proyecto",
+        activity_type="proyecto",
+        subject_name="Bases",
+        activity_title="Entrega final",
+        due_date="2026-05-10",
+        status="pending",
+        todo_task_id="todo-act-proyecto",
+    )
+    client = _FakeMicrosoftTodoClient(
+        tasks=[
+            MicrosoftTodoTaskSnapshot(
+                external_task_id="todo-act-proyecto",
+                title="[proyecto] Bases: Entrega ajustada",
+                due_at=real_datetime(2026, 5, 12, 23, 59, tzinfo=timezone.utc),
+            )
+        ]
+    )
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    result = service.sync_academic_activities_to_todo(
+        student_id=7,
+        task_list_id="todo-list-1",
+        activities=[activity],
+    )
+
+    assert result.synced is False
+    assert result.requires_confirmation is True
+    assert result.error_code == "microsoft_todo_manual_changes_detected"
+    assert result.inbound_change_count == 1
+    assert set(result.inbound_changes[0]["changed_fields"]) == {"title", "due_date"}
+    assert result.synced_activities[0].activity_title == "Entrega final"
+    assert result.synced_activities[0].due_date == "2026-05-10"
+    assert client.upserts == []
+    assert client.deletes == []
+
+
+def test_microsoft_todo_activity_sync_imports_manual_changes_when_confirmed() -> None:
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    activity = AcademicActivity(
+        activity_id="act-proyecto",
+        activity_type="proyecto",
+        subject_name="Bases",
+        activity_title="Entrega final",
+        due_date="2026-05-10",
+        status="pending",
+        todo_task_id="todo-act-proyecto",
+    )
+    client = _FakeMicrosoftTodoClient(
+        tasks=[
+            MicrosoftTodoTaskSnapshot(
+                external_task_id="todo-act-proyecto",
+                title="[proyecto] Bases: Entrega ajustada",
+                due_at=real_datetime(2026, 5, 12, 23, 59, tzinfo=timezone.utc),
+            )
+        ]
+    )
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    result = service.sync_academic_activities_to_todo(
+        student_id=7,
+        task_list_id="todo-list-1",
+        activities=[activity],
+        import_manual_todo_changes=True,
+    )
+
+    assert result.synced is True
+    assert result.inbound_change_count == 1
+    assert result.synced_activities[0].activity_title == "Entrega ajustada"
+    assert result.synced_activities[0].due_date == "2026-05-12"
+    assert client.upserts[0].title == "[proyecto] Bases: Entrega ajustada"
+
+
+def test_microsoft_todo_activity_sync_restores_assistant_task_when_requested() -> None:
+    state_repository = InMemoryMicrosoftGraphStateRepository()
+    activity = AcademicActivity(
+        activity_id="act-proyecto",
+        activity_type="proyecto",
+        subject_name="Bases",
+        activity_title="Entrega final",
+        due_date="2026-05-10",
+        status="pending",
+        todo_task_id="todo-act-proyecto",
+    )
+    client = _FakeMicrosoftTodoClient(
+        tasks=[
+            MicrosoftTodoTaskSnapshot(
+                external_task_id="todo-act-proyecto",
+                title="[proyecto] Bases: Entrega ajustada",
+                due_at=real_datetime(2026, 5, 12, 23, 59, tzinfo=timezone.utc),
+            )
+        ]
+    )
+    service = MicrosoftTodoSyncService(
+        repository=InMemoryMicrosoftGraphSyncRepository(),
+        state_repository=state_repository,
+        auth_client=_oauth_client(state_repository),
+        client=client,
+    )
+
+    result = service.sync_academic_activities_to_todo(
+        student_id=7,
+        task_list_id="todo-list-1",
+        activities=[activity],
+        restore_manual_todo_changes=True,
+    )
+
+    assert result.synced is True
+    assert result.inbound_change_count == 1
+    assert result.synced_activities[0].activity_title == "Entrega final"
+    assert result.synced_activities[0].due_date == "2026-05-10"
+    assert client.upserts[0].title == "[proyecto] Bases: Entrega final"

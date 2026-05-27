@@ -14,6 +14,7 @@ ReAct y las fusiona en el dict de retorno del nodo academic_agent.
 from __future__ import annotations
 
 import json
+import re
 from datetime import date, timedelta
 from zoneinfo import ZoneInfoNotFoundError
 from typing import Any
@@ -25,6 +26,14 @@ from agents.support.nodes.academic_agent.context import (
     format_current_datetime_for_student,
 )
 from agents.support.state import AgentState
+from services.scheduling.constants import SPANISH_TO_ENGLISH
+from services.scheduling.validation import (
+    normalize_day,
+    normalize_day_typos_in_text,
+    normalize_time as normalize_schedule_time,
+    sort_events,
+    validate_event,
+)
 
 _DAYS_ES: dict[str, str] = {
     "monday": "Lunes",
@@ -37,8 +46,82 @@ _DAYS_ES: dict[str, str] = {
 }
 
 _DAYS_ORDER = ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+_EVENT_DAY_BY_WEEKDAY: dict[str, str] = {
+    "monday": "Lunes",
+    "tuesday": "Martes",
+    "wednesday": "Miercoles",
+    "thursday": "Jueves",
+    "friday": "Viernes",
+    "saturday": "Sabado",
+    "sunday": "Domingo",
+}
+_WEEKDAY_BY_EVENT_DAY = {value: key for key, value in _EVENT_DAY_BY_WEEKDAY.items()}
+_WEEKDAY_LABELS_FOR_PARSER: dict[str, str] = {
+    "monday": "Lunes",
+    "tuesday": "Martes",
+    "wednesday": "Miercoles",
+    "thursday": "Jueves",
+    "friday": "Viernes",
+    "saturday": "Sabado",
+    "sunday": "Domingo",
+}
+_SCHEDULE_BLOCK_TYPE_ALIASES: dict[str, str] = {
+    "academic": "academic",
+    "academico": "academic",
+    "academica": "academic",
+    "clase": "academic",
+    "materia": "academic",
+    "asignatura": "academic",
+    "curso": "academic",
+    "work": "work",
+    "laboral": "work",
+    "trabajo": "work",
+    "empleo": "work",
+    "turno": "work",
+    "extracurricular": "extracurricular",
+    "extra": "extracurricular",
+    "hobby": "extracurricular",
+    "deporte": "extracurricular",
+    "personal": "extracurricular",
+}
 
 _VALID_PRIORIDAD: frozenset[str] = frozenset({"alta", "media", "baja"})
+
+
+def _format_manual_todo_change_prompt(result: object) -> str:
+    changes = list(getattr(result, "inbound_changes", []) or [])
+    lines = [
+        "Detecté cambios manuales en Microsoft To Do antes de sincronizar.",
+        "",
+        "No los voy a sobrescribir sin confirmación.",
+    ]
+    for index, change in enumerate(changes[:5], start=1):
+        title = str(change.get("activity_title") or change.get("assistant_title") or "actividad")
+        changed_fields = set(str(field) for field in change.get("changed_fields") or [])
+        details: list[str] = []
+        if "title" in changed_fields:
+            details.append(f"título en To Do: {change.get('todo_title')}")
+        if "due_date" in changed_fields:
+            details.append(f"fecha en To Do: {change.get('todo_due_date') or 'sin fecha'}")
+        lines.append(f"{index}. {title} — {', '.join(details)}")
+    if len(changes) > 5:
+        lines.append(f"... y {len(changes) - 5} cambio(s) más.")
+    imported_count = getattr(result, "imported_completed_count", 0)
+    if imported_count:
+        lines.append("")
+        lines.append(
+            f"Además, marqué {imported_count} actividad(es) como completada(s) porque ya estaban completas en To Do."
+        )
+    lines.extend(
+        [
+            "",
+            "¿Qué quieres hacer?",
+            "1. Importar esos cambios al asistente",
+            "2. Restaurar Microsoft To Do con la información del asistente",
+            "3. Cancelar",
+        ]
+    )
+    return "\n".join(lines)
 
 
 def _local_today(timezone_name: str = "America/Bogota") -> date:
@@ -616,6 +699,164 @@ def make_tools(state: AgentState) -> list:
         except Exception as exc:
             return f"No pude generar la propuesta de replanificación: {exc}"
 
+    @tool
+    def move_study_session(
+        session_reference: str,
+        target_day: str | None = None,
+        target_start_time: str | None = None,
+        target_end_time: str | None = None,
+        source_day: str | None = None,
+        after_event_reference: str | None = None,
+    ) -> str:
+        """Mueve una sesión puntual del plan de estudio, validando disponibilidad antes de aplicar.
+        session_reference: materia, título, id o número de la sesión a mover. Ej: "Física", "sesión 2".
+        target_day: nuevo día deseado. Ej: "martes".
+        target_start_time: nueva hora de inicio en HH:MM o con am/pm. Ej: "17:00".
+        target_end_time: nueva hora de fin opcional; si se omite, conserva la duración actual.
+        source_day: día actual de la sesión si el estudiante lo menciona. Ej: "martes".
+        after_event_reference: bloque fijo después del cual ubicarla. Ej: "clase de Física".
+        Úsala para frases como "mueve la sesión de Física del martes a las 5",
+        "esa sesión no me sirve" o "ponla después de clase"."""
+        plan_events = list(state.study_plan.plan_events or [])
+        if not plan_events:
+            return "No tienes sesiones de estudio generadas para mover."
+
+        matches = _match_study_sessions(
+            plan_events,
+            session_reference=session_reference,
+            source_day=source_day,
+        )
+        if not matches:
+            return f"No encontré una sesión de estudio que coincida con '{session_reference}'."
+        if len(matches) > 1:
+            return _format_ambiguous_study_sessions(matches)
+
+        target = matches[0]
+        duration = _event_duration_minutes(target)
+        if duration <= 0:
+            return "No pude calcular la duración de esa sesión para moverla."
+
+        resolved_day = _normalize_event_day(target_day) if target_day else None
+        resolved_start = _normalize_move_time(target_start_time) if target_start_time else None
+        resolved_end = _normalize_move_time(target_end_time) if target_end_time else None
+
+        if after_event_reference and not resolved_start:
+            after_slot = _resolve_after_event_slot(
+                state,
+                target,
+                after_event_reference=after_event_reference,
+                target_day=resolved_day,
+            )
+            if after_slot is None:
+                alternatives = _suggest_study_session_slots(
+                    state,
+                    target,
+                    preferred_day=resolved_day,
+                    limit=4,
+                )
+                return (
+                    "No encontré una clase o bloque fijo claro para ubicar esa sesión después.\n"
+                    + _format_alternatives(alternatives)
+                ).strip()
+            resolved_day, resolved_start = after_slot
+
+        if resolved_day is None and resolved_start is None:
+            alternatives = _suggest_study_session_slots(state, target, limit=5)
+            return (
+                "Puedo mover esa sesión, pero necesito un nuevo día y hora.\n"
+                + _format_alternatives(alternatives)
+            ).strip()
+        if resolved_day is None:
+            resolved_day = target.dia
+        if resolved_start is None:
+            alternatives = _suggest_study_session_slots(
+                state,
+                target,
+                preferred_day=resolved_day,
+                limit=5,
+            )
+            return (
+                f"Necesito la hora de inicio para moverla a **{resolved_day}**.\n"
+                + _format_alternatives(alternatives)
+            ).strip()
+        if resolved_end is None:
+            resolved_end = _minutes_to_hhmm(_time_to_minutes(resolved_start) + duration)
+
+        try:
+            start_min = _time_to_minutes(resolved_start)
+            end_min = _time_to_minutes(resolved_end)
+        except ValueError:
+            return "No pude interpretar la hora solicitada. Usa formato HH:MM o am/pm."
+        if start_min >= end_min:
+            return "La hora de inicio debe ser anterior a la hora de fin."
+
+        availability = _study_session_slot_availability(
+            state,
+            target,
+            day=resolved_day,
+            start_time=resolved_start,
+            end_time=resolved_end,
+        )
+        if not availability[0]:
+            alternatives = _suggest_study_session_slots(
+                state,
+                target,
+                preferred_day=resolved_day,
+                limit=4,
+            )
+            return (
+                f"No puedo mover **{target.titulo}** a {resolved_day} "
+                f"{resolved_start}–{resolved_end}: {availability[1]}.\n"
+                + _format_alternatives(alternatives)
+            ).strip()
+
+        moved = target.model_copy(
+            update={
+                "dia": resolved_day,
+                "inicio": resolved_start,
+                "fin": resolved_end,
+            }
+        )
+        try:
+            validate_event(moved)
+        except ValueError as exc:
+            return f"No pude aplicar el cambio porque la sesión quedaría inválida: {exc}"
+
+        updated_events = [
+            moved if getattr(event, "id", None) == getattr(target, "id", None) else event
+            for event in plan_events
+        ]
+        updated_plan = state.study_plan.model_copy(
+            update={
+                "plan_events": sort_events(updated_events),
+                "rules": {
+                    **dict(state.study_plan.rules or {}),
+                    "last_manual_session_move": {
+                        "session_id": target.id,
+                        "from": {
+                            "day": target.dia,
+                            "start_time": target.inicio,
+                            "end_time": target.fin,
+                        },
+                        "to": {
+                            "day": moved.dia,
+                            "start_time": moved.inicio,
+                            "end_time": moved.fin,
+                        },
+                    },
+                },
+            }
+        )
+        return json.dumps(
+            {
+                "result": (
+                    f"✅ Moví **{target.titulo}** de {target.dia} "
+                    f"{target.inicio}–{target.fin} a {moved.dia} {moved.inicio}–{moved.fin}."
+                ),
+                "_state_update": {"study_plan": updated_plan.model_dump(mode="python")},
+            }
+        )
+
     # ------------------------------------------------- Restricciones --------
 
     @tool
@@ -627,6 +868,7 @@ def make_tools(state: AgentState) -> list:
         preferred_study_end: str | None = None,
         sleep_start: str | None = None,
         sleep_end: str | None = None,
+        unavailable_windows: list[dict[str, Any]] | None = None,
     ) -> str:
         """Actualiza las restricciones de planificación del estudiante.
         study_session_min: duración mínima de sesión en minutos (ej: 25).
@@ -636,9 +878,14 @@ def make_tools(state: AgentState) -> list:
         preferred_study_end: hora de fin preferida para estudiar, formato HH:MM (ej: '14:00').
         sleep_start: hora a la que se acuesta, formato HH:MM (ej: '23:00').
         sleep_end: hora a la que se levanta, formato HH:MM (ej: '06:00').
+        unavailable_windows: franjas donde NO puede estudiar; lista de objetos con day o days,
+        start_time, end_time y reason. Ej: [{"days":["monday","tuesday"],"start_time":"06:00",
+        "end_time":"07:00","reason":"transporte"}].
         Úsala cuando el estudiante mencione: cuánto puede concentrarse seguido, cuándo prefiere estudiar,
         cuánto puede estudiar al día, su hora de dormir/levantarse, o restricciones de horario.
-        Ejemplos: 'solo puedo estudiar de 8am a 2pm', 'máximo 45 minutos seguidos', 'duermo a las 11pm'."""
+        Ejemplos: 'solo puedo estudiar de 8am a 2pm', 'máximo 45 minutos seguidos',
+        'duermo a las 11pm', 'estoy en transporte de lunes a viernes de 6 a 7',
+        'no puedo estudiar en esos espacios', 'bloquea esa hora'."""
         from schemas.planning import Constraints
 
         current = state.constraints
@@ -676,6 +923,17 @@ def make_tools(state: AgentState) -> list:
                 changes["sleep_end"] = _normalize_time(sleep_end)
             except Exception:
                 return f"Hora de despertar inválida: '{sleep_end}'. Usa formato HH:MM."
+        if unavailable_windows is not None:
+            normalized_windows = _normalize_unavailable_windows(unavailable_windows)
+            if not normalized_windows:
+                return "No pude identificar una franja no disponible válida. Indica día, hora de inicio y hora de fin."
+            existing_windows = [
+                _window_to_dict(window)
+                for window in list(current.unavailable_windows or [])
+            ]
+            changes["unavailable_windows"] = _dedupe_unavailable_windows(
+                existing_windows + normalized_windows
+            )
 
         if not changes:
             return "No indicaste ningún límite a actualizar."
@@ -696,7 +954,7 @@ def make_tools(state: AgentState) -> list:
             except Exception:
                 pass
 
-        updated = current.model_copy(update=changes)
+        updated = Constraints(**(current.model_dump(mode="python") | changes))
         msg_parts: list[str] = []
         if "study_session_min" in changes or "study_session_max" in changes:
             msg_parts.append(f"sesiones de {updated.study_session_min}–{updated.study_session_max} min")
@@ -708,11 +966,15 @@ def make_tools(state: AgentState) -> list:
             )
         if "sleep_start" in changes or "sleep_end" in changes:
             msg_parts.append(f"sueño {updated.sleep_end}–{updated.sleep_start}")
+        if "unavailable_windows" in changes:
+            added = len(changes["unavailable_windows"]) - len(current.unavailable_windows or [])
+            msg_parts.append(f"{max(added, 0)} franja(s) no disponible(s)")
 
         msg = "✅ Restricciones de planificación actualizadas: " + ", ".join(msg_parts) + "."
         state_update: dict[str, Any] = {"constraints": updated.model_dump()}
         if state.study_plan.plan_events:
-            state_update["replan"] = {"trigger": "user_request"}
+            trigger = "availability_change" if "unavailable_windows" in changes else "user_request"
+            state_update["replan"] = {"trigger": trigger}
 
         return json.dumps({"result": msg, "_state_update": state_update})
 
@@ -773,6 +1035,9 @@ def make_tools(state: AgentState) -> list:
             "work": "Laboral 💼",
             "extracurricular": "Extracurricular 🏃",
         }
+        repair_guard = _fixed_schedule_outlook_repair_guard(state)
+        if repair_guard:
+            return repair_guard
         blocks = _load_current_schedule_blocks(state)
         if not blocks:
             return "No tienes horario fijo registrado."
@@ -821,53 +1086,64 @@ def make_tools(state: AgentState) -> list:
     ) -> str:
         """Agrega un bloque al horario fijo del estudiante y sincroniza con Outlook.
         title: nombre de la clase/materia/actividad.
-        day: día en inglés — monday | tuesday | wednesday | thursday | friday | saturday | sunday.
-        start_time: hora de inicio en formato HH:MM (ej: '09:00').
-        end_time: hora de fin en formato HH:MM (ej: '11:00').
-        block_type: academic (clase/materia) | work (trabajo) | extracurricular (deporte/personal).
+        day: día en español o inglés; acepta rangos o varios días (ej: "martes y viernes").
+        start_time: hora de inicio en HH:MM o con am/pm (ej: '09:00', '4 pm').
+        end_time: hora de fin en HH:MM o con am/pm (ej: '11:00', '7 pm').
+        block_type: academic/academico | work/laboral | extracurricular.
         Úsala cuando el estudiante quiera agregar una clase, trabajo o actividad al horario semanal.
         Extrae día y horas del mensaje del usuario — NO pidas datos que ya mencionó."""
-        import uuid
-        from services.scheduling.models import WeeklyScheduleBlock
-
-        valid_days = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
-        valid_types = {"academic", "work", "extracurricular"}
-        day_norm = day.strip().lower()
-        type_norm = block_type.strip().lower()
-        if day_norm not in valid_days:
-            return f"Día inválido: '{day}'. Acepta: monday, tuesday, wednesday, thursday, friday, saturday, sunday."
-        if type_norm not in valid_types:
-            return f"Tipo inválido: '{block_type}'. Acepta: academic, work, extracurricular."
-
         try:
-            blocks = _load_current_schedule_blocks(state)
-            _start = _normalize_time(start_time)
-            _end = _normalize_time(end_time)
-            _day_label = _DAYS_ES.get(day_norm, day_norm)
-            _source_text = (
-                f"{_day_label} {_start}-{_end}"
-                if type_norm == "work"
-                else f"{_day_label} {_start}-{_end} {title.strip()}"
-            ).strip()
-            new_block = WeeklyScheduleBlock(
-                block_id=str(uuid.uuid4()),
-                block_type=type_norm,
-                title=title.strip(),
-                day_of_week=day_norm,
-                start_time=_start,
-                end_time=_end,
-                frequency="weekly",
-                timezone=str(state.timezone or "America/Bogota"),
-                source_text=_source_text,
-                is_active=True,
-                user_confirmed=True,
+            repair_guard = _fixed_schedule_outlook_repair_guard(state)
+            if repair_guard:
+                return repair_guard
+
+            from services.scheduling.fixed_schedule_management import (
+                build_fixed_schedule_add_preview,
             )
-            updated_blocks = blocks + [new_block]
+
+            type_norm = _normalize_schedule_block_type(block_type)
+            raw_text = _build_schedule_add_parser_text(
+                title=title,
+                day=day,
+                start_time=start_time,
+                end_time=end_time,
+                block_type=type_norm,
+            )
+            preview = build_fixed_schedule_add_preview(
+                raw_text,
+                type_norm,
+                timezone=timezone_name,
+            )
+            if preview.prompt:
+                return preview.prompt
+            if not preview.replacement_blocks:
+                return "No pude interpretar el nuevo bloque. Indica nombre, día, hora de inicio y hora de fin."
+
+            title_norm = _normalize_schedule_tool_title(title, type_norm)
+            if not title_norm:
+                return "Indica el nombre del nuevo bloque."
+
+            new_blocks = [
+                _prepare_schedule_tool_block(
+                    block,
+                    title=title_norm,
+                    block_type=type_norm,
+                    timezone=timezone_name,
+                )
+                for block in preview.replacement_blocks
+            ]
+            blocks = _load_current_schedule_blocks(state)
+            updated_blocks = blocks + new_blocks
             msg, state_update = _apply_and_persist_schedule(state, updated_blocks, "actualizado")
+            block_count = len(new_blocks)
+            block_label = "Bloque" if block_count == 1 else "Bloques"
+            added_label = f"'{title_norm}'" if block_count == 1 else f"'{title_norm}' ({block_count})"
             return json.dumps(
-                {"result": f"✅ Bloque '{title}' agregado al horario. {msg}", "_state_update": state_update},
+                {"result": f"✅ {block_label} {added_label} agregado(s) al horario. {msg}", "_state_update": state_update},
                 default=_json_default,
             )
+        except ValueError as exc:
+            return str(exc)
         except Exception as exc:
             return f"Error inesperado al agregar el bloque '{title}': {exc}"
 
@@ -882,11 +1158,18 @@ def make_tools(state: AgentState) -> list:
     ) -> str:
         """Modifica un bloque existente del horario fijo y sincroniza con Outlook.
         block_reference: descripción para identificar el bloque (nombre, día, o combinación).
-        Pasa solo los campos que cambian: day en inglés, start_time/end_time en HH:MM.
+        Pasa solo los campos que cambian: day puede venir en español o inglés; horas en HH:MM o am/pm.
         Úsala cuando el estudiante quiera cambiar horario, día o nombre de una clase ya registrada."""
-        from services.scheduling.fixed_schedule_management import match_fixed_schedule_blocks
+        from services.scheduling.fixed_schedule_management import (
+            build_fixed_schedule_update_preview,
+            match_fixed_schedule_blocks,
+        )
 
         try:
+            repair_guard = _fixed_schedule_outlook_repair_guard(state)
+            if repair_guard:
+                return repair_guard
+
             blocks = _load_current_schedule_blocks(state)
             if not blocks:
                 return "No tienes bloques registrados en el horario fijo."
@@ -904,32 +1187,72 @@ def make_tools(state: AgentState) -> list:
 
             target = result.matches[0]
             updates: dict[str, Any] = {}
+            type_norm = _normalize_schedule_block_type(block_type) if block_type is not None else None
             if title is not None:
-                updates["title"] = title.strip()
-            if day is not None:
-                d = day.strip().lower()
-                if d not in {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}:
-                    return f"Día inválido: '{day}'."
-                updates["day_of_week"] = d
-            if start_time is not None:
-                updates["start_time"] = _normalize_time(start_time)
-            if end_time is not None:
-                updates["end_time"] = _normalize_time(end_time)
-            if block_type is not None:
-                t = block_type.strip().lower()
-                if t not in {"academic", "work", "extracurricular"}:
-                    return f"Tipo inválido: '{block_type}'."
-                updates["block_type"] = t
+                normalized_title = _normalize_schedule_tool_title(title, type_norm or target.block_type)
+                if not normalized_title:
+                    return "Indica el nuevo nombre del bloque."
+                updates["title"] = normalized_title
+            if type_norm is not None:
+                updates["block_type"] = type_norm
             if not updates:
+                schedule_updates = _build_schedule_update_replacements_from_tool_args(
+                    target,
+                    day=day,
+                    start_time=start_time,
+                    end_time=end_time,
+                    timezone=timezone_name,
+                    build_preview=build_fixed_schedule_update_preview,
+                )
+                if isinstance(schedule_updates, str):
+                    return schedule_updates
+                if schedule_updates:
+                    updated_blocks = [
+                        b for b in blocks if b.block_id != target.block_id
+                    ] + schedule_updates
+                    msg, state_update = _apply_and_persist_schedule(state, updated_blocks, "actualizado")
+                    return json.dumps(
+                        {"result": f"✅ Bloque '{target.title}' modificado. {msg}", "_state_update": state_update},
+                        default=_json_default,
+                    )
                 return "No indicaste ningún campo a cambiar."
 
-            updated_target = target.model_copy(update=updates)
-            updated_blocks = [updated_target if b.block_id == target.block_id else b for b in blocks]
+            schedule_updates = _build_schedule_update_replacements_from_tool_args(
+                target.model_copy(update=updates),
+                day=day,
+                start_time=start_time,
+                end_time=end_time,
+                timezone=timezone_name,
+                build_preview=build_fixed_schedule_update_preview,
+            )
+            if isinstance(schedule_updates, str):
+                return schedule_updates
+            if schedule_updates:
+                updated_replacements = [
+                    _prepare_schedule_tool_block(
+                        block,
+                        title=updates.get("title"),
+                        block_type=updates.get("block_type"),
+                        timezone=timezone_name,
+                    )
+                    for block in schedule_updates
+                ]
+                updated_blocks = [
+                    b for b in blocks if b.block_id != target.block_id
+                ] + updated_replacements
+            else:
+                updated_target = _prepare_schedule_tool_block(
+                    target.model_copy(update=updates),
+                    timezone=timezone_name,
+                )
+                updated_blocks = [updated_target if b.block_id == target.block_id else b for b in blocks]
             msg, state_update = _apply_and_persist_schedule(state, updated_blocks, "actualizado")
             return json.dumps(
                 {"result": f"✅ Bloque '{target.title}' modificado. {msg}", "_state_update": state_update},
                 default=_json_default,
             )
+        except ValueError as exc:
+            return str(exc)
         except Exception as exc:
             return f"Error inesperado al modificar el bloque '{block_reference}': {exc}"
 
@@ -941,6 +1264,10 @@ def make_tools(state: AgentState) -> list:
         from services.scheduling.fixed_schedule_management import match_fixed_schedule_blocks
 
         try:
+            repair_guard = _fixed_schedule_outlook_repair_guard(state)
+            if repair_guard:
+                return repair_guard
+
             blocks = _load_current_schedule_blocks(state)
             if not blocks:
                 return "No tienes bloques registrados en el horario fijo."
@@ -1033,12 +1360,18 @@ def make_tools(state: AgentState) -> list:
             return f"Error inesperado al agendar el evento '{title}': {exc}"
 
     @tool
-    def sync_plan_to_calendar() -> str:
+    def sync_plan_to_calendar(
+        restore_manual_outlook_changes: bool = False,
+        keep_manual_outlook_changes: bool = False,
+    ) -> str:
         """Sincroniza las SESIONES DEL PLAN DE ESTUDIO (bloques generados por el planificador)
         con Outlook Calendar. SOLO usar cuando el estudiante pida sincronizar su PLAN DE SESIONES
         de estudio con Outlook. NO usar para clases, materias ni bloques del horario fijo (work,
         academic, extracurricular): esos se sincronizan automáticamente al usar add_schedule_block
-        o update_schedule_block."""
+        o update_schedule_block.
+        restore_manual_outlook_changes: True solo si el estudiante eligió restaurar el plan del asistente
+        tras detectar cambios manuales en Outlook.
+        keep_manual_outlook_changes: True solo si el estudiante eligió conservar cambios manuales de Outlook."""
         from agents.support.dependencies import (
             get_outlook_calendar_sync_service,
             get_study_plan_materialization_service,
@@ -1060,6 +1393,13 @@ def make_tools(state: AgentState) -> list:
                         "No pude dejar listas las sesiones fechadas para Outlook: "
                         f"{materialized.detail or materialized.error_code or 'error desconocido'}"
                     )
+                manual_guard = _study_calendar_outlook_manual_change_guard(
+                    state,
+                    restore_manual_outlook_changes=restore_manual_outlook_changes,
+                    keep_manual_outlook_changes=keep_manual_outlook_changes,
+                )
+                if manual_guard:
+                    return manual_guard
             result = service.sync_student_calendar(
                 student_id=student_id,
                 calendar_state=state.calendar,
@@ -1081,10 +1421,16 @@ def make_tools(state: AgentState) -> list:
             return f"Error al sincronizar con Outlook: {exc}"
 
     @tool
-    def sync_tasks_to_todo() -> str:
+    def sync_tasks_to_todo(
+        import_manual_todo_changes: bool = False,
+        restore_assistant_tasks: bool = False,
+    ) -> str:
         """Sincroniza actividades académicas con Microsoft To Do.
         Las actividades con prioridad alta aparecen con ⭐ en To Do.
         Actividades completadas se marcan como completadas y eliminadas se retiran de To Do.
+        Si To Do tiene cambios manuales de título o fecha, pregunta antes de importarlos.
+        Usa import_manual_todo_changes=True si el estudiante quiere conservar lo editado en To Do.
+        Usa restore_assistant_tasks=True si el estudiante quiere restaurar To Do con los datos del asistente.
         Úsala proactivamente después de registrar o modificar actividades,
         o cuando el estudiante pida ver sus tareas en Microsoft To Do."""
         from agents.support.dependencies import get_microsoft_todo_sync_service
@@ -1100,11 +1446,32 @@ def make_tools(state: AgentState) -> list:
                 student_id=student_id,
                 task_list_id=task_list_id,
                 activities=activities,
+                import_manual_todo_changes=import_manual_todo_changes,
+                restore_manual_todo_changes=restore_assistant_tasks,
             )
+            if getattr(result, "requires_confirmation", False):
+                msg = _format_manual_todo_change_prompt(result)
+                state_update: dict[str, object] = {}
+                if result.synced_activities:
+                    updated_all = {a.activity_id: a for a in result.synced_activities}
+                    merged = [
+                        updated_all.get(a.activity_id, a).model_dump()
+                        for a in activities
+                    ]
+                    _cycle_updates["academic_activities"] = merged
+                    state_update["academic_activities"] = merged
+                return json.dumps({"result": msg, "_state_update": state_update})
             if result.synced:
                 msg = f"✅ {result.upserted_count} actividad(es) sincronizada(s) en Microsoft To Do."
                 if getattr(result, "deleted_count", 0):
                     msg += f" {result.deleted_count} tarea(s) eliminada(s)."
+                imported_count = getattr(result, "imported_completed_count", 0)
+                if imported_count:
+                    msg += f" {imported_count} actividad(es) marcada(s) como completada(s) desde To Do."
+                if import_manual_todo_changes and getattr(result, "inbound_change_count", 0):
+                    msg += " Importé los cambios manuales de To Do al asistente."
+                if restore_assistant_tasks and getattr(result, "inbound_change_count", 0):
+                    msg += " Restauré To Do con la información del asistente."
                 if result.synced_activities:
                     updated_all = {a.activity_id: a for a in result.synced_activities}
                     merged = [
@@ -1129,6 +1496,7 @@ def make_tools(state: AgentState) -> list:
         get_pending_activities,
         get_weekly_plan,
         update_study_plan,
+        move_study_session,
         update_constraints,
         get_schedule,
         add_schedule_block,
@@ -1158,6 +1526,206 @@ def _load_current_schedule_blocks(state: AgentState) -> list:
     except Exception:
         pass
     return []
+
+
+def _fixed_schedule_outlook_repair_guard(state: AgentState) -> str | None:
+    """Reconciliación previa para no sobrescribir cambios manuales de Outlook."""
+    student_id = _get_student_id(state)
+    if not student_id:
+        return None
+    schedule_profile_id = getattr(state.schedule, "persisted_profile_id", None)
+    if not schedule_profile_id:
+        return None
+    calendar = state.calendar
+    calendar_id = getattr(calendar, "calendar_id", None)
+    try:
+        from agents.support.dependencies import get_outlook_fixed_schedule_reconciliation_service
+        from agents.support.scheduling.state_helpers import update_schedule_flow_state
+
+        result = get_outlook_fixed_schedule_reconciliation_service().reconcile_schedule_profile(
+            student_id=student_id,
+            schedule_profile_id=schedule_profile_id,
+            calendar_id=calendar_id,
+        )
+    except Exception:
+        return None
+
+    if not result.reconciled:
+        return None
+    if result.drifted_count <= 0 and result.missing_count <= 0:
+        return None
+
+    schedule_update = update_schedule_flow_state(
+        state.schedule,
+        repair_stage="awaiting_decision",
+        persisted_profile_id=result.schedule_profile_id or schedule_profile_id,
+    )
+    prompt = _fixed_schedule_manual_change_prompt(
+        drifted_count=result.drifted_count,
+        missing_count=result.missing_count,
+    )
+    return json.dumps(
+        {
+            "result": prompt,
+            "_state_update": {
+                "schedule": schedule_update,
+                "phase": "schedule_repair",
+                "awaiting_user_input": True,
+            },
+        },
+        default=_json_default,
+    )
+
+
+def _fixed_schedule_manual_change_prompt(*, drifted_count: int, missing_count: int) -> str:
+    return (
+        "🛠️ Detecté cambios manuales en tu horario fijo de Outlook.\n"
+        f"Eventos editados: {drifted_count}. Eventos eliminados: {missing_count}.\n\n"
+        "Tu horario oficial sigue guardado en el asistente. Antes de mostrarlo o modificarlo, "
+        "necesito que decidas qué hacer:\n"
+        "(Escribe el número de la opción que quieres elegir)\n"
+        "1. Restaurar Outlook con el horario oficial del asistente\n"
+        "2. Conservar el cambio de Outlook y organizar un horario fijo nuevo\n"
+        "3. Revisarlo después"
+    )
+
+
+def _study_calendar_outlook_manual_change_guard(
+    state: AgentState,
+    *,
+    restore_manual_outlook_changes: bool,
+    keep_manual_outlook_changes: bool,
+) -> str | None:
+    student_id = _get_student_id(state)
+    study_plan_profile_id = getattr(state.study_plan, "persisted_profile_id", None)
+    if not student_id or not study_plan_profile_id:
+        return None
+    try:
+        from agents.support.dependencies import get_outlook_study_calendar_reconciliation_service
+
+        service = get_outlook_study_calendar_reconciliation_service()
+        result = service.reconcile_student_calendar(
+            student_id=student_id,
+            calendar_id=getattr(state.calendar, "calendar_id", None),
+            study_plan_profile_id=study_plan_profile_id,
+        )
+    except Exception:
+        return None
+
+    if not result.reconciled:
+        return None
+    manual_findings = [
+        finding for finding in result.findings if finding.status in {"drifted", "missing"}
+    ]
+    if not manual_findings:
+        return None
+
+    if restore_manual_outlook_changes:
+        missing_keys = [
+            finding.source_instance_key
+            for finding in manual_findings
+            if finding.status == "missing"
+        ]
+        if missing_keys:
+            try:
+                service.mark_missing_links_deleted(
+                    student_id=student_id,
+                    source_instance_keys=missing_keys,
+                )
+            except Exception:
+                pass
+        return None
+
+    if keep_manual_outlook_changes:
+        state_update = _study_plan_external_sync_update(
+            state,
+            status="manual_outlook_change_kept",
+            result={
+                "decision": "keep",
+                "manual_change_count": len(manual_findings),
+            },
+        )
+        return json.dumps(
+            {
+                "result": (
+                    "De acuerdo. Conservaré el cambio manual en Outlook y no lo sobrescribiré ahora. "
+                    "Tu plan oficial del asistente queda igual."
+                ),
+                "_state_update": state_update,
+            },
+            default=_json_default,
+        )
+
+    state_update = _study_plan_external_sync_update(
+        state,
+        status="awaiting_manual_outlook_decision",
+        preview={
+            "drifted_count": result.drifted_count,
+            "missing_count": result.missing_count,
+        },
+    )
+    return json.dumps(
+        {
+            "result": _study_calendar_manual_change_prompt(
+                drifted_count=result.drifted_count,
+                missing_count=result.missing_count,
+                findings=manual_findings,
+            ),
+            "_state_update": state_update,
+        },
+        default=_json_default,
+    )
+
+
+def _study_calendar_manual_change_prompt(
+    *,
+    drifted_count: int,
+    missing_count: int,
+    findings: list[Any],
+) -> str:
+    first = findings[0] if findings else None
+    title = str(getattr(first, "title", "") or "esta sesión").strip()
+    noun = "esta sesión" if drifted_count + missing_count == 1 else "estas sesiones"
+    return (
+        f"Detecté que editaste {noun} en Outlook: {title}.\n"
+        f"Sesiones editadas: {drifted_count}. Sesiones eliminadas: {missing_count}.\n\n"
+        "¿Quieres conservar ese cambio o restaurar el plan del asistente?\n"
+        "(Escribe el número de la opción que quieres elegir)\n"
+        "1. Conservar el cambio de Outlook\n"
+        "2. Restaurar el plan del asistente en Outlook\n"
+        "3. Cancelar"
+    )
+
+
+def _study_plan_external_sync_update(
+    state: AgentState,
+    *,
+    status: str,
+    preview: dict[str, object] | None = None,
+    result: dict[str, object] | None = None,
+) -> dict[str, object]:
+    from services.planning import ensure_study_plan_state, update_study_plan_state
+
+    normalized = ensure_study_plan_state(state.study_plan)
+    rules = dict(normalized.rules or {})
+    payload = dict(rules.get("external_sync") or {})
+    payload.update(
+        {
+            "provider": "outlook",
+            "target": "study_sessions",
+            "status": status,
+            "requires_confirmation": status == "awaiting_manual_outlook_decision",
+            "last_error": None,
+        }
+    )
+    if preview is not None:
+        payload["preview"] = dict(preview)
+    if result is not None:
+        payload["result"] = dict(result)
+    rules["external_sync"] = payload
+    rules["external_sync_status"] = status
+    rules["external_sync_requires_confirmation"] = status == "awaiting_manual_outlook_decision"
+    return {"study_plan": update_study_plan_state(normalized.model_copy(update={"rules": rules}))}
 
 
 def _block_from_persisted_record(record: object):
@@ -1375,6 +1943,810 @@ def _normalize_time(t: str) -> str:
         return f"{int(parts[0]):02d}:{int(parts[1]):02d}"
     except (ValueError, IndexError):
         return raw
+
+
+def _normalize_schedule_block_type(block_type: str | None) -> str:
+    from services.scheduling.activity_matching import normalize_text
+
+    key = normalize_text(str(block_type or "academic"))
+    key = re.sub(r"[^a-z]+", " ", key).strip()
+    key = re.sub(r"\s+", " ", key)
+    normalized = _SCHEDULE_BLOCK_TYPE_ALIASES.get(key)
+    if normalized:
+        return normalized
+    raise ValueError(
+        f"Tipo inválido: '{block_type}'. Acepta: academic/academico, work/laboral o extracurricular."
+    )
+
+
+def _normalize_schedule_tool_title(title: str | None, block_type: str) -> str:
+    if block_type == "work":
+        return "Trabajo"
+    return re.sub(r"\s+", " ", str(title or "")).strip()
+
+
+def _build_schedule_add_parser_text(
+    *,
+    title: str | None,
+    day: str | None,
+    start_time: str | None,
+    end_time: str | None,
+    block_type: str,
+) -> str:
+    title_text = _normalize_schedule_tool_title(title, block_type)
+    return " ".join(
+        part
+        for part in (
+            title_text,
+            _coerce_day_text_for_schedule_parser(day),
+            _build_schedule_time_range_text(start_time, end_time),
+        )
+        if part
+    ).strip()
+
+
+def _build_schedule_time_range_text(
+    start_time: str | None,
+    end_time: str | None,
+) -> str:
+    start = str(start_time or "").strip()
+    end = str(end_time or "").strip()
+    if start and end:
+        return f"{start} a {end}"
+    return start or end
+
+
+def _coerce_day_text_for_schedule_parser(value: str | None) -> str:
+    text = str(value or "").strip()
+    if not text:
+        return ""
+    text = re.sub(r"\bto\b", "a", text, flags=re.IGNORECASE)
+    text = re.sub(r"\band\b", "y", text, flags=re.IGNORECASE)
+    for english_day, spanish_day in _WEEKDAY_LABELS_FOR_PARSER.items():
+        text = re.sub(
+            rf"\b{re.escape(english_day)}\b",
+            spanish_day,
+            text,
+            flags=re.IGNORECASE,
+        )
+    return normalize_day_typos_in_text(text)
+
+
+def _build_schedule_update_replacements_from_tool_args(
+    target: Any,
+    *,
+    day: str | None,
+    start_time: str | None,
+    end_time: str | None,
+    timezone: str,
+    build_preview: Any,
+) -> list[Any] | str:
+    has_day = bool(str(day or "").strip())
+    has_start = bool(str(start_time or "").strip())
+    has_end = bool(str(end_time or "").strip())
+    if not has_day and not has_start and not has_end:
+        return []
+
+    if has_day and has_start != has_end:
+        missing = "hora de fin" if has_start else "hora de inicio"
+        return f"Indica también la {missing} para cambiar el día y horario del bloque."
+
+    day_text = _coerce_day_text_for_schedule_parser(day)
+    if has_day and (has_start and has_end or _contains_schedule_time_range(day_text)):
+        schedule_text = " ".join(
+            part
+            for part in (
+                day_text,
+                _build_schedule_time_range_text(start_time, end_time),
+            )
+            if part
+        ).strip()
+        preview = build_preview(target, schedule_text, timezone=timezone)
+        if preview.prompt:
+            return preview.prompt
+        if not preview.replacement_blocks:
+            return "No pude interpretar el nuevo horario del bloque."
+        return [
+            _prepare_schedule_tool_block(block, timezone=timezone)
+            for block in preview.replacement_blocks
+        ]
+
+    if has_day:
+        weekdays = _extract_weekdays_for_schedule_tool(day_text)
+        if not weekdays:
+            return "Indica el día exacto del nuevo horario."
+        from services.scheduling.models import new_block_id
+
+        return [
+            _prepare_schedule_tool_block(
+                target.model_copy(
+                    update={
+                        "block_id": target.block_id if index == 0 else new_block_id(),
+                        "day_of_week": weekday,
+                        "timezone": timezone,
+                    }
+                ),
+                timezone=timezone,
+            )
+            for index, weekday in enumerate(weekdays)
+        ]
+
+    updates: dict[str, str] = {}
+    if has_start:
+        updates["start_time"] = _normalize_schedule_tool_time(start_time)
+    if has_end:
+        updates["end_time"] = _normalize_schedule_tool_time(end_time)
+    return [
+        _prepare_schedule_tool_block(
+            target.model_copy(update=updates),
+            timezone=timezone,
+        )
+    ]
+
+
+def _contains_schedule_time_range(text: str | None) -> bool:
+    return bool(
+        re.search(
+            r"\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?"
+            r"\s*(?:-|a|hasta)\s*"
+            r"\d{1,2}(?::\d{2})?(?::\d{2})?(?:\s*[ap]\.?\s*m\.?)?",
+            str(text or ""),
+            re.IGNORECASE,
+        )
+    )
+
+
+def _extract_weekdays_for_schedule_tool(day_text: str) -> list[str]:
+    from services.scheduling.text_parser import extract_natural_schedule_components
+
+    try:
+        parsed = extract_natural_schedule_components(f"{day_text} 00:00-01:00")
+    except ValueError:
+        return []
+    weekdays: list[str] = []
+    for spanish_day in list(parsed.get("days") or []):
+        weekday = SPANISH_TO_ENGLISH.get(str(spanish_day))
+        if weekday and weekday not in weekdays:
+            weekdays.append(weekday)
+    return weekdays
+
+
+def _prepare_schedule_tool_block(
+    block: Any,
+    *,
+    title: str | None = None,
+    block_type: str | None = None,
+    timezone: str,
+) -> Any:
+    from services.scheduling.models import ensure_weekly_block
+
+    base = ensure_weekly_block(block)
+    normalized_type = _normalize_schedule_block_type(block_type or base.block_type)
+    normalized_title = _normalize_schedule_tool_title(title or base.title, normalized_type)
+    if not normalized_title:
+        raise ValueError("Indica el nombre del bloque.")
+
+    weekday = _normalize_schedule_weekday(base.day_of_week)
+    start = _normalize_schedule_tool_time(base.start_time)
+    end = _normalize_schedule_tool_time(base.end_time)
+    if _time_to_minutes(start) >= _time_to_minutes(end):
+        raise ValueError(
+            "La hora de inicio debe ser anterior a la hora de fin. "
+            "Si el bloque cruza medianoche, divídelo en dos bloques."
+        )
+
+    return base.model_copy(
+        update={
+            "block_type": normalized_type,
+            "title": normalized_title,
+            "day_of_week": weekday,
+            "start_time": start,
+            "end_time": end,
+            "timezone": timezone or base.timezone,
+            "source_text": _build_schedule_block_source_text(
+                normalized_type,
+                title=normalized_title,
+                day_of_week=weekday,
+                start_time=start,
+                end_time=end,
+            ),
+            "user_confirmed": True,
+            "has_conflict": False,
+            "conflict_accepted": False,
+        }
+    )
+
+
+def _normalize_schedule_weekday(day: str | None) -> str:
+    raw = str(day or "").strip()
+    if not raw:
+        raise ValueError("Indica el día exacto del nuevo horario.")
+    lowered = raw.lower()
+    if lowered in _DAYS_ORDER:
+        return lowered
+    spanish_day = normalize_day(normalize_day_typos_in_text(raw))
+    weekday = SPANISH_TO_ENGLISH.get(spanish_day)
+    if not weekday:
+        raise ValueError(f"Día inválido: '{day}'.")
+    return weekday
+
+
+def _normalize_schedule_tool_time(value: str | None) -> str:
+    from services.scheduling.text_parser._common import normalize_parser_text, strip_seconds
+
+    raw = normalize_parser_text(str(value or "")).strip().lower()
+    raw = re.sub(r"\s+", "", raw).rstrip("h")
+    if "." in raw and not re.search(r"[ap]\.?m\.?$", raw):
+        raw = raw.replace(".", ":")
+    raw = strip_seconds(raw)
+    return normalize_schedule_time(raw)
+
+
+def _build_schedule_block_source_text(
+    block_type: str,
+    *,
+    title: str,
+    day_of_week: str,
+    start_time: str,
+    end_time: str,
+) -> str:
+    day_label = _DAYS_ES.get(day_of_week, day_of_week)
+    if block_type == "work":
+        return f"{day_label} {start_time}-{end_time}"
+    return f"{day_label} {start_time}-{end_time} {title}".strip()
+
+
+def _normalize_unavailable_windows(windows: list[dict[str, Any]]) -> list[dict[str, str | None]]:
+    normalized: list[dict[str, str | None]] = []
+    for raw_window in list(windows or []):
+        if not isinstance(raw_window, dict):
+            continue
+        raw_days = raw_window.get("days", raw_window.get("day", raw_window.get("day_of_week")))
+        days = _normalize_unavailable_days(raw_days)
+        if not days:
+            continue
+        try:
+            start_time = _normalize_time(str(raw_window.get("start_time") or raw_window.get("start") or ""))
+            end_time = _normalize_time(str(raw_window.get("end_time") or raw_window.get("end") or ""))
+            _validate_time_range(start_time, end_time)
+        except ValueError:
+            continue
+        reason = str(raw_window.get("reason") or "no disponible").strip() or "no disponible"
+        for day in days:
+            normalized.append(
+                {
+                    "day": day,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "reason": reason,
+                }
+            )
+    return normalized
+
+
+def _normalize_unavailable_days(value: Any) -> list[str]:
+    if isinstance(value, str):
+        range_days = _expand_spanish_day_range(value)
+        raw_values = range_days if range_days else [value]
+    elif isinstance(value, list):
+        raw_values = list(value)
+    else:
+        raw_values = []
+
+    days: list[str] = []
+    for raw_day in raw_values:
+        day = _normalize_unavailable_day(raw_day)
+        if day and day not in days:
+            days.append(day)
+    return days
+
+
+def _normalize_unavailable_day(value: Any) -> str | None:
+    raw = str(value or "").strip()
+    if raw in _DAYS_ORDER:
+        return raw
+    try:
+        spanish = normalize_day(raw)
+    except ValueError:
+        return None
+    return SPANISH_TO_ENGLISH.get(spanish)
+
+
+def _expand_spanish_day_range(value: str) -> list[str]:
+    raw = str(value or "").strip()
+    if not raw:
+        return []
+    separators = (" a ", " hasta ", "-")
+    for separator in separators:
+        if separator not in raw.lower():
+            continue
+        parts = raw.lower().split(separator, maxsplit=1)
+        if len(parts) != 2:
+            continue
+        start = _normalize_unavailable_day(parts[0])
+        end = _normalize_unavailable_day(parts[1])
+        if start not in _DAYS_ORDER or end not in _DAYS_ORDER:
+            continue
+        start_index = _DAYS_ORDER.index(start)
+        end_index = _DAYS_ORDER.index(end)
+        if start_index <= end_index:
+            return _DAYS_ORDER[start_index:end_index + 1]
+        return _DAYS_ORDER[start_index:] + _DAYS_ORDER[:end_index + 1]
+    return []
+
+
+def _validate_time_range(start_time: str, end_time: str) -> None:
+    start = _time_to_minutes(start_time)
+    end = _time_to_minutes(end_time)
+    if start == end:
+        raise ValueError("empty unavailable window")
+
+
+def _time_to_minutes(value: str) -> int:
+    hour, minute = str(value or "").split(":", maxsplit=1)
+    hour_int = int(hour)
+    minute_int = int(minute)
+    if not (0 <= hour_int <= 23 and 0 <= minute_int <= 59):
+        raise ValueError(f"invalid time: {value!r}")
+    return hour_int * 60 + minute_int
+
+
+def _window_to_dict(window: Any) -> dict[str, str | None]:
+    if isinstance(window, dict):
+        return {
+            "day": str(window.get("day") or ""),
+            "start_time": str(window.get("start_time") or ""),
+            "end_time": str(window.get("end_time") or ""),
+            "reason": str(window.get("reason") or "") or None,
+        }
+    return {
+        "day": str(getattr(window, "day", "") or ""),
+        "start_time": str(getattr(window, "start_time", "") or ""),
+        "end_time": str(getattr(window, "end_time", "") or ""),
+        "reason": str(getattr(window, "reason", "") or "") or None,
+    }
+
+
+def _dedupe_unavailable_windows(windows: list[dict[str, str | None]]) -> list[dict[str, str | None]]:
+    deduped: list[dict[str, str | None]] = []
+    seen: set[tuple[str, str, str, str]] = set()
+    for window in windows:
+        key = (
+            str(window.get("day") or ""),
+            str(window.get("start_time") or ""),
+            str(window.get("end_time") or ""),
+            str(window.get("reason") or ""),
+        )
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(window)
+    return deduped
+
+
+def _match_study_sessions(
+    plan_events: list,
+    *,
+    session_reference: str,
+    source_day: str | None = None,
+) -> list:
+    study_events = [
+        event
+        for event in list(plan_events or [])
+        if getattr(event, "categoria", None) == "estudio"
+    ]
+    if not study_events:
+        return []
+
+    reference = str(session_reference or "").strip()
+    source_day_label = (
+        _normalize_event_day(source_day)
+        if source_day
+        else _infer_event_day_from_reference(reference)
+    )
+    if source_day_label:
+        study_events = [event for event in study_events if getattr(event, "dia", "") == source_day_label]
+
+    reference_key = _normalize_text_key(reference)
+    if not reference_key or reference_key in {"esa", "estasesion", "esasesion", "sesion", "lasesion"}:
+        return study_events if len(study_events) == 1 else []
+
+    if reference_key.isdigit():
+        index = int(reference_key) - 1
+        return [study_events[index]] if 0 <= index < len(study_events) else []
+
+    matches = []
+    for event in study_events:
+        title_key = _normalize_text_key(getattr(event, "titulo", ""))
+        event_id_key = _normalize_text_key(getattr(event, "id", ""))
+        subject_key = _normalize_text_key(_session_subject(event))
+        if (
+            reference_key == event_id_key
+            or reference_key in title_key
+            or title_key in reference_key
+            or (subject_key and (reference_key in subject_key or subject_key in reference_key))
+        ):
+            matches.append(event)
+    return matches
+
+
+def _format_ambiguous_study_sessions(events: list) -> str:
+    lines = ["Encontré varias sesiones de estudio. Indícame cuál quieres mover:"]
+    for index, event in enumerate(events, start=1):
+        lines.append(
+            f"{index}. {event.titulo} — {event.dia} de {event.inicio} a {event.fin}"
+        )
+    return "\n".join(lines)
+
+
+def _normalize_event_day(value: str | None) -> str:
+    raw = str(value or "").strip()
+    if not raw:
+        raise ValueError("day value is required")
+    if raw in _WEEKDAY_BY_EVENT_DAY:
+        return raw
+    if raw.lower() in _EVENT_DAY_BY_WEEKDAY:
+        return _EVENT_DAY_BY_WEEKDAY[raw.lower()]
+    return normalize_day(raw)
+
+
+def _infer_event_day_from_reference(value: str) -> str | None:
+    key = _normalize_text_key(value)
+    aliases = {
+        "lunes": "Lunes",
+        "monday": "Lunes",
+        "martes": "Martes",
+        "tuesday": "Martes",
+        "miercoles": "Miercoles",
+        "wednesday": "Miercoles",
+        "jueves": "Jueves",
+        "thursday": "Jueves",
+        "viernes": "Viernes",
+        "friday": "Viernes",
+        "sabado": "Sabado",
+        "saturday": "Sabado",
+        "domingo": "Domingo",
+        "sunday": "Domingo",
+    }
+    for alias, day in aliases.items():
+        if alias in key:
+            return day
+    return None
+
+
+def _normalize_move_time(value: str | None) -> str:
+    return normalize_schedule_time(str(value or ""))
+
+
+def _event_duration_minutes(event) -> int:
+    return _time_to_minutes(event.fin) - _time_to_minutes(event.inicio)
+
+
+def _resolve_after_event_slot(
+    state: AgentState,
+    target_event,
+    *,
+    after_event_reference: str,
+    target_day: str | None,
+) -> tuple[str, str] | None:
+    candidates = _matching_fixed_blocks_after_reference(
+        state,
+        target_event,
+        after_event_reference=after_event_reference,
+        target_day=target_day,
+    )
+    if not candidates:
+        return None
+    block = candidates[0]
+    day = _EVENT_DAY_BY_WEEKDAY.get(getattr(block, "day_of_week", ""), "")
+    if not day:
+        return None
+    return day, str(getattr(block, "end_time", ""))
+
+
+def _matching_fixed_blocks_after_reference(
+    state: AgentState,
+    target_event,
+    *,
+    after_event_reference: str,
+    target_day: str | None,
+) -> list:
+    reference_key = _normalize_text_key(after_event_reference)
+    subject_key = _normalize_text_key(_session_subject(target_event))
+    generic_reference = reference_key in {
+        "",
+        "clase",
+        "clases",
+        "despuesdeclase",
+        "despuesdemiclase",
+        "despuesdelaclase",
+    }
+    blocks = []
+    for raw_block in list(state.schedule.blocks or []):
+        if not getattr(raw_block, "is_active", True):
+            continue
+        if target_day and _EVENT_DAY_BY_WEEKDAY.get(getattr(raw_block, "day_of_week", "")) != target_day:
+            continue
+        block_type = str(getattr(raw_block, "block_type", "") or "")
+        title_key = _normalize_text_key(getattr(raw_block, "title", ""))
+        if generic_reference:
+            if block_type == "academic" and subject_key and subject_key in title_key:
+                blocks.append(raw_block)
+            continue
+        if block_type == "academic" and subject_key and subject_key in reference_key and subject_key in title_key:
+            blocks.append(raw_block)
+            continue
+        if reference_key in title_key or title_key in reference_key:
+            blocks.append(raw_block)
+    if not blocks and generic_reference:
+        blocks = [
+            block
+            for block in list(state.schedule.blocks or [])
+            if getattr(block, "is_active", True)
+            and str(getattr(block, "block_type", "") or "") == "academic"
+            and (not target_day or _EVENT_DAY_BY_WEEKDAY.get(getattr(block, "day_of_week", "")) == target_day)
+        ]
+    return sorted(
+        blocks,
+        key=lambda block: (
+            _DAYS_ORDER.index(getattr(block, "day_of_week", "monday"))
+            if getattr(block, "day_of_week", "") in _DAYS_ORDER
+            else len(_DAYS_ORDER),
+            str(getattr(block, "end_time", "")),
+        ),
+    )
+
+
+def _study_session_slot_availability(
+    state: AgentState,
+    target_event,
+    *,
+    day: str,
+    start_time: str,
+    end_time: str,
+) -> tuple[bool, str]:
+    start = _time_to_minutes(start_time)
+    end = _time_to_minutes(end_time)
+    if start >= end:
+        return False, "la hora de inicio debe ser anterior a la hora de fin"
+
+    allowed_windows = _allowed_study_windows_for_day(state.constraints, day)
+    if not any(start >= window_start and end <= window_end for window_start, window_end in allowed_windows):
+        return False, "queda fuera de tus límites de estudio o descanso"
+
+    busy = _busy_intervals_for_move(state, exclude_event_id=getattr(target_event, "id", None)).get(day, [])
+    for busy_start, busy_end, label in busy:
+        if start < busy_end and end > busy_start:
+            return False, f"se cruza con {label}"
+    return True, ""
+
+
+def _suggest_study_session_slots(
+    state: AgentState,
+    target_event,
+    *,
+    preferred_day: str | None = None,
+    limit: int = 4,
+) -> list[tuple[str, str, str]]:
+    duration = _event_duration_minutes(target_event)
+    if duration <= 0:
+        return []
+    day_order = list(_WEEKDAY_BY_EVENT_DAY.keys())
+    if preferred_day in day_order:
+        day_order = [preferred_day] + [day for day in day_order if day != preferred_day]
+    busy_by_day = _busy_intervals_for_move(state, exclude_event_id=getattr(target_event, "id", None))
+    alternatives: list[tuple[str, str, str]] = []
+    for day in day_order:
+        free_windows = list(_allowed_study_windows_for_day(state.constraints, day))
+        for busy_start, busy_end, _label in busy_by_day.get(day, []):
+            free_windows = _subtract_move_interval_list(free_windows, (busy_start, busy_end))
+        for window_start, window_end in free_windows:
+            cursor = _round_up_to_step(window_start, 15)
+            while cursor + duration <= window_end:
+                start = _minutes_to_hhmm(cursor)
+                end = _minutes_to_hhmm(cursor + duration)
+                if not (day == getattr(target_event, "dia", "") and start == target_event.inicio):
+                    alternatives.append((day, start, end))
+                    if len(alternatives) >= limit:
+                        return alternatives
+                cursor += 15
+    return alternatives
+
+
+def _format_alternatives(alternatives: list[tuple[str, str, str]]) -> str:
+    if not alternatives:
+        return "No encontré alternativas con la disponibilidad actual."
+    lines = ["Alternativas disponibles:"]
+    for index, (day, start, end) in enumerate(alternatives, start=1):
+        lines.append(f"{index}. {day} de {start} a {end}")
+    return "\n".join(lines)
+
+
+def _busy_intervals_for_move(
+    state: AgentState,
+    *,
+    exclude_event_id: str | None,
+) -> dict[str, list[tuple[int, int, str]]]:
+    busy: dict[str, list[tuple[int, int, str]]] = {day: [] for day in _WEEKDAY_BY_EVENT_DAY}
+    for block in list(state.schedule.blocks or []):
+        if not getattr(block, "is_active", True):
+            continue
+        day = _EVENT_DAY_BY_WEEKDAY.get(getattr(block, "day_of_week", ""))
+        if not day:
+            continue
+        busy[day].append(
+            (
+                _time_to_minutes(str(getattr(block, "start_time", ""))),
+                _time_to_minutes(str(getattr(block, "end_time", ""))),
+                f"{getattr(block, 'title', 'bloque fijo')} [{getattr(block, 'block_type', 'horario')}]",
+            )
+        )
+
+    for event in list(state.study_plan.plan_events or []):
+        if getattr(event, "id", None) == exclude_event_id:
+            continue
+        if getattr(event, "categoria", None) != "estudio":
+            continue
+        day = _normalize_event_day(getattr(event, "dia", ""))
+        busy.setdefault(day, []).append(
+            (
+                _time_to_minutes(event.inicio),
+                _time_to_minutes(event.fin),
+                getattr(event, "titulo", "otra sesión de estudio"),
+            )
+        )
+
+    for event in list(state.events or []):
+        if getattr(event, "categoria", None) == "estudio":
+            continue
+        try:
+            day = _normalize_event_day(getattr(event, "dia", ""))
+            busy.setdefault(day, []).append(
+                (
+                    _time_to_minutes(event.inicio),
+                    _time_to_minutes(event.fin),
+                    getattr(event, "titulo", "evento del horario"),
+                )
+            )
+        except Exception:
+            continue
+
+    for day, start, end, reason in _constraint_unavailable_intervals(state.constraints):
+        busy.setdefault(day, []).append((start, end, reason or "franja no disponible"))
+
+    return {
+        day: sorted(intervals, key=lambda item: (item[0], item[1], item[2]))
+        for day, intervals in busy.items()
+    }
+
+
+def _allowed_study_windows_for_day(constraints, day: str) -> list[tuple[int, int]]:
+    try:
+        windows = _awake_move_windows(
+            sleep_start=str(constraints.sleep_start),
+            sleep_end=str(constraints.sleep_end),
+        )
+    except Exception:
+        windows = [(0, 24 * 60)]
+
+    pref_start = getattr(constraints, "preferred_study_start", None)
+    pref_end = getattr(constraints, "preferred_study_end", None)
+    if pref_start and pref_end:
+        try:
+            pref = (_time_to_minutes(pref_start), _time_to_minutes(pref_end))
+        except ValueError:
+            pref = None
+        if pref and pref[0] < pref[1]:
+            preferred = _intersect_move_intervals(windows, [pref])
+            if preferred:
+                windows = preferred
+    return windows
+
+
+def _awake_move_windows(*, sleep_start: str, sleep_end: str) -> list[tuple[int, int]]:
+    start = _time_to_minutes(sleep_start)
+    end = _time_to_minutes(sleep_end)
+    if start == end:
+        return [(0, 24 * 60)]
+    if start < end:
+        return _merge_move_intervals([(0, start), (end, 24 * 60)])
+    return [(end, start)]
+
+
+def _constraint_unavailable_intervals(constraints) -> list[tuple[str, int, int, str]]:
+    intervals: list[tuple[str, int, int, str]] = []
+    windows = list(getattr(constraints, "unavailable_windows", []) or [])
+    for raw_window in windows:
+        window = _window_to_dict(raw_window)
+        day_key = _normalize_unavailable_day(window.get("day"))
+        if not day_key:
+            continue
+        day = _EVENT_DAY_BY_WEEKDAY[day_key]
+        try:
+            start = _time_to_minutes(str(window.get("start_time") or ""))
+            end = _time_to_minutes(str(window.get("end_time") or ""))
+        except ValueError:
+            continue
+        reason = str(window.get("reason") or "franja no disponible")
+        if start == end:
+            continue
+        if start < end:
+            intervals.append((day, start, end, reason))
+            continue
+        intervals.append((day, start, 24 * 60, reason))
+        next_day_key = _DAYS_ORDER[(_DAYS_ORDER.index(day_key) + 1) % len(_DAYS_ORDER)]
+        intervals.append((_EVENT_DAY_BY_WEEKDAY[next_day_key], 0, end, reason))
+    return intervals
+
+
+def _session_subject(event) -> str:
+    title = str(getattr(event, "titulo", "") or "")
+    if "·" in title:
+        return title.split("·", maxsplit=1)[1].strip()
+    lowered = title.lower()
+    for prefix in ("sesión de estudio", "sesion de estudio", "estudio", "repaso", "bloque"):
+        if lowered.startswith(prefix):
+            return title[len(prefix):].strip(" :-")
+    return title
+
+
+def _subtract_move_interval_list(
+    windows: list[tuple[int, int]],
+    busy_interval: tuple[int, int],
+) -> list[tuple[int, int]]:
+    busy_start, busy_end = busy_interval
+    remaining: list[tuple[int, int]] = []
+    for window_start, window_end in windows:
+        if busy_end <= window_start or busy_start >= window_end:
+            remaining.append((window_start, window_end))
+            continue
+        if busy_start > window_start:
+            remaining.append((window_start, busy_start))
+        if busy_end < window_end:
+            remaining.append((busy_end, window_end))
+    return _merge_move_intervals(remaining)
+
+
+def _intersect_move_intervals(
+    a: list[tuple[int, int]],
+    b: list[tuple[int, int]],
+) -> list[tuple[int, int]]:
+    result: list[tuple[int, int]] = []
+    for a_start, a_end in a:
+        for b_start, b_end in b:
+            start = max(a_start, b_start)
+            end = min(a_end, b_end)
+            if start < end:
+                result.append((start, end))
+    return _merge_move_intervals(result)
+
+
+def _merge_move_intervals(intervals: list[tuple[int, int]]) -> list[tuple[int, int]]:
+    clean = sorted(
+        [(start, end) for start, end in intervals if end > start],
+        key=lambda item: (item[0], item[1]),
+    )
+    if not clean:
+        return []
+    merged = [clean[0]]
+    for start, end in clean[1:]:
+        current_start, current_end = merged[-1]
+        if start <= current_end:
+            merged[-1] = (current_start, max(current_end, end))
+            continue
+        merged.append((start, end))
+    return merged
+
+
+def _round_up_to_step(value: int, step: int) -> int:
+    remainder = value % step
+    return value if remainder == 0 else value + (step - remainder)
+
+
+def _minutes_to_hhmm(value: int) -> str:
+    hour = value // 60
+    minute = value % 60
+    return f"{hour:02d}:{minute:02d}"
 
 
 def _format_pending_activity_line(activity: Any, *, today: date, due: date | None) -> str:

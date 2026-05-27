@@ -22,10 +22,11 @@ from dataclasses import dataclass
 from services.personalization import get_technique
 from services.priorities import PrioritizedSubject, resolve_prioritized_subjects
 from services.priorities.state_helpers import ensure_subject_items
-from services.scheduling.constants import DAY_LABELS, DAY_ORDER
+from services.scheduling.constants import DAY_LABELS, DAY_ORDER, SPANISH_TO_ENGLISH
 from services.scheduling.models import WeeklyScheduleBlock, ensure_weekly_block
 from schemas.planning import StudyPlanState
 from schemas.scheduling import Event
+from services.scheduling.validation import normalize_day as normalize_spanish_day
 from services.scheduling.validation import new_event_id, sort_events, validate_event
 
 from .state_helpers import ensure_constraints, ensure_study_profile
@@ -282,6 +283,8 @@ def _build_available_windows(
         busy_by_day[block.day_of_week].append(
             (_to_minutes(block.start_time), _to_minutes(block.end_time))
         )
+    for day, start_minute, end_minute in _unavailable_window_intervals(constraints):
+        busy_by_day[day].append((start_minute, end_minute))
 
     awake_intervals = _awake_intervals(
         sleep_start=constraints.sleep_start,
@@ -306,6 +309,46 @@ def _build_available_windows(
             free_windows = _subtract_interval_list(free_windows, interval)
         available[day] = free_windows
     return available
+
+
+def _unavailable_window_intervals(constraints) -> list[tuple[str, int, int]]:
+    intervals: list[tuple[str, int, int]] = []
+    windows = list(getattr(constraints, "unavailable_windows", []) or [])
+    for window in windows:
+        day = _normalize_constraint_day(_constraint_value(window, "day"))
+        if day not in DAY_ORDER:
+            continue
+        try:
+            start = _to_minutes(str(_constraint_value(window, "start_time") or ""))
+            end = _to_minutes(str(_constraint_value(window, "end_time") or ""))
+        except Exception:
+            continue
+        if start == end:
+            continue
+        if start < end:
+            intervals.append((day, start, end))
+            continue
+        intervals.append((day, start, 24 * 60))
+        next_day = DAY_ORDER[(DAY_ORDER.index(day) + 1) % len(DAY_ORDER)]
+        intervals.append((next_day, 0, end))
+    return intervals
+
+
+def _constraint_value(window, key: str):
+    if isinstance(window, dict):
+        return window.get(key)
+    return getattr(window, key, None)
+
+
+def _normalize_constraint_day(value) -> str:
+    raw = str(value or "").strip()
+    if raw in DAY_ORDER:
+        return raw
+    try:
+        spanish = normalize_spanish_day(raw)
+    except ValueError:
+        spanish = raw.title()
+    return SPANISH_TO_ENGLISH.get(spanish, raw.lower())
 
 
 def _awake_intervals(*, sleep_start: str, sleep_end: str) -> list[tuple[int, int]]:

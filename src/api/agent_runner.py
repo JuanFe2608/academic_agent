@@ -20,6 +20,11 @@ from services.channels.whatsapp_service import WhatsAppChannelService
 
 logger = logging.getLogger(__name__)
 
+_NO_VISIBLE_AGENT_RESPONSE_MESSAGE = (
+    "Recibí tu mensaje, pero no pude generar una respuesta clara en este turno.\n\n"
+    "Por favor escríbeme de nuevo qué quieres hacer para continuar. 📚"
+)
+
 
 class _BoundedLockMap:
     """Mapa acotado de asyncio.Lock con eviction LRU de locks inactivos.
@@ -196,7 +201,12 @@ class AgentRunner:
 
         new_responses = _extract_new_ai_messages(result.get("messages", []))
         if not new_responses:
-            logger.warning("El agente no genero respuestas para thread_id=%s", thread_id)
+            logger.warning(
+                "El agente no genero respuestas visibles para thread_id=%s message_count=%s",
+                thread_id,
+                len(result.get("messages", [])),
+            )
+            self._send_direct_message(thread_id, _NO_VISIBLE_AGENT_RESPONSE_MESSAGE)
             return
 
         try:

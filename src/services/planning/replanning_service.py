@@ -20,9 +20,15 @@ from repositories.planning.replan_repository import (
 )
 from schemas.planning import StudyPlanState
 from schemas.scheduling import Event
-from services.scheduling.constants import DAY_LABELS as WEEKLY_DAY_LABELS
+from services.scheduling.constants import DAY_LABELS as WEEKLY_DAY_LABELS, SPANISH_TO_ENGLISH
 from services.scheduling.models import ensure_weekly_block
-from services.scheduling.validation import DAY_ORDER, normalize_time, sort_events, validate_event
+from services.scheduling.validation import (
+    DAY_ORDER,
+    normalize_day as normalize_spanish_day,
+    normalize_time,
+    sort_events,
+    validate_event,
+)
 
 from .state_helpers import ensure_constraints, ensure_study_plan_state, study_plan_state_to_update
 from .study_plan_sync_service import sync_subjects_and_study_plan
@@ -641,12 +647,71 @@ def _find_next_slot(
         free_windows = list(awake_windows)
         for busy in occupied.get(day, []):
             free_windows = _subtract_interval_list(free_windows, busy)
+        for busy in _unavailable_windows_for_day(normalized_constraints, day):
+            free_windows = _subtract_interval_list(free_windows, busy)
         for start, end in free_windows:
             cursor = _round_up_to_step(start, 15)
             while cursor + duration_minutes <= end:
                 return day, _minutes_to_hhmm(cursor), _minutes_to_hhmm(cursor + duration_minutes)
                 cursor += 15
     return None
+
+
+def _unavailable_windows_for_day(
+    constraints: object,
+    day_label: str,
+) -> list[tuple[int, int]]:
+    intervals: list[tuple[int, int]] = []
+    target = _day_label_to_english(day_label)
+    if not target:
+        return intervals
+    weekly_days = list(WEEKLY_DAY_LABELS.keys())
+    for window in list(getattr(constraints, "unavailable_windows", []) or []):
+        day = _normalize_unavailable_day(_constraint_value(window, "day"))
+        if day not in weekly_days:
+            continue
+        try:
+            start = _to_minutes(str(_constraint_value(window, "start_time") or ""))
+            end = _to_minutes(str(_constraint_value(window, "end_time") or ""))
+        except Exception:
+            continue
+        if start == end:
+            continue
+        if start < end:
+            if day == target:
+                intervals.append((start, end))
+            continue
+        if day == target:
+            intervals.append((start, 24 * 60))
+        next_day = weekly_days[(weekly_days.index(day) + 1) % len(weekly_days)]
+        if next_day == target:
+            intervals.append((0, end))
+    return _merge_intervals(intervals)
+
+
+def _constraint_value(window, key: str):
+    if isinstance(window, dict):
+        return window.get(key)
+    return getattr(window, key, None)
+
+
+def _day_label_to_english(day_label: str) -> str | None:
+    for english, spanish in WEEKLY_DAY_LABELS.items():
+        if spanish == day_label:
+            return english
+    normalized = _normalize_unavailable_day(day_label)
+    return normalized if normalized in WEEKLY_DAY_LABELS else None
+
+
+def _normalize_unavailable_day(value) -> str:
+    raw = str(value or "").strip()
+    if raw in WEEKLY_DAY_LABELS:
+        return raw
+    try:
+        spanish = normalize_spanish_day(raw)
+    except ValueError:
+        spanish = raw.title()
+    return SPANISH_TO_ENGLISH.get(spanish, raw.lower())
 
 
 def _start_day_index(

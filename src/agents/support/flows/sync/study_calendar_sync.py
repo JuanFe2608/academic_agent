@@ -7,6 +7,7 @@ from zoneinfo import ZoneInfo
 
 from agents.support.dependencies import (
     get_outlook_calendar_sync_service,
+    get_outlook_study_calendar_reconciliation_service,
     get_study_plan_materialization_service,
 )
 from agents.support.nodes.utils import append_message, detect_new_input, parse_yes_no
@@ -17,6 +18,7 @@ from services.planning import ensure_study_plan_state, update_study_plan_state
 from services.sync import OutlookCalendarSyncPreviewResult, OutlookCalendarSyncResult
 
 _CALENDAR_SYNC_DOMAIN = "calendar_sync"
+_MANUAL_DRIFT_OPERATION = "resolve_study_calendar_manual_changes"
 
 
 def sync_study_calendar_turn(state: AgentState) -> dict:
@@ -101,6 +103,47 @@ def _preview_and_prompt(
         )
 
     service = get_outlook_calendar_sync_service()
+    reconciliation = _reconcile_study_calendar_before_sync(
+        state,
+        student_id=student_id,
+        study_plan_profile_id=study_plan.persisted_profile_id,
+    )
+    if reconciliation is not None:
+        if not reconciliation.get("reconciled"):
+            return _closed_update(
+                state,
+                current_count=current_count if has_new_input else state.get("user_message_count", 0),
+                last_text=last_text if has_new_input else state.get("last_user_text"),
+                message=str(reconciliation.get("message") or "No pude revisar Outlook antes de sincronizar."),
+                study_plan_status="manual_reconciliation_failed",
+                error_code=str(reconciliation.get("error_code") or "manual_reconciliation_failed"),
+                materialization_update=materialization_update,
+            )
+        if reconciliation.get("manual_changes"):
+            confirmation_payload = {
+                "domain": _CALENDAR_SYNC_DOMAIN,
+                "operation": _MANUAL_DRIFT_OPERATION,
+                "study_plan_profile_id": study_plan.persisted_profile_id,
+                "findings": list(reconciliation.get("findings") or []),
+            }
+            return {
+                "phase": "running",
+                "awaiting_user_input": True,
+                "user_message_count": current_count if has_new_input else state.get("user_message_count", 0),
+                "last_user_text": last_text if has_new_input else state.get("last_user_text"),
+                "messages": append_message(messages, "assistant", _manual_study_calendar_change_prompt(reconciliation)),
+                **_study_plan_sync_state_update(
+                    state,
+                    status="awaiting_manual_outlook_decision",
+                    preview={
+                        "drifted_count": int(reconciliation.get("drifted_count") or 0),
+                        "missing_count": int(reconciliation.get("missing_count") or 0),
+                    },
+                    materialization_update=materialization_update,
+                ),
+                **_confirmation_interaction(state, confirmation_payload),
+            }
+
     preview = service.preview_student_calendar_sync(
         student_id=student_id,
         calendar_state=state.get("calendar", {}),
@@ -165,6 +208,15 @@ def _handle_confirmation(
     current_count: int,
 ) -> dict:
     messages = state.get("messages", [])
+    payload = dict(state.interaction_state.last_confirmation_payload or {})
+    if payload.get("operation") == _MANUAL_DRIFT_OPERATION:
+        return _handle_manual_drift_decision(
+            state,
+            last_text=last_text,
+            current_count=current_count,
+            payload=payload,
+        )
+
     decision = parse_yes_no(last_text)
     if decision is None:
         prompt = "Responde si o no para confirmar la sincronizacion con Outlook."
@@ -234,6 +286,124 @@ def _handle_confirmation(
     }
 
 
+def _handle_manual_drift_decision(
+    state: AgentState,
+    *,
+    last_text: str,
+    current_count: int,
+    payload: dict[str, object],
+) -> dict:
+    messages = state.get("messages", [])
+    decision = _parse_manual_drift_decision(last_text)
+    if decision is None:
+        prompt = (
+            "Responde con una opción:\n"
+            "1. Conservar el cambio de Outlook\n"
+            "2. Restaurar el plan del asistente en Outlook\n"
+            "3. Cancelar"
+        )
+        return {
+            "phase": "running",
+            "awaiting_user_input": True,
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "messages": append_message(messages, "assistant", prompt),
+            **_confirmation_interaction(state, payload),
+        }
+
+    if decision == "keep":
+        return {
+            "phase": "end",
+            "awaiting_user_input": False,
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "messages": append_message(
+                messages,
+                "assistant",
+                (
+                    "De acuerdo. Conservaré el cambio manual en Outlook y no lo sobrescribiré ahora. "
+                    "Tu plan oficial del asistente queda igual."
+                ),
+            ),
+            **_study_plan_sync_state_update(
+                state,
+                status="manual_outlook_change_kept",
+                result={
+                    "decision": "keep",
+                    "manual_change_count": len(list(payload.get("findings") or [])),
+                },
+            ),
+            **_clear_interaction(state),
+        }
+
+    if decision == "cancel":
+        return {
+            "phase": "end",
+            "awaiting_user_input": False,
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "messages": append_message(messages, "assistant", "Listo, no hice cambios en Outlook."),
+            **_study_plan_sync_state_update(state, status="manual_outlook_decision_cancelled"),
+            **_clear_interaction(state),
+        }
+
+    student_id = _student_id(state)
+    _mark_missing_study_calendar_links_deleted(
+        state,
+        student_id=student_id,
+        findings=list(payload.get("findings") or []),
+    )
+    service = get_outlook_calendar_sync_service()
+    result = service.sync_student_calendar(
+        student_id=student_id,
+        calendar_state=state.get("calendar", {}),
+        calendar_id=dict(state.get("calendar", {})).get("calendar_id"),
+        study_plan_profile_id=None,
+    )
+    if not result.synced:
+        return {
+            "phase": "end",
+            "awaiting_user_input": False,
+            "user_message_count": current_count,
+            "last_user_text": last_text,
+            "messages": append_message(messages, "assistant", _sync_failure_message(result)),
+            **_study_plan_sync_state_update(
+                state,
+                status=_sync_status_for_error(result.error_code),
+                error_code=result.error_code,
+            ),
+            **_calendar_update(state, result),
+            **_clear_interaction(state),
+        }
+
+    return {
+        "phase": "end",
+        "awaiting_user_input": False,
+        "user_message_count": current_count,
+        "last_user_text": last_text,
+        "messages": append_message(
+            messages,
+            "assistant",
+            (
+                "Listo. Restauré Outlook usando el plan oficial del asistente. "
+                f"Eventos creados o actualizados: {result.upserted_count}; eliminados: {result.deleted_count}."
+            ),
+        ),
+        **_study_plan_sync_state_update(
+            state,
+            status="synced",
+            result={
+                "decision": "restore",
+                "upserted_count": result.upserted_count,
+                "deleted_count": result.deleted_count,
+                "synced_event_count": len(result.synced_event_map),
+            },
+        ),
+        **_calendar_update(state, result),
+        **_clear_interaction(state),
+    }
+
+
 def _materialize_instances_for_calendar(
     state: AgentState,
     *,
@@ -276,6 +446,132 @@ def _materialize_instances_for_calendar(
         "No pude preparar las sesiones fechadas para Outlook. "
         f"Detalle: {result.error_code or result.detail or 'materialization_error'}."
     )
+
+
+def _reconcile_study_calendar_before_sync(
+    state: AgentState,
+    *,
+    student_id: int,
+    study_plan_profile_id: int,
+) -> dict[str, object] | None:
+    try:
+        service = get_outlook_study_calendar_reconciliation_service()
+        result = service.reconcile_student_calendar(
+            student_id=student_id,
+            calendar_id=dict(state.get("calendar", {})).get("calendar_id"),
+            study_plan_profile_id=study_plan_profile_id,
+        )
+    except RepositoryConfigurationError:
+        return None
+    except Exception as exc:
+        return {
+            "reconciled": False,
+            "error_code": "outlook_study_calendar_reconciliation_error",
+            "message": f"No pude revisar cambios manuales en Outlook. Detalle: {exc}",
+        }
+
+    if not result.reconciled:
+        if result.error_code in {"microsoft_connection_not_found", "microsoft_oauth_error"}:
+            return None
+        return {
+            "reconciled": False,
+            "error_code": result.error_code or "outlook_study_calendar_reconciliation_failed",
+            "message": (
+                "No pude revisar cambios manuales en Outlook antes de sincronizar. "
+                f"Detalle: {result.detail or result.error_code or 'desconocido'}."
+            ),
+        }
+
+    manual_findings = [
+        finding
+        for finding in result.findings
+        if finding.status in {"drifted", "missing"}
+    ]
+    if not manual_findings:
+        return {"reconciled": True, "manual_changes": False}
+    return {
+        "reconciled": True,
+        "manual_changes": True,
+        "drifted_count": result.drifted_count,
+        "missing_count": result.missing_count,
+        "findings": [
+            {
+                "source_instance_key": finding.source_instance_key,
+                "external_event_id": finding.external_event_id,
+                "status": finding.status,
+                "title": finding.title,
+                "drift_fields": list(finding.drift_fields),
+                "detail": finding.detail,
+                "web_link": finding.web_link,
+            }
+            for finding in manual_findings
+        ],
+    }
+
+
+def _manual_study_calendar_change_prompt(reconciliation: dict[str, object]) -> str:
+    drifted_count = int(reconciliation.get("drifted_count") or 0)
+    missing_count = int(reconciliation.get("missing_count") or 0)
+    finding = next(iter(list(reconciliation.get("findings") or [])), {})
+    title = str(finding.get("title") or "esta sesión").strip()
+    noun = "esta sesión" if drifted_count + missing_count == 1 else "estas sesiones"
+    return (
+        f"Detecté que editaste {noun} en Outlook: {title}.\n"
+        f"Sesiones editadas: {drifted_count}. Sesiones eliminadas: {missing_count}.\n\n"
+        "¿Quieres conservar ese cambio o restaurar el plan del asistente?\n"
+        "(Escribe el número de la opción que quieres elegir)\n"
+        "1. Conservar el cambio de Outlook\n"
+        "2. Restaurar el plan del asistente en Outlook\n"
+        "3. Cancelar"
+    )
+
+
+def _parse_manual_drift_decision(text: str | None) -> str | None:
+    normalized = _normalize_decision_text(text)
+    if normalized.startswith("1") or any(token in normalized for token in ("conservar", "mantener", "dejar outlook")):
+        return "keep"
+    if normalized.startswith("2") or any(token in normalized for token in ("restaurar", "sobrescribir", "plan del asistente")):
+        return "restore"
+    if normalized.startswith("3") or any(token in normalized for token in ("cancelar", "no hacer", "despues", "después")):
+        return "cancel"
+    return None
+
+
+def _normalize_decision_text(text: str | None) -> str:
+    import unicodedata
+
+    raw = str(text or "").strip().lower()
+    return (
+        unicodedata.normalize("NFKD", raw)
+        .encode("ascii", "ignore")
+        .decode("ascii")
+    )
+
+
+def _mark_missing_study_calendar_links_deleted(
+    state: AgentState,
+    *,
+    student_id: int | None,
+    findings: list[object],
+) -> None:
+    missing_keys: list[str] = []
+    for finding in findings:
+        if not isinstance(finding, dict):
+            continue
+        if finding.get("status") != "missing":
+            continue
+        key = str(finding.get("source_instance_key") or "").strip()
+        if key:
+            missing_keys.append(key)
+    if not missing_keys:
+        return
+    try:
+        get_outlook_study_calendar_reconciliation_service().mark_missing_links_deleted(
+            student_id=student_id,
+            source_instance_keys=missing_keys,
+        )
+    except Exception:
+        return
 
 
 def _study_plan_sync_state_update(

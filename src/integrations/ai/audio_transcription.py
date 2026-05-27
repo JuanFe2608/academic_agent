@@ -18,6 +18,16 @@ logger = logging.getLogger(__name__)
 
 
 _MAX_AUDIO_BYTES = 25 * 1024 * 1024
+_FORMAT_REJECTION_MARKERS = (
+    "invalid file format",
+    "unsupported file format",
+    "unsupported audio format",
+    "file format is not supported",
+    "format not supported",
+    "unrecognized file format",
+    "could not decode audio",
+    "failed to decode audio",
+)
 
 
 @dataclass(frozen=True)
@@ -106,10 +116,26 @@ class AzureOpenAIAudioTranscriptionService:
                     language=language,
                 )
         except Exception as exc:
+            error_code, detail = _classify_azure_transcription_error(exc, file_path)
+            suffix = file_path.suffix.lower() or "<sin_extension>"
+            if error_code == "audio_format_rejected":
+                logger.warning(
+                    "Azure rejected audio format for transcription suffix=%s size_bytes=%s detail=%s",
+                    suffix,
+                    size,
+                    detail,
+                )
+            else:
+                logger.warning(
+                    "Azure audio transcription failed suffix=%s size_bytes=%s detail=%s",
+                    suffix,
+                    size,
+                    detail,
+                )
             return AudioTranscriptionResult(
                 ok=False,
-                error_code="audio_transcription_failed",
-                detail=str(exc),
+                error_code=error_code,
+                detail=detail,
             )
 
         text = _transcription_text(result)
@@ -147,6 +173,26 @@ def _transcription_text(result: object) -> str:
     if isinstance(result, dict):
         return str(result.get("text") or "").strip()
     return ""
+
+
+def _classify_azure_transcription_error(
+    exc: Exception,
+    file_path: Path,
+) -> tuple[str, str]:
+    raw_detail = str(exc).strip() or exc.__class__.__name__
+    suffix = file_path.suffix.lower() or "sin extensión"
+    normalized = raw_detail.lower()
+    if any(marker in normalized for marker in _FORMAT_REJECTION_MARKERS):
+        return (
+            "audio_format_rejected",
+            (
+                f"Azure rechazó el formato del archivo {suffix}. "
+                "Si es una nota de voz WhatsApp OGG/Opus, verificar que se descargó "
+                "con extensión .ogg o convertir a wav/mp3 antes de reintentar. "
+                f"Detalle original: {raw_detail}"
+            ),
+        )
+    return "audio_transcription_failed", f"Azure no pudo transcribir el audio: {raw_detail}"
 
 
 __all__ = [

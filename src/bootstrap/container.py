@@ -60,9 +60,17 @@ from services.sync.outlook_fixed_schedule_sync_service import (
     OutlookFixedScheduleSyncService,
     build_outlook_fixed_schedule_sync_service,
 )
+from services.sync.outlook_fixed_schedule_reconciliation_service import (
+    OutlookFixedScheduleReconciliationService,
+    build_outlook_fixed_schedule_reconciliation_service,
+)
 from services.sync.outlook_fixed_schedule_repair_service import (
     OutlookFixedScheduleRepairService,
     build_outlook_fixed_schedule_repair_service,
+)
+from services.sync.outlook_study_calendar_reconciliation_service import (
+    OutlookStudyCalendarReconciliationService,
+    build_outlook_study_calendar_reconciliation_service,
 )
 from services.sync.microsoft_oauth_flow_service import (
     MicrosoftOAuthFlowService,
@@ -273,6 +281,18 @@ class AppContainer:
     ) -> None:
         self._set_override("outlook_fixed_schedule_sync_service", service)
 
+    def get_outlook_fixed_schedule_reconciliation_service(self) -> OutlookFixedScheduleReconciliationService:
+        return self._get_or_build(
+            "outlook_fixed_schedule_reconciliation_service",
+            self._build_outlook_fixed_schedule_reconciliation_service,
+        )
+
+    def set_outlook_fixed_schedule_reconciliation_service(
+        self,
+        service: OutlookFixedScheduleReconciliationService | None,
+    ) -> None:
+        self._set_override("outlook_fixed_schedule_reconciliation_service", service)
+
     def get_outlook_fixed_schedule_repair_service(self) -> OutlookFixedScheduleRepairService:
         return self._get_or_build(
             "outlook_fixed_schedule_repair_service",
@@ -284,6 +304,18 @@ class AppContainer:
         service: OutlookFixedScheduleRepairService | None,
     ) -> None:
         self._set_override("outlook_fixed_schedule_repair_service", service)
+
+    def get_outlook_study_calendar_reconciliation_service(self) -> OutlookStudyCalendarReconciliationService:
+        return self._get_or_build(
+            "outlook_study_calendar_reconciliation_service",
+            self._build_outlook_study_calendar_reconciliation_service,
+        )
+
+    def set_outlook_study_calendar_reconciliation_service(
+        self,
+        service: OutlookStudyCalendarReconciliationService | None,
+    ) -> None:
+        self._set_override("outlook_study_calendar_reconciliation_service", service)
 
     def get_microsoft_todo_sync_service(self) -> MicrosoftTodoSyncService:
         return self._get_or_build(
@@ -358,10 +390,26 @@ class AppContainer:
             auth_client=self.get_microsoft_oauth_client(),
         )
 
+    def _build_outlook_fixed_schedule_reconciliation_service(self) -> OutlookFixedScheduleReconciliationService:
+        schedule_service = self.get_schedule_service()
+        return build_outlook_fixed_schedule_reconciliation_service(
+            schedule_repository=getattr(schedule_service, "repository", None),
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
+
     def _build_outlook_fixed_schedule_repair_service(self) -> OutlookFixedScheduleRepairService:
         schedule_service = self.get_schedule_service()
         return build_outlook_fixed_schedule_repair_service(
             schedule_repository=getattr(schedule_service, "repository", None),
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
+
+    def _build_outlook_study_calendar_reconciliation_service(self) -> OutlookStudyCalendarReconciliationService:
+        materialization_service = self.get_study_plan_materialization_service()
+        return build_outlook_study_calendar_reconciliation_service(
+            instances_repository=getattr(materialization_service, "repository", None),
             state_repository=self.get_microsoft_graph_state_repository(),
             auth_client=self.get_microsoft_oauth_client(),
         )

@@ -234,6 +234,20 @@ def set_outlook_fixed_schedule_sync_service(
     get_app_container().set_outlook_fixed_schedule_sync_service(service)
 
 
+def get_outlook_fixed_schedule_reconciliation_service() -> OutlookFixedScheduleReconciliationService:
+    """Retorna el servicio reusable de reconciliación del horario fijo."""
+
+    return get_app_container().get_outlook_fixed_schedule_reconciliation_service()
+
+
+def set_outlook_fixed_schedule_reconciliation_service(
+    service: OutlookFixedScheduleReconciliationService | None,
+) -> None:
+    """Permite inyectar la reconciliación del horario fijo en pruebas."""
+
+    get_app_container().set_outlook_fixed_schedule_reconciliation_service(service)
+
+
 def get_outlook_fixed_schedule_repair_service() -> OutlookFixedScheduleRepairService:
     """Retorna el servicio reusable de reparación del horario fijo en Outlook."""
 
@@ -246,6 +260,20 @@ def set_outlook_fixed_schedule_repair_service(
     """Permite inyectar el repair service del horario fijo en pruebas."""
 
     get_app_container().set_outlook_fixed_schedule_repair_service(service)
+
+
+def get_outlook_study_calendar_reconciliation_service() -> OutlookStudyCalendarReconciliationService:
+    """Retorna el servicio de reconciliación de sesiones de estudio en Outlook."""
+
+    return get_app_container().get_outlook_study_calendar_reconciliation_service()
+
+
+def set_outlook_study_calendar_reconciliation_service(
+    service: OutlookStudyCalendarReconciliationService | None,
+) -> None:
+    """Permite inyectar reconciliación de sesiones de estudio en pruebas."""
+
+    get_app_container().set_outlook_study_calendar_reconciliation_service(service)
 
 
 def get_microsoft_todo_sync_service() -> MicrosoftTodoSyncService:
@@ -284,8 +312,10 @@ __all__ = [
     "get_microsoft_todo_sync_service",
     "get_onboarding_service",
     "get_outlook_calendar_sync_service",
+    "get_outlook_fixed_schedule_reconciliation_service",
     "get_outlook_fixed_schedule_repair_service",
     "get_outlook_fixed_schedule_sync_service",
+    "get_outlook_study_calendar_reconciliation_service",
     "get_outlook_one_time_event_service",
     "get_personalization_service",
     "get_reminders_service",
@@ -302,8 +332,10 @@ __all__ = [
     "set_microsoft_todo_sync_service",
     "set_onboarding_service",
     "set_outlook_calendar_sync_service",
+    "set_outlook_fixed_schedule_reconciliation_service",
     "set_outlook_fixed_schedule_repair_service",
     "set_outlook_fixed_schedule_sync_service",
+    "set_outlook_study_calendar_reconciliation_service",
     "set_outlook_one_time_event_service",
     "set_personalization_service",
     "set_reminders_service",

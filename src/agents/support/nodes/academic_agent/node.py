@@ -142,9 +142,13 @@ def academic_agent(state: AgentState, config: RunnableConfig | None = None) -> d
     if tool_updates:
         from services.planning import reconcile_react_tool_updates
         tool_updates = reconcile_react_tool_updates(state, tool_updates)
+    final_message_content = _empty_react_response_fallback(
+        result["messages"][-1].content,
+        tool_updates=tool_updates,
+    )
     final_message = _final_message_content_with_schedule_preview(
         state,
-        result["messages"][-1].content,
+        final_message_content,
         tool_updates,
     )
 
@@ -335,6 +339,45 @@ def _final_message_content_with_schedule_preview(
         return content
     except Exception:
         return final_message
+
+
+def _empty_react_response_fallback(
+    final_message: object,
+    *,
+    tool_updates: dict | None = None,
+) -> object:
+    """Evita dejar al estudiante sin respuesta si el ReAct retorna contenido vacío."""
+
+    if not _is_empty_message_content(final_message):
+        return final_message
+    if tool_updates:
+        return (
+            "Listo. Procesé tu solicitud, pero no pude generar una explicación clara. "
+            "¿Qué quieres revisar ahora?"
+        )
+    return (
+        "Tuve un problema generando la respuesta. "
+        "¿Me puedes repetir tu solicitud o darme un poco más de detalle?"
+    )
+
+
+def _is_empty_message_content(content: object) -> bool:
+    if content is None:
+        return True
+    if isinstance(content, str):
+        return not content.strip()
+    if isinstance(content, list):
+        for item in content:
+            if isinstance(item, str) and item.strip():
+                return False
+            if isinstance(item, dict):
+                text = item.get("text")
+                if isinstance(text, str) and text.strip():
+                    return False
+                if item.get("type") in {"image_url", "image"}:
+                    return False
+        return True
+    return False
 
 
 def _append_operational_note(update: dict, note: str) -> None:
@@ -574,11 +617,11 @@ def _persist_todo_task_id_updates(
     update: dict,
     pre_sync_snapshot: list,
 ) -> None:
-    """Persiste solo las actividades cuyo todo_task_id cambió tras la sincronización con To Do.
+    """Persiste cambios derivados de la sincronización con To Do.
 
-    Evita escribir en BD actividades que ya fueron persistidas en el primer
-    _persist_activities_after_tool_update del mismo turno y cuyo único cambio
-    esperado es el todo_task_id asignado por Microsoft To Do.
+    Evita reescribir toda la lista después de una persistencia previa y guarda
+    solo los campos que To Do puede cambiar: id externo, estado completado,
+    título o fecha importada con confirmación.
     """
     student_id = getattr(state.student_profile, "persisted_student_id", None)
     if not student_id:
@@ -596,11 +639,16 @@ def _persist_todo_task_id_updates(
     except Exception:
         return
 
-    pre_sync_todo_id: dict[str, str | None] = {}
+    pre_sync_values: dict[str, tuple[str | None, str | None, str | None, str | None]] = {}
     for raw in pre_sync_snapshot:
         try:
             act = AcademicActivity.model_validate(raw) if isinstance(raw, dict) else raw
-            pre_sync_todo_id[act.activity_id] = getattr(act, "todo_task_id", None)
+            pre_sync_values[act.activity_id] = (
+                getattr(act, "todo_task_id", None),
+                getattr(act, "status", None),
+                getattr(act, "activity_title", None),
+                getattr(act, "due_date", None),
+            )
         except Exception:
             pass
 
@@ -612,10 +660,15 @@ def _persist_todo_task_id_updates(
             persisted_list.append(raw if isinstance(raw, dict) else raw.model_dump())
             continue
 
-        current_todo_task_id = getattr(act, "todo_task_id", None)
-        pre_todo_task_id = pre_sync_todo_id.get(act.activity_id)
+        current_values = (
+            getattr(act, "todo_task_id", None),
+            getattr(act, "status", None),
+            getattr(act, "activity_title", None),
+            getattr(act, "due_date", None),
+        )
+        pre_values = pre_sync_values.get(act.activity_id)
 
-        if pre_todo_task_id == current_todo_task_id:
+        if pre_values == current_values:
             persisted_list.append(act.model_dump())
             continue
 
@@ -714,6 +767,21 @@ def _sync_academic_activities_to_todo_after_tool_update(
         )
     except Exception:
         return None
+
+    if getattr(result, "requires_confirmation", False):
+        update_payload: dict[str, object] = {
+            "operational_note": (
+                "Nota operativa: detecté cambios manuales en Microsoft To Do. "
+                "No los sobrescribí. Pregunta al estudiante si quiere importarlos "
+                "al asistente o restaurar To Do con la información del asistente."
+            )
+        }
+        if getattr(result, "synced_activities", None):
+            update_payload["academic_activities"] = [
+                activity.model_dump(mode="python")
+                for activity in result.synced_activities
+            ]
+        return update_payload
 
     if not getattr(result, "synced", False):
         detail = getattr(result, "detail", None) or getattr(result, "error_code", None) or "error desconocido"

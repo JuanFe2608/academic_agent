@@ -140,7 +140,8 @@ class TestCycleStateVisibility:
         # Mock del servicio de sincronización con To Do
         captured_activities: list = []
 
-        def _fake_sync(student_id, task_list_id, activities):
+        def _fake_sync(student_id, task_list_id, activities, **kwargs):
+            del kwargs
             captured_activities.extend(activities)
             result = MagicMock()
             result.synced = False  # evita lógica de merge adicional

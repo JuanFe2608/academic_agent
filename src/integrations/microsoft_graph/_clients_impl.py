@@ -10,7 +10,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import quote
 from urllib.request import Request, urlopen
 
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 _DEFAULT_GRAPH_BASE_URL = "https://graph.microsoft.com/v1.0"
 
@@ -102,6 +102,19 @@ class UpsertedMicrosoftTodoTask:
 
 
 @dataclass(frozen=True)
+class MicrosoftTodoTaskSnapshot:
+    """Lectura resumida de una tarea existente en Microsoft To Do."""
+
+    external_task_id: str
+    title: str
+    due_at: datetime | None = None
+    is_completed: bool = False
+    importance: str | None = None
+    last_modified_at: datetime | None = None
+    web_link: str | None = None
+
+
+@dataclass(frozen=True)
 class MicrosoftTodoTaskList:
     """Resumen de una lista disponible en Microsoft To Do."""
 
@@ -179,6 +192,13 @@ class MicrosoftTodoClient(Protocol):
         access_token: str,
     ) -> list[MicrosoftTodoTaskList]: ...
 
+    def list_tasks(
+        self,
+        *,
+        access_token: str,
+        task_list_id: str,
+    ) -> list[MicrosoftTodoTaskSnapshot]: ...
+
     def upsert_tasks(
         self,
         *,
@@ -250,6 +270,17 @@ class DisabledMicrosoftTodoClient:
         *,
         access_token: str,
     ) -> list[MicrosoftTodoTaskList]:
+        raise MicrosoftGraphClientError(
+            error_code="todo_client_not_configured",
+            detail="MicrosoftTodoClient no configurado. Falta adapter real de Microsoft Graph.",
+        )
+
+    def list_tasks(
+        self,
+        *,
+        access_token: str,
+        task_list_id: str,
+    ) -> list[MicrosoftTodoTaskSnapshot]:
         raise MicrosoftGraphClientError(
             error_code="todo_client_not_configured",
             detail="MicrosoftTodoClient no configurado. Falta adapter real de Microsoft Graph.",
@@ -518,6 +549,58 @@ class GraphMicrosoftTodoClient:
             )
         return task_lists
 
+    def list_tasks(
+        self,
+        *,
+        access_token: str,
+        task_list_id: str,
+    ) -> list[MicrosoftTodoTaskSnapshot]:
+        if not str(task_list_id).strip():
+            raise MicrosoftGraphClientError(
+                error_code="missing_task_list_id",
+                detail="Debes suministrar un task_list_id para leer Microsoft To Do.",
+            )
+
+        list_id = quote(task_list_id, safe="")
+        url = (
+            f"{self.graph_base_url}/me/todo/lists/{list_id}/tasks"
+            "?$select=id,title,dueDateTime,status,importance,lastModifiedDateTime,webLink"
+        )
+        tasks: list[MicrosoftTodoTaskSnapshot] = []
+        while url:
+            response = self.transport.request_json(
+                method="GET",
+                url=url,
+                access_token=access_token,
+            )
+            raw_tasks = response.get("value")
+            if not isinstance(raw_tasks, list):
+                raise MicrosoftGraphClientError(
+                    error_code="microsoft_todo_tasks_invalid_payload",
+                    detail="Microsoft Graph devolvió una colección de tareas inválida.",
+                )
+            for raw in raw_tasks:
+                if not isinstance(raw, dict):
+                    continue
+                task_id = _optional_str(raw.get("id"))
+                if not task_id:
+                    continue
+                tasks.append(
+                    MicrosoftTodoTaskSnapshot(
+                        external_task_id=task_id,
+                        title=str(raw.get("title") or "").strip(),
+                        due_at=_coerce_graph_datetime(raw.get("dueDateTime")),
+                        is_completed=str(raw.get("status") or "").lower() == "completed",
+                        importance=_optional_str(raw.get("importance")),
+                        last_modified_at=_coerce_graph_datetime(
+                            raw.get("lastModifiedDateTime")
+                        ),
+                        web_link=_optional_str(raw.get("webLink")),
+                    )
+                )
+            url = _optional_str(response.get("@odata.nextLink"))
+        return tasks
+
     def upsert_tasks(
         self,
         *,
@@ -744,6 +827,45 @@ def _coerce_graph_datetime_dict(value: Any) -> dict[str, str]:
         "dateTime": str(value.get("dateTime") or "").strip(),
         "timeZone": str(value.get("timeZone") or "").strip(),
     }
+
+
+def _coerce_graph_datetime(value: Any) -> datetime | None:
+    if isinstance(value, dict):
+        raw = str(value.get("dateTime") or "").strip()
+        timezone_name = str(value.get("timeZone") or "").strip()
+    else:
+        raw = str(value or "").strip()
+        timezone_name = ""
+    if not raw:
+        return None
+    normalized = raw.replace("Z", "+00:00")
+    if "." in normalized:
+        prefix, suffix = normalized.split(".", 1)
+        offset_start = len(suffix)
+        for marker in ("+", "-"):
+            marker_index = suffix.find(marker)
+            if marker_index > 0:
+                offset_start = min(offset_start, marker_index)
+        fraction = suffix[:offset_start][:6]
+        tail = suffix[offset_start:]
+        normalized = f"{prefix}.{fraction}{tail}"
+    try:
+        parsed = datetime.fromisoformat(normalized)
+    except ValueError:
+        try:
+            parsed_date = date.fromisoformat(raw[:10])
+        except ValueError:
+            return None
+        return datetime(parsed_date.year, parsed_date.month, parsed_date.day, tzinfo=timezone.utc)
+    if parsed.tzinfo is None:
+        if timezone_name and timezone_name.upper() != "UTC":
+            try:
+                parsed = parsed.replace(tzinfo=ZoneInfo(timezone_name))
+            except ZoneInfoNotFoundError:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+        else:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+    return parsed.astimezone(timezone.utc)
 
 
 def _is_missing_graph_resource_error(exc: MicrosoftGraphClientError) -> bool:

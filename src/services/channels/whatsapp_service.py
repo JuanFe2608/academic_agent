@@ -28,6 +28,13 @@ from utils.media_artifacts import (
 )
 
 _WHATSAPP_IMAGE_CAPTION_LIMIT = 1024
+_DOWNLOAD_EXTENSION_BY_MIME_TYPE = {
+    "audio/amr": ".amr",
+    "audio/mp4": ".m4a",
+    "audio/ogg": ".ogg",
+    "audio/webm": ".webm",
+    "audio/x-m4a": ".m4a",
+}
 
 
 class WhatsAppChannelService:
@@ -362,8 +369,21 @@ def _download_filename(inbound: WhatsAppInboundMessage) -> str | None:
         return None
     if inbound.media.filename:
         return inbound.media.filename
-    extension = mimetypes.guess_extension(str(inbound.media.mime_type or "")) or ".bin"
+    extension = _download_extension(inbound.media.mime_type)
     return f"{inbound.media.id}{extension}"
+
+
+def _download_extension(mime_type: str | None) -> str:
+    normalized = _normalized_mime_type(mime_type)
+    if not normalized:
+        return ".bin"
+    if normalized in _DOWNLOAD_EXTENSION_BY_MIME_TYPE:
+        return _DOWNLOAD_EXTENSION_BY_MIME_TYPE[normalized]
+    return mimetypes.guess_extension(normalized) or ".bin"
+
+
+def _normalized_mime_type(mime_type: str | None) -> str:
+    return str(mime_type or "").split(";", 1)[0].strip().lower()
 
 
 def _channel_media_type(value: str) -> str:

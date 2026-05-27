@@ -324,9 +324,9 @@ def _build_repair_prompt(blocks: list[Any]) -> str:
         f"Eventos editados: {drifted_count}. Eventos eliminados: {missing_count}.\n\n"
         "Tu horario oficial sigue guardado en el asistente. ¿Qué quieres hacer?\n"
         "(Escribe el número de la opción que quieres elegir)\n"
-        "1. ✅ Restaurar Outlook con el horario oficial del asistente\n"
-        "2. 🗓️ Organizar un horario fijo nuevo\n"
-        "3. ⏳ Revisarlo después"
+        "1. Restaurar Outlook con el horario oficial del asistente\n"
+        "2. Conservar el cambio de Outlook y organizar un horario fijo nuevo\n"
+        "3. Revisarlo después"
     )
 
 

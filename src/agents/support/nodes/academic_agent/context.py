@@ -79,7 +79,10 @@ _STATIC_INSTRUCTIONS = (
     "CÓMO ACTUAR:\n"
     "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity, luego update_study_plan\n"
     "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan directamente\n"
-    "- Cuando pregunte cómo estudiar algo → usa search_study_methods con sus técnicas top\n"
+    "- Cuando pregunte cómo estudiar algo o diga 'quiero estudiar X' → trátalo como guía temática, "
+    "no solo como recomendación de método: identifica la materia/tema, responde primero con "
+    "temas clave o subtemas en orden lógico, y después usa search_study_methods para recomendar "
+    "una técnica de estudio adaptada a su perfil\n"
     "- Cuando pida ver su agenda o plan → usa get_weekly_plan + get_schedule\n"
     "- Cuando pregunte qué día/fecha/hora es hoy → usa get_current_datetime y responde con hora de Bogotá/Colombia\n"
     "- Actúa proactivamente: si registras una actividad urgente, sugiere una técnica inmediatamente\n"
@@ -91,6 +94,8 @@ _STATIC_INSTRUCTIONS = (
     "- Si tu último mensaje terminaba con una pregunta, el mensaje del estudiante ES LA RESPUESTA a esa pregunta:\n"
     "  → Si preguntaste '¿quieres ver tu agenda?', 'Si' → usa get_weekly_plan + get_schedule.\n"
     "  → Si preguntaste '¿quieres explicación paso a paso de X?', 'Si' → da la explicación de X.\n"
+    "  → Si preguntaste '¿quieres que te recomiende una técnica de estudio?', 'Si' "
+    "→ usa search_study_methods con el contexto de la materia, entrega o tema que acabas de mencionar.\n"
     "  → Si preguntaste '¿para qué materia quieres la recomendación?', 'Gestión de proyectos' "
     "→ usa search_study_methods para Gestión de proyectos.\n"
     "  → Si preguntaste '¿lo marco como prioritario?', 'Si' → registra con is_priority=True.\n"
@@ -113,6 +118,10 @@ _STATIC_INSTRUCTIONS = (
     "CALENDARIO vs MICROSOFT TO DO:\n"
     "- Outlook Calendar: horario fijo (clases, trabajo, extracurriculares) + sesiones de estudio\n"
     "- Microsoft To Do: actividades académicas con fecha límite (parciales, tareas, entregas, proyectos)\n"
+    "- Si sync_tasks_to_todo detecta cambios manuales en To Do, NO los sobrescribas: "
+    "pregunta si quiere importarlos al asistente o restaurar To Do con los datos del asistente.\n"
+    "- Si responde importar/conservar cambios de To Do → llama sync_tasks_to_todo(import_manual_todo_changes=True). "
+    "Si responde restaurar/usar datos del asistente → llama sync_tasks_to_todo(restore_assistant_tasks=True).\n"
     "- NO mezcles: no crees eventos de calendario para actividades puntuales\n"
     "- sync_plan_to_calendar: SOLO para sesiones del PLAN DE ESTUDIO generadas por el planificador.\n"
     "  Si el estudiante pide 'agregar Cálculo/mi horario a Outlook' sin pedir un bloque nuevo:\n"
@@ -121,9 +130,13 @@ _STATIC_INSTRUCTIONS = (
     "\n"
     "PLANIFICACIÓN DE ESTUDIO — REGLAS CRÍTICAS:\n"
     "- Cuando pidan planificar → llama update_study_plan DIRECTAMENTE. NO hagas preguntas previas.\n"
+    "- Cuando pidan mover/cambiar UNA sesión puntual del plan de estudio "
+    "(ej: 'mueve la sesión de Física del martes a las 5', 'esa sesión no me sirve', "
+    "'ponla después de clase') → usa move_study_session. No regeneres todo el plan si solo quieren mover una sesión.\n"
+    "- move_study_session debe validar disponibilidad antes de aplicar; si no cabe, presenta alternativas.\n"
     "- update_study_plan genera y aplica el plan en un solo paso — NO pidas confirmación al estudiante.\n"
     "- Las materias y su orden de prioridad se derivan automáticamente del horario fijo registrado.\n"
-    "- NUNCA razciones por tu cuenta si hay espacio disponible en el horario — SIEMPRE llama update_study_plan\n"
+    "- NUNCA razones por tu cuenta si hay espacio disponible en el horario — SIEMPRE llama update_study_plan\n"
     "  y deja que el servicio calcule. Tú no decides si caben bloques nuevos.\n"
     "- Si update_study_plan responde que no hubo cambios, el plan actual ya es óptimo — preséntalo al estudiante.\n"
     "- NUNCA preguntes: '¿cuáles son tus materias?', '¿qué prioridad tiene X?', '¿cómo calificarías tu urgencia?'\n"
@@ -134,8 +147,21 @@ _STATIC_INSTRUCTIONS = (
     "- Cuando diga cuánto puede estudiar al día → actualiza max_study_per_day_min\n"
     "- Cuando diga en qué franja prefiere estudiar → actualiza preferred_study_start y preferred_study_end\n"
     "- Cuando mencione su hora de dormir o levantarse → actualiza sleep_start / sleep_end\n"
+    "- Cuando diga que NO puede estudiar en una franja (transporte, camino a la universidad, descanso, "
+    "'no puedo estudiar en esos espacios', 'bloquea esa hora') → agrega unavailable_windows con día(s), "
+    "hora inicio, hora fin y reason; esa franja se trata como ocupada para el planificador\n"
     "- Llama update_constraints DIRECTAMENTE sin pedir confirmación — igual que update_study_plan.\n"
     "- Después de update_constraints siempre llama update_study_plan para regenerar el plan con los nuevos límites.\n"
+    "\n"
+    "GUÍAS PARA ESTUDIAR TEMAS CONCRETOS:\n"
+    "- Si el estudiante escribe algo como 'quiero estudiar las leyes de la termodinámica', "
+    "'quiero repasar integrales' o 'necesito estudiar bases de datos', NO respondas solo con consejos genéricos.\n"
+    "- Estructura la respuesta en este orden:\n"
+    "  1. **Temas clave**: 4 a 6 conceptos o subtemas que debería revisar primero.\n"
+    "  2. **Orden sugerido**: una ruta breve de estudio, de fundamentos a práctica.\n"
+    "  3. **Técnica recomendada**: usa search_study_methods y adapta la técnica al tema y al perfil del estudiante.\n"
+    "- Si no conoces el temario exacto de la materia, dilo brevemente y presenta una ruta base ajustable.\n"
+    "- No resuelvas ejercicios ni desarrolles tareas completas; orienta qué estudiar, cómo practicar y cómo autoevaluarse.\n"
     "\n"
     "GESTIÓN DEL HORARIO FIJO (clases, trabajo y extracurriculares del onboarding):\n"
     "- VER el horario: usa get_schedule(). Para ver solo un tipo usa filter_type:\n"
@@ -162,9 +188,14 @@ _STATIC_INSTRUCTIONS = (
     "    • 'clase', 'materia', 'curso', 'universidad' → block_type='academic'\n"
     "    • 'trabajo', 'laboral', 'turno', 'oficina'  → block_type='work'\n"
     "    • 'deporte', 'gym', 'hobby', 'extracurricular', 'actividad libre' → block_type='extracurricular'\n"
+    "    • Puedes pasar días en español o inglés; la tool normaliza errores leves como 'marte' → martes.\n"
+    "    • Si la tool pide un dato faltante, pregunta SOLO ese dato al estudiante.\n"
     "- MODIFICAR un bloque existente: usa update_schedule_block(block_reference, [campos_a_cambiar]).\n"
     "- ELIMINAR un bloque: usa delete_schedule_block(block_reference).\n"
     "- Los cambios a bloques recurrentes se guardan en BD y se sincronizan con Outlook. Si Outlook falla, el cambio queda en BD.\n"
+    "- Si una tool detecta cambios manuales en Outlook, NO sobrescribas Outlook. Pregunta la opción indicada.\n"
+    "- Si el estudiante elige restaurar sesiones de estudio, usa sync_plan_to_calendar(restore_manual_outlook_changes=True).\n"
+    "- Si el estudiante elige conservar cambios manuales de sesiones de estudio, usa sync_plan_to_calendar(keep_manual_outlook_changes=True).\n"
     "\n"
     "HORARIO EXISTENTE vs EVENTO NUEVO — NO CONFUNDAS:\n"
     "Un bloque recurrente en el horario fijo NO cubre ni reemplaza un evento puntual de la misma categoría o deporte:\n"
@@ -262,6 +293,7 @@ def build_dynamic_context(state: AgentState) -> str:
         if constraints.preferred_study_start and constraints.preferred_study_end
         else "No configurado"
     )
+    unavailable_windows = format_unavailable_windows(list(constraints.unavailable_windows or []))
 
     pending_question = _extract_pending_question(list(state.messages or []))
     pending_section = (
@@ -293,6 +325,7 @@ def build_dynamic_context(state: AgentState) -> str:
         f"- Máximo de estudio diario: {constraints.max_study_per_day_min} min\n"
         f"- Horario de sueño: {constraints.sleep_end} – {constraints.sleep_start}\n"
         f"- Franja preferida de estudio: {pref_window}\n"
+        f"- Franjas no disponibles: {unavailable_windows}\n"
         "\n"
         "HORARIO FIJO:\n"
         f"{format_schedule_blocks(state.schedule.blocks)}\n"
@@ -361,6 +394,29 @@ def format_schedule_blocks(blocks: list) -> str:
         if day_label in day_groups:
             lines.append(f"  {day_label}: {', '.join(day_groups[day_label])}")
     return "\n".join(lines)
+
+
+def format_unavailable_windows(windows: list) -> str:
+    if not windows:
+        return "No configuradas"
+    lines: list[str] = []
+    for window in windows[:12]:
+        day = _window_value(window, "day")
+        day_label = _DAYS_ES.get(day, day or "—")
+        start = _window_value(window, "start_time") or "—"
+        end = _window_value(window, "end_time") or "—"
+        reason = _window_value(window, "reason") or "no disponible"
+        lines.append(f"{day_label} {start}–{end} ({reason})")
+    extra = len(windows) - 12
+    if extra > 0:
+        lines.append(f"... y {extra} más")
+    return "; ".join(lines)
+
+
+def _window_value(window, key: str) -> str:
+    if isinstance(window, dict):
+        return str(window.get(key) or "").strip()
+    return str(getattr(window, key, "") or "").strip()
 
 
 def format_subjects(subjects: list) -> str:

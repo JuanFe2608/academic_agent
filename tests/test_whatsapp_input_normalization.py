@@ -5,12 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from types import SimpleNamespace
 
+import pytest
 from langchain_core.messages import AIMessage, HumanMessage
 
 from api.agent_runner import AgentRunner
 from integrations.whatsapp import WhatsAppInboundMedia, WhatsAppInboundMessage
 from schemas.channels import ChannelInboundMessage, ChannelMedia
 from services.channels.input_normalization import NormalizedAgentInput, WhatsAppInputNormalizer
+from services.channels.whatsapp_service import _download_filename
 
 
 @dataclass
@@ -59,6 +61,15 @@ class _FakeAgent:
                 AIMessage(content="Listo, lo organicé."),
             ]
         }
+
+
+class _FakeSilentAgent:
+    def __init__(self) -> None:
+        self.calls: list[tuple[dict, dict]] = []
+
+    def invoke(self, input_data: dict, *, config: dict):
+        self.calls.append((input_data, config))
+        return {"messages": list(input_data["messages"])}
 
 
 class _FakeDirectNormalizer:
@@ -221,6 +232,27 @@ def test_normalizer_falls_back_when_audio_transcription_fails() -> None:
     assert "no pude transcribirlo" in result.direct_response
 
 
+@pytest.mark.parametrize(
+    ("mime_type", "expected_filename"),
+    [
+        ("audio/ogg", "media-123.ogg"),
+        ("audio/ogg; codecs=opus", "media-123.ogg"),
+        ("audio/ogg; codecs=\"opus\"", "media-123.ogg"),
+        ("Audio/OGG; codecs=opus", "media-123.ogg"),
+        ("audio/mp4", "media-123.m4a"),
+        ("audio/amr", "media-123.amr"),
+        ("audio/webm", "media-123.webm"),
+    ],
+)
+def test_audio_download_filename_normalizes_audio_mime_with_codecs(
+    mime_type: str,
+    expected_filename: str,
+) -> None:
+    message = _message(media_type="audio", mime_type=mime_type)
+
+    assert _download_filename(message) == expected_filename
+
+
 def test_agent_runner_sends_direct_response_without_invoking_graph() -> None:
     runner = AgentRunner.__new__(AgentRunner)
     runner._whatsapp_service = _FakeSendService()
@@ -250,3 +282,20 @@ def test_agent_runner_invokes_graph_with_normalized_text() -> None:
     assert runner._whatsapp_service.sent == [
         ("573001112233", [AIMessage(content="Listo, lo organicé.")])
     ]
+
+
+def test_agent_runner_sends_recovery_message_when_graph_returns_no_visible_response() -> None:
+    runner = AgentRunner.__new__(AgentRunner)
+    runner._whatsapp_service = _FakeSendService()
+    runner._input_normalizer = _FakeAgentNormalizer()
+    runner._agent = _FakeSilentAgent()
+
+    runner._run_agent_sync(_message(text="si"))
+
+    assert runner._whatsapp_service.sent
+    recipient_id, messages = runner._whatsapp_service.sent[0]
+    assert recipient_id == "573001112233"
+    assert any(
+        "recibí" in str(message).lower() or "recibi" in str(message).lower()
+        for message in messages
+    )

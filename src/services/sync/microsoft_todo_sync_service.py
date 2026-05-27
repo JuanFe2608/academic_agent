@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import date as date_type
 from typing import Any
 
 from integrations.microsoft_graph.auth_client import (
@@ -17,6 +18,7 @@ from integrations.microsoft_graph.models import (
     MicrosoftGraphClientError,
     MicrosoftTodoClient,
     MicrosoftTodoTaskList,
+    MicrosoftTodoTaskSnapshot,
     MicrosoftTodoTaskUpsert,
 )
 from integrations.microsoft_graph.todo_client import GraphMicrosoftTodoClient
@@ -77,6 +79,10 @@ class MicrosoftTodoActivitySyncResult:
     upserted_count: int = 0
     deleted_count: int = 0
     synced_activities: list = field(default_factory=list)
+    imported_completed_count: int = 0
+    inbound_change_count: int = 0
+    inbound_changes: list[dict[str, object]] = field(default_factory=list)
+    requires_confirmation: bool = False
     error_code: str | None = None
     detail: str | None = None
 
@@ -381,6 +387,8 @@ class MicrosoftTodoSyncService:
         student_id: int | None,
         task_list_id: str | None,
         activities: list,
+        import_manual_todo_changes: bool = False,
+        restore_manual_todo_changes: bool = False,
     ) -> MicrosoftTodoActivitySyncResult:
         """Sincroniza actividades académicas con Microsoft To Do.
 
@@ -388,8 +396,22 @@ class MicrosoftTodoSyncService:
         conserva todo_task_id. priority_level='alta' se marca con importance='high' (⭐).
         Usa activity.todo_task_id como id externo para evitar duplicados.
         Retorna las actividades con todo_task_id actualizado.
+
+        Antes de escribir, lee las tareas vinculadas en To Do. Las tareas
+        completadas se importan localmente; cambios manuales de título o fecha
+        requieren confirmación explícita para evitar sobrescribirlos.
         """
         from schemas.planning import AcademicActivity
+
+        if import_manual_todo_changes and restore_manual_todo_changes:
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                error_code="ambiguous_todo_manual_change_decision",
+                detail=(
+                    "Elige solo una acción: importar cambios manuales desde To Do "
+                    "o restaurar To Do con los datos del asistente."
+                ),
+            )
 
         if not student_id:
             return MicrosoftTodoActivitySyncResult(
@@ -461,6 +483,45 @@ class MicrosoftTodoSyncService:
         if not coerced:
             return MicrosoftTodoActivitySyncResult(synced=True, upserted_count=0, synced_activities=[])
 
+        linked_activities = [
+            act for act in coerced if str(getattr(act, "todo_task_id", "") or "").strip()
+        ]
+        imported_completed_count = 0
+        inbound_changes: list[dict[str, object]] = []
+        if linked_activities:
+            try:
+                existing_tasks = self.client.list_tasks(
+                    access_token=token_result.token.access_token,
+                    task_list_id=effective_task_list_id,
+                )
+            except MicrosoftGraphClientError as exc:
+                return MicrosoftTodoActivitySyncResult(
+                    synced=False,
+                    error_code=getattr(exc, "error_code", "microsoft_todo_read_error"),
+                    detail=getattr(exc, "detail", str(exc)),
+                )
+
+            coerced, imported_completed_count, inbound_changes = (
+                _reconcile_inbound_activity_task_changes(
+                    activities=coerced,
+                    existing_tasks=existing_tasks,
+                    import_manual_todo_changes=import_manual_todo_changes,
+                    restore_manual_todo_changes=restore_manual_todo_changes,
+                )
+            )
+
+        if inbound_changes and not (import_manual_todo_changes or restore_manual_todo_changes):
+            return MicrosoftTodoActivitySyncResult(
+                synced=False,
+                synced_activities=coerced,
+                imported_completed_count=imported_completed_count,
+                inbound_change_count=len(inbound_changes),
+                inbound_changes=inbound_changes,
+                requires_confirmation=True,
+                error_code="microsoft_todo_manual_changes_detected",
+                detail=_format_inbound_todo_change_detail(inbound_changes),
+            )
+
         upsertable = [act for act in coerced if act.status in {"pending", "completed"}]
         deleteable = [
             act
@@ -505,6 +566,9 @@ class MicrosoftTodoSyncService:
             upserted_count=len(upserted),
             deleted_count=len(deleted),
             synced_activities=updated_activities,
+            imported_completed_count=imported_completed_count,
+            inbound_change_count=len(inbound_changes),
+            inbound_changes=inbound_changes,
         )
 
 
@@ -582,6 +646,138 @@ def _build_activity_todo_task(activity: object) -> "MicrosoftTodoTaskUpsert":
         importance=importance,
         is_completed=(status == "completed"),
         existing_external_task_id=existing_task_id,
+    )
+
+
+def _reconcile_inbound_activity_task_changes(
+    *,
+    activities: list,
+    existing_tasks: list[MicrosoftTodoTaskSnapshot],
+    import_manual_todo_changes: bool,
+    restore_manual_todo_changes: bool,
+) -> tuple[list, int, list[dict[str, object]]]:
+    snapshot_by_id = {
+        snapshot.external_task_id: snapshot
+        for snapshot in existing_tasks
+        if str(snapshot.external_task_id or "").strip()
+    }
+
+    updated: list = []
+    imported_completed_count = 0
+    inbound_changes: list[dict[str, object]] = []
+
+    for activity in activities:
+        snapshot = snapshot_by_id.get(str(getattr(activity, "todo_task_id", "") or "").strip())
+        if snapshot is None or getattr(activity, "status", None) == "deleted":
+            updated.append(activity)
+            continue
+
+        current = activity
+        if snapshot.is_completed and getattr(activity, "status", None) != "completed":
+            current = current.model_copy(update={"status": "completed"})
+            imported_completed_count += 1
+
+        expected_task = _build_activity_todo_task(current)
+        title_changed = str(snapshot.title or "").strip() != str(expected_task.title or "").strip()
+        expected_due_date = _activity_due_date(current)
+        snapshot_due_date = _todo_snapshot_due_date(snapshot)
+        due_changed = expected_due_date != snapshot_due_date
+
+        if title_changed or due_changed:
+            inbound_changes.append(
+                {
+                    "activity_id": getattr(current, "activity_id", None),
+                    "subject_name": getattr(current, "subject_name", None),
+                    "activity_title": getattr(current, "activity_title", None),
+                    "todo_task_id": getattr(current, "todo_task_id", None),
+                    "changed_fields": [
+                        field
+                        for field, changed in (
+                            ("title", title_changed),
+                            ("due_date", due_changed),
+                        )
+                        if changed
+                    ],
+                    "assistant_title": expected_task.title,
+                    "todo_title": snapshot.title,
+                    "assistant_due_date": (
+                        expected_due_date.isoformat()
+                        if expected_due_date is not None
+                        else None
+                    ),
+                    "todo_due_date": (
+                        snapshot_due_date.isoformat()
+                        if snapshot_due_date is not None
+                        else None
+                    ),
+                }
+            )
+
+            if import_manual_todo_changes:
+                changes: dict[str, object] = {}
+                if title_changed:
+                    changes["activity_title"] = _activity_title_from_todo_title(
+                        snapshot.title,
+                        current,
+                    )
+                if due_changed:
+                    changes["due_date"] = (
+                        snapshot_due_date.isoformat()
+                        if snapshot_due_date is not None
+                        else None
+                    )
+                current = current.model_copy(update=changes)
+            elif restore_manual_todo_changes:
+                pass
+
+        updated.append(current)
+
+    return updated, imported_completed_count, inbound_changes
+
+
+def _activity_due_date(activity: object) -> date_type | None:
+    raw_due_date = getattr(activity, "due_date", None)
+    if not raw_due_date:
+        return None
+    try:
+        return date_type.fromisoformat(str(raw_due_date))
+    except ValueError:
+        return None
+
+
+def _todo_snapshot_due_date(snapshot: MicrosoftTodoTaskSnapshot) -> date_type | None:
+    if snapshot.due_at is None:
+        return None
+    return snapshot.due_at.date()
+
+
+def _activity_title_from_todo_title(raw_title: str, activity: object) -> str:
+    title = str(raw_title or "").strip()
+    if title.startswith("⭐"):
+        title = title[1:].strip()
+
+    activity_type = str(getattr(activity, "activity_type", "") or "").strip()
+    subject_name = str(getattr(activity, "subject_name", "") or "").strip()
+    bracket_prefix = f"[{activity_type}]"
+    if activity_type and title.lower().startswith(bracket_prefix.lower()):
+        title = title[len(bracket_prefix) :].strip()
+    subject_prefix = f"{subject_name}:"
+    if subject_name and title.lower().startswith(subject_prefix.lower()):
+        title = title[len(subject_prefix) :].strip()
+    return title or str(getattr(activity, "activity_title", "") or "").strip()
+
+
+def _format_inbound_todo_change_detail(changes: list[dict[str, object]]) -> str:
+    labels = []
+    for change in changes[:3]:
+        title = str(change.get("activity_title") or change.get("assistant_title") or "actividad")
+        fields = ", ".join(str(field) for field in change.get("changed_fields") or [])
+        labels.append(f"{title} ({fields})" if fields else title)
+    suffix = "" if len(changes) <= 3 else f" y {len(changes) - 3} más"
+    joined = "; ".join(labels)
+    return (
+        "Detecté cambios manuales en Microsoft To Do antes de sincronizar: "
+        f"{joined}{suffix}. Confirma si quieres importarlos al asistente o restaurar To Do."
     )
 
 
