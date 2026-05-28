@@ -10,6 +10,7 @@ from services.scheduling.ai_support import (
     llm_normalize_schedule,
 )
 from services.scheduling.extracurricular_parsing import parse_extracurricular_items
+from services.scheduling.heuristic_schedule_parsing import split_schedule_chunks
 from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     is_ambiguous_time_range,
@@ -284,7 +285,7 @@ def _normalize_with_json_llm(
 
 
 def _heuristic_academic_blocks(text: str, timezone: str) -> list[WeeklyScheduleBlock]:
-    segments = _split_segments(text)
+    segments = split_schedule_chunks(text)
     blocks: list[WeeklyScheduleBlock] = []
     default_days: list[str] = []
     for segment in segments:

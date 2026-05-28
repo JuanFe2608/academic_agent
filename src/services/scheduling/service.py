@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import date
 from typing import Any
 
@@ -19,6 +19,33 @@ from repositories.scheduling.repository import (
     build_schedule_repository,
 )
 
+_VALID_DAY_OF_WEEK: frozenset[str] = frozenset(
+    ["monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"]
+)
+_VALID_BLOCK_TYPES: frozenset[str] = frozenset(["academic", "work", "extracurricular"])
+
+
+def _block_field(block: Any, name: str) -> str:
+    if isinstance(block, dict):
+        return str(block.get(name) or "").strip()
+    return str(getattr(block, name, "") or "").strip()
+
+
+def _validate_block(block: Any) -> str | None:
+    """Returns a friendly error description if the block is invalid, else None."""
+    day = _block_field(block, "day_of_week").lower()
+    if day not in _VALID_DAY_OF_WEEK:
+        title = _block_field(block, "title") or "bloque sin nombre"
+        start = _block_field(block, "start_time")
+        end = _block_field(block, "end_time")
+        time_range = f" {start}-{end}" if start and end else ""
+        return f"'{title}'{time_range} (día no reconocido: {day!r})"
+    btype = _block_field(block, "block_type").lower()
+    if btype not in _VALID_BLOCK_TYPES:
+        title = _block_field(block, "title") or "bloque sin nombre"
+        return f"'{title}' (tipo desconocido: {btype!r})"
+    return None
+
 
 @dataclass(frozen=True)
 class PersistScheduleResult:
@@ -30,6 +57,7 @@ class PersistScheduleResult:
     schedule_end_date: date | None = None
     error_code: str | None = None
     detail: str | None = None
+    invalid_blocks: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -86,19 +114,31 @@ class ScheduleService:
                 error_code="missing_student_id",
                 detail="No encontré el estudiante persistido para asociar el horario.",
             )
-        if not blocks:
+
+        valid_blocks: list[Any] = []
+        invalid_descriptions: list[str] = []
+        for block in blocks:
+            error = _validate_block(block)
+            if error is None:
+                valid_blocks.append(block)
+            else:
+                invalid_descriptions.append(error)
+
+        if not valid_blocks:
             return PersistScheduleResult(
                 persisted=False,
-                error_code="empty_schedule",
+                error_code="no_valid_blocks",
                 detail="No hay bloques válidos para persistir.",
+                invalid_blocks=tuple(invalid_descriptions),
             )
+
         try:
             record = self.repository.replace_student_schedule(
                 student_id=student_id,
                 occupation=occupation,
                 timezone=timezone,
                 summary_text=summary_text,
-                blocks=blocks,
+                blocks=valid_blocks,
                 conflicts=conflicts,
                 conflicts_accepted=conflicts_accepted,
                 schedule_end_date=schedule_end_date,
@@ -108,12 +148,14 @@ class ScheduleService:
                 persisted=False,
                 error_code="schedule_persistence_error",
                 detail=str(exc),
+                invalid_blocks=tuple(invalid_descriptions),
             )
         return PersistScheduleResult(
             persisted=True,
             schedule_profile_id=record.schedule_profile_id,
             block_count=record.block_count,
             schedule_end_date=record.schedule_end_date,
+            invalid_blocks=tuple(invalid_descriptions),
         )
 
     def get_current_schedule_profile(

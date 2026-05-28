@@ -105,6 +105,41 @@ def test_fixed_schedule_repair_prompts_when_drift_is_pending() -> None:
         set_schedule_service(None)
 
 
+def test_fixed_schedule_repair_option2_returns_to_running_without_wiping_schedule() -> None:
+    service, profile_id = _schedule_service_with_drifted_block()
+    set_schedule_service(service)
+    try:
+        state = AgentState(
+            phase="schedule_repair",
+            awaiting_user_input=True,
+            student_profile={"persisted_student_id": 21},
+            schedule={
+                "repair_stage": "awaiting_decision",
+                "persisted_profile_id": profile_id,
+            },
+        )
+
+        update = handle_fixed_schedule_repair_turn(
+            state,
+            has_new_input=True,
+            last_text="2",
+            current_count=1,
+        )
+
+        # Vuelve a running — NO regresa al onboarding determinístico (schedules)
+        assert update["phase"] == "running"
+        assert update["awaiting_user_input"] is False
+        assert update["schedule"]["repair_stage"] == "idle"
+        # Los bloques en DB siguen intactos (el servicio no fue llamado para borrarlos)
+        remaining = service.list_current_schedule_blocks(student_id=21)
+        assert remaining.found and len(remaining.blocks) == 1
+        # El mensaje guía al estudiante a describir los cambios conversacionalmente
+        assert "Conservo el horario" in update["messages"][0].content
+        assert "Calculo" in update["messages"][0].content  # bloque drifted nombrado
+    finally:
+        set_schedule_service(None)
+
+
 def test_fixed_schedule_repair_restores_outlook_after_confirmation() -> None:
     service, profile_id = _schedule_service_with_drifted_block()
     repair_service = _FixedScheduleRepairServiceStub()

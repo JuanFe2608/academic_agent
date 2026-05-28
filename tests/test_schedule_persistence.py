@@ -88,6 +88,140 @@ class _FixedScheduleSyncServiceStub:
         return _Result()
 
 
+def _bad_block(day_of_week: str = "Inglés") -> dict:
+    return {
+        "block_id": "bad-1",
+        "block_type": "academic",
+        "title": "Inglés",
+        "day_of_week": day_of_week,
+        "start_time": "10:00",
+        "end_time": "12:00",
+        "frequency": "weekly",
+        "timezone": "America/Bogota",
+        "source_text": "inglés lunes 10-12",
+        "normalized_title": "Inglés",
+        "original_title": "Inglés",
+        "confidence": 0.8,
+        "ambiguity_flags": [],
+        "needs_clarification": False,
+        "is_active": True,
+        "user_confirmed": True,
+        "has_conflict": False,
+        "conflict_accepted": False,
+    }
+
+
+def test_persist_schedule_skips_invalid_day_of_week_block() -> None:
+    service = ScheduleService(repository=InMemoryScheduleRepository())
+    valid = _block()
+    invalid = _bad_block(day_of_week="Inglés")
+
+    result = service.persist_schedule(
+        student_id=7,
+        occupation="solo_estudio",
+        timezone="America/Bogota",
+        summary_text="test",
+        blocks=[valid, invalid],
+        conflicts=[],
+        conflicts_accepted=False,
+    )
+
+    assert result.persisted is True
+    assert result.block_count == 1
+    assert len(result.invalid_blocks) == 1
+    assert "inglés" in result.invalid_blocks[0].lower()
+
+
+def test_persist_schedule_returns_no_valid_blocks_when_all_invalid() -> None:
+    service = ScheduleService(repository=InMemoryScheduleRepository())
+
+    result = service.persist_schedule(
+        student_id=7,
+        occupation="solo_estudio",
+        timezone="America/Bogota",
+        summary_text="test",
+        blocks=[_bad_block("Inglés"), _bad_block("Física")],
+        conflicts=[],
+        conflicts_accepted=False,
+    )
+
+    assert result.persisted is False
+    assert result.error_code == "no_valid_blocks"
+    assert len(result.invalid_blocks) == 2
+
+
+class _StubScheduleServicePartialSave:
+    """Simula un servicio que persiste con bloques inválidos omitidos."""
+
+    def persist_schedule(self, **kwargs):
+        from services.scheduling.service import PersistScheduleResult
+        return PersistScheduleResult(
+            persisted=True,
+            schedule_profile_id=1,
+            block_count=1,
+            invalid_blocks=("'Inglés' 10:00-12:00 (día no reconocido: 'inglés')",),
+        )
+
+
+class _StubScheduleServiceAllInvalid:
+    """Simula un servicio que no puede persistir ningún bloque."""
+
+    def persist_schedule(self, **kwargs):
+        from services.scheduling.service import PersistScheduleResult
+        return PersistScheduleResult(
+            persisted=False,
+            error_code="no_valid_blocks",
+            invalid_blocks=("'Inglés' 10:00-12:00 (día no reconocido: 'inglés')",),
+        )
+
+
+def test_persist_schedule_node_shows_friendly_partial_save_message() -> None:
+    set_schedule_service(_StubScheduleServicePartialSave())
+    try:
+        state = AgentState(
+            phase="schedule_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "blocks": [_block()],
+                "summary_text": "test",
+                "conflicts": [],
+            },
+        )
+
+        update = persist_schedule(state)
+
+        assert update["phase"] == "schedule_sync"
+        msg = update["messages"][0].content.lower()
+        assert "guardado" in msg
+        assert "omití" in msg or "omiti" in msg
+    finally:
+        set_schedule_service(None)
+
+
+def test_persist_schedule_node_shows_friendly_message_when_all_blocks_invalid() -> None:
+    set_schedule_service(_StubScheduleServiceAllInvalid())
+    try:
+        state = AgentState(
+            phase="schedule_persist",
+            student_profile={"persisted_student_id": 15, "occupation": "solo_estudio"},
+            schedule={
+                "blocks": [_block()],
+                "summary_text": "test",
+                "conflicts": [],
+            },
+        )
+
+        update = persist_schedule(state)
+
+        assert update["phase"] == "end"
+        msg = update["messages"][0].content.lower()
+        assert "detalle técnico" not in msg
+        assert "no_valid_blocks" not in msg
+        assert "formato" in msg or "válido" in msg or "valido" in msg
+    finally:
+        set_schedule_service(None)
+
+
 def test_sync_fixed_schedule_node_marks_outlook_sync_success() -> None:
     set_outlook_fixed_schedule_sync_service(_FixedScheduleSyncServiceStub())
     try:

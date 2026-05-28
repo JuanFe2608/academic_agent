@@ -373,10 +373,11 @@ def _detect_drift_fields(
         if actual_end_date != expected_end_date:
             drift_fields.append("recurrence.end_date")
 
-    stored_change_key = str(block.external_sync_metadata.get("external_change_key") or "").strip()
-    current_change_key = str(snapshot.external_change_key or "").strip()
-    if stored_change_key and current_change_key and stored_change_key != current_change_key:
-        drift_fields.append("external_change_key")
+    # external_change_key se excluye intencionalmente: Outlook rota el changeKey
+    # de forma asíncrona en series recurrentes tras un PATCH, lo que generaría
+    # falsos positivos de drift aunque el contenido no haya cambiado.
+    # El valor se sigue actualizando en _build_reconciliation_update para mantener
+    # el metadata al día, pero no se usa como señal de reparación.
     return drift_fields
 
 

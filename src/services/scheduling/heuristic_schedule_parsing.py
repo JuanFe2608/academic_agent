@@ -42,11 +42,65 @@ _TIME_RANGE_PATTERN = re.compile(
     re.IGNORECASE,
 )
 _SEPARATOR_PATTERN = re.compile(r"(?:[\n;]+|,\s*(?=[A-Za-zÁÉÍÓÚáéíóúÑñ]))")
+_ACTIVITY_SEPARATOR_PATTERN = re.compile(
+    r"(?:\s*,\s*|\s+(?:y|e|luego|despues|después|ademas|además)\s+)",
+    re.IGNORECASE,
+)
 
 
 def split_segments(text: str) -> list[str]:
     parts = [part.strip() for part in _SEPARATOR_PATTERN.split(text) if part.strip()]
     return parts or [str(text).strip()]
+
+
+def split_schedule_chunks(text: str) -> list[str]:
+    """Divide texto de horario en fragmentos atómicos (un bloque por fragmento).
+
+    Primero hace una partición gruesa por saltos de línea y punto-y-coma; luego,
+    dentro de cada parte, busca límites entre actividades distintas basándose en
+    la posición de los rangos horarios (e.g. "Física 7-9am y Inglés 10-12pm").
+    """
+    raw = str(text or "").strip()
+    if not raw:
+        return []
+    coarse_parts = [part.strip(" ,") for part in re.split(r"[\n;]+", raw) if part.strip(" ,")]
+    chunks: list[str] = []
+    for part in coarse_parts:
+        chunks.extend(_split_chunk_on_time_boundaries(part))
+    return chunks or [raw]
+
+
+def _split_chunk_on_time_boundaries(text: str) -> list[str]:
+    raw = str(text or "").strip(" ,")
+    if not raw:
+        return []
+    matches = list(_TIME_RANGE_PATTERN.finditer(raw))
+    if len(matches) <= 1:
+        return split_segments(raw)
+    chunks: list[str] = []
+    cursor = 0
+    for index, match in enumerate(matches[:-1]):
+        next_match = matches[index + 1]
+        boundary = _find_activity_boundary(raw, match.end(), next_match.start())
+        if boundary is None:
+            continue
+        chunk_end, next_cursor = boundary
+        chunk = raw[cursor:chunk_end].strip(" ,")
+        if chunk:
+            chunks.append(chunk)
+        cursor = next_cursor
+    tail = raw[cursor:].strip(" ,")
+    if tail:
+        chunks.extend(split_segments(tail))
+    return chunks or [raw]
+
+
+def _find_activity_boundary(text: str, start: int, end: int) -> tuple[int, int] | None:
+    between = text[start:end]
+    separator = _ACTIVITY_SEPARATOR_PATTERN.search(between)
+    if not separator:
+        return None
+    return start + separator.start(), start + separator.end()
 
 
 def extract_days_from_text(text: str) -> list[str]:
@@ -138,6 +192,7 @@ __all__ = [
     "extract_days_from_text",
     "extract_time_range",
     "infer_title",
+    "split_schedule_chunks",
     "split_segments",
     "to_day_key",
 ]

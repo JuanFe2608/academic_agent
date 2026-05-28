@@ -9,6 +9,7 @@ from services.scheduling.heuristic_schedule_parsing import (
     extract_days_from_text,
     extract_time_range,
     infer_title,
+    split_schedule_chunks,
     split_segments,
     to_day_key,
 )
@@ -42,10 +43,6 @@ _DAY_TOKEN_PATTERN = re.compile(
     r"\b(?:lunes|lun|martes|mar|miercoles|miércoles|mie|mier|jueves|jue|"
     r"viernes|vie|sabado|sábado|sabados|sab|domingo|domingos|dom|"
     r"l-v|lun-vie|lunes\s+a\s+viernes)\b",
-    re.IGNORECASE,
-)
-_ACTIVITY_SEPARATOR_PATTERN = re.compile(
-    r"(?:\s*,\s*|\s+(?:y|e|luego|despues|después|ademas|además)\s+)",
     re.IGNORECASE,
 )
 _INLINE_TITLE_SEPARATOR_PATTERN = re.compile(r"(?:\s[-—–]\s|:\s)")
@@ -116,7 +113,7 @@ def _parse_work_with_context(
     text: str,
     timezone: str,
 ) -> tuple[list[WeeklyScheduleBlock], list[str], list[PendingScheduleItem]]:
-    chunks = _split_fixed_schedule_chunks(text)
+    chunks = split_schedule_chunks(text)
     blocks: list[WeeklyScheduleBlock] = []
     clarifications: list[str] = []
     pending_items: list[PendingScheduleItem] = []
@@ -187,7 +184,7 @@ def _parse_academic_with_context(
 def _iter_academic_chunks(text: str) -> list[tuple[str, str]]:
     lines = _normalize_lines(text)
     if len(lines) <= 1:
-        return [(segment, "") for segment in _split_fixed_schedule_chunks(text)]
+        return [(segment, "") for segment in split_schedule_chunks(text)]
 
     chunks: list[tuple[str, str]] = []
     current_subject = ""
@@ -209,7 +206,7 @@ def _iter_academic_chunks(text: str) -> list[tuple[str, str]]:
                 continue
             chunks.extend(
                 (chunk, current_subject)
-                for chunk in _split_fixed_schedule_chunks(line)
+                for chunk in split_schedule_chunks(line)
                 if chunk
             )
             continue
@@ -220,7 +217,7 @@ def _iter_academic_chunks(text: str) -> list[tuple[str, str]]:
 
     if chunks:
         return chunks
-    return [(segment, "") for segment in _split_fixed_schedule_chunks(text)]
+    return [(segment, "") for segment in split_schedule_chunks(text)]
 
 
 def _looks_like_schedule_fragment(text: str) -> bool:
@@ -428,54 +425,6 @@ def _strip_placeholder_title_from_schedule_text(raw_text: str, title: str) -> st
         cleaned,
     ).strip(" ,.;:-—–")
     return cleaned or raw
-
-
-def _split_fixed_schedule_chunks(text: str) -> list[str]:
-    raw = str(text or "").strip()
-    if not raw:
-        return []
-
-    coarse_parts = [part.strip(" ,") for part in re.split(r"[\n;]+", raw) if part.strip(" ,")]
-    chunks: list[str] = []
-    for part in coarse_parts:
-        chunks.extend(_split_chunk_on_time_boundaries(part))
-    return chunks or [raw]
-
-
-def _split_chunk_on_time_boundaries(text: str) -> list[str]:
-    raw = str(text or "").strip(" ,")
-    if not raw:
-        return []
-
-    matches = list(_TIME_RANGE_PATTERN.finditer(raw))
-    if len(matches) <= 1:
-        return split_segments(raw)
-
-    chunks: list[str] = []
-    cursor = 0
-    for index, match in enumerate(matches[:-1]):
-        next_match = matches[index + 1]
-        boundary = _find_activity_boundary(raw, match.end(), next_match.start())
-        if boundary is None:
-            continue
-        chunk_end, next_cursor = boundary
-        chunk = raw[cursor:chunk_end].strip(" ,")
-        if chunk:
-            chunks.append(chunk)
-        cursor = next_cursor
-
-    tail = raw[cursor:].strip(" ,")
-    if tail:
-        chunks.extend(split_segments(tail))
-    return chunks or [raw]
-
-
-def _find_activity_boundary(text: str, start: int, end: int) -> tuple[int, int] | None:
-    between = text[start:end]
-    separator = _ACTIVITY_SEPARATOR_PATTERN.search(between)
-    if not separator:
-        return None
-    return start + separator.start(), start + separator.end()
 
 
 def _can_inherit_days(text: str, inherited_days: list[str]) -> bool:

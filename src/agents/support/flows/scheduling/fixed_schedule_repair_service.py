@@ -101,9 +101,10 @@ def handle_fixed_schedule_repair_turn(
                 last_text=last_text,
             )
         if decision == "replace":
-            return _restart_schedule_capture(
+            return _accept_outlook_drift_to_running(
                 state,
                 schedule_state=schedule_state,
+                repairable_blocks=repairable_blocks,
                 current_count=current_count,
                 last_text=last_text,
             )
@@ -210,58 +211,58 @@ def _restore_outlook_from_internal_schedule(
     }
 
 
-def _restart_schedule_capture(
+def _accept_outlook_drift_to_running(
     state: AgentState,
     *,
     schedule_state: object,
+    repairable_blocks: list[Any],
     current_count: int,
     last_text: str | None,
 ) -> dict:
+    """Acepta el drift de Outlook sin borrar el horario interno.
+
+    Regresa al flujo running para que el estudiante describa los cambios
+    que quiere aplicar y Lara los ejecute con las tools de modificación.
+    """
+    drifted = [b for b in repairable_blocks if _block_sync_status(b) == "drifted"]
+    missing = [b for b in repairable_blocks if _block_sync_status(b) == "missing"]
+
+    lines = [
+        "✅ Entendido. Conservo el horario oficial del asistente como base.",
+        "",
+        "Si quieres incorporar los cambios que hiciste en Outlook, cuéntame cuáles son "
+        "y los aplico desde aquí — por ejemplo: "
+        "'mueve Física al martes', 'elimina Inglés del viernes', 'cambia Cálculo a las 8am'.",
+    ]
+    if missing:
+        titles = ", ".join(
+            f"'{_block_title(b)}'" for b in missing[:3]
+        )
+        lines.append(f"\nEventos que ya no están en Outlook: {titles}.")
+    if drifted:
+        titles = ", ".join(
+            f"'{_block_title(b)}'" for b in drifted[:3]
+        )
+        lines.append(f"Eventos con cambios detectados: {titles}.")
+
     return {
         **update_scheduling_state(
             state,
-            raw_inputs={},
-            extras_collect_stage=None,
-            extras_pending_is_variable=None,
-            extras_pending_items=[],
-            academic_pending_items=[],
-            work_pending_items=[],
-            extracurricular=[],
-            events=[],
-            schedule_preview={},
             schedule=update_schedule_flow_state(
                 schedule_state,
-                blocks=[],
-                conflicts=[],
-                summary_text=None,
-                review_stage="idle",
-                capture_target=None,
-                capture_stage="idle",
-                correction_target=None,
-                editing_block_id=None,
-                editing_field=None,
-                pending_correction_text=None,
-                conflicts_accepted=False,
-                schedule_end_date=None,
-                persisted_profile_id=None,
-                persistence_error=None,
-                renewal_stage="idle",
                 repair_stage="idle",
             ),
         ),
         **update_conversation_state(
             state,
-            phase="schedules",
+            phase="running",
             user_message_count=current_count,
             last_user_text=last_text,
             awaiting_user_input=False,
             messages=append_message(
                 state.get("messages", []),
                 "assistant",
-                (
-                    "🛠️ Perfecto. Si el cambio en Outlook era intencional, "
-                    "vamos a organizar un horario fijo nuevo desde cero."
-                ),
+                "\n".join(lines),
             ),
         ),
     }
@@ -325,7 +326,7 @@ def _build_repair_prompt(blocks: list[Any]) -> str:
         "Tu horario oficial sigue guardado en el asistente. ¿Qué quieres hacer?\n"
         "(Escribe el número de la opción que quieres elegir)\n"
         "1. Restaurar Outlook con el horario oficial del asistente\n"
-        "2. Conservar el cambio de Outlook y organizar un horario fijo nuevo\n"
+        "2. Conservar mis cambios de Outlook y actualizar el asistente\n"
         "3. Revisarlo después"
     )
 
@@ -357,6 +358,12 @@ def _block_sync_status(block: Any) -> str:
     if isinstance(block, dict):
         return str(block.get("external_sync_status") or "").strip()
     return str(getattr(block, "external_sync_status", "") or "").strip()
+
+
+def _block_title(block: Any) -> str:
+    if isinstance(block, dict):
+        return str(block.get("title") or "?")
+    return str(getattr(block, "title", "?") or "?")
 
 
 __all__ = [

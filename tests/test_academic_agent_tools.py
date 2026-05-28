@@ -324,6 +324,8 @@ def test_update_schedule_block_asks_only_missing_time_when_day_and_partial_time(
 
 
 def test_get_schedule_blocks_when_outlook_fixed_schedule_has_manual_drift(monkeypatch) -> None:
+    # get_schedule es solo lectura: no debe disparar el guard de reparación aunque
+    # haya drift en Outlook. El estudiante debe poder consultar su horario siempre.
     reconciliation_service = MagicMock()
     reconciliation_service.reconcile_schedule_profile.return_value = MagicMock(
         reconciled=True,
@@ -345,11 +347,12 @@ def test_get_schedule_blocks_when_outlook_fixed_schedule_has_manual_drift(monkey
     )
     get_schedule = _tool_by_name(make_tools(state), "get_schedule")
 
-    result = json.loads(get_schedule.invoke({}))
+    result = get_schedule.invoke({})
 
-    assert "Detecté cambios manuales" in result["result"]
-    assert result["_state_update"]["phase"] == "schedule_repair"
-    assert result["_state_update"]["schedule"]["repair_stage"] == "awaiting_decision"
+    # Debe devolver el horario directamente, nunca el prompt de reparación
+    assert "Fisica II" in result
+    assert "Detecté cambios manuales" not in result
+    reconciliation_service.reconcile_schedule_profile.assert_not_called()
 
 
 def test_add_academic_activity_rejects_work_context() -> None:

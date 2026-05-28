@@ -2,6 +2,8 @@
 
 import pytest
 
+from agents.support.scheduling.contextual_parser import parse_schedule_section_with_context
+from agents.support.scheduling.pipeline import parse_fixed_schedule_section
 from services.scheduling.text_parser import (
     extract_natural_schedule_components,
     parse_academic_schedule_text,
@@ -172,3 +174,44 @@ def test_normalize_day_accepts_weekend_plurals():
 def test_normalize_day_typos_in_text_keeps_non_day_words() -> None:
     assert normalize_day_typos_in_text("Marketing y laboratorio") == "Marketing y laboratorio"
     assert normalize_day_typos_in_text("Marte y vierne") == "martes y viernes"
+
+
+def test_compound_multi_subject_schedule_splits_correctly() -> None:
+    """Texto con dos materias y dos rangos horarios en una sola línea."""
+    result = parse_fixed_schedule_section(
+        "Martes y jueves física 7am-9am y viernes inglés 10am-12am",
+        "academic",
+    )
+    blocks = {(b.day_of_week, b.title, b.start_time, b.end_time) for b in result.blocks}
+    assert ("tuesday", "Física", "07:00", "09:00") in blocks
+    assert ("thursday", "Física", "07:00", "09:00") in blocks
+    assert ("friday", "Inglés", "10:00", "12:00") in blocks
+    assert len(result.blocks) == 3
+    assert not result.needs_clarification
+
+
+def test_12am_as_end_time_infers_noon_for_class_schedule() -> None:
+    """'10am-12am' en un horario de clase debe inferir mediodía, no medianoche."""
+    blocks, _, _ = parse_schedule_section_with_context("Física lunes 10am-12am", "academic")
+    assert len(blocks) == 1
+    assert blocks[0].end_time == "12:00"
+    assert blocks[0].start_time == "10:00"
+
+
+def test_8pm_to_12am_keeps_midnight_as_end() -> None:
+    """'8pm-12am' es un bloque nocturno legítimo (mediodía no aplica)."""
+    blocks, _, _ = parse_schedule_section_with_context("Trabajo lunes 8pm-12am", "academic")
+    assert len(blocks) == 1
+    assert blocks[0].start_time == "20:00"
+    assert blocks[0].end_time == "00:00"
+
+
+def test_compound_schedule_with_comma_separator() -> None:
+    """Materias separadas por coma también se dividen correctamente."""
+    result = parse_fixed_schedule_section(
+        "Lunes matemáticas 8am-10am, miércoles química 14-16",
+        "academic",
+    )
+    days_and_titles = {(b.day_of_week, b.title) for b in result.blocks}
+    assert ("monday", "Matemáticas") in days_and_titles
+    assert ("wednesday", "Química") in days_and_titles

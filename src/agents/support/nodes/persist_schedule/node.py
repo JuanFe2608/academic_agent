@@ -28,6 +28,15 @@ def persist_schedule(state: AgentState) -> dict:
     )
 
     if result.persisted:
+        if result.invalid_blocks:
+            lines = [
+                "✅ Tu horario semanal quedó guardado, aunque omití algunos bloques que no pude interpretar:",
+            ]
+            lines.extend(f"- {desc}" for desc in result.invalid_blocks)
+            lines.append("Puedes volver a indicarme esos bloques cuando quieras.")
+            success_msg = "\n".join(lines)
+        else:
+            success_msg = "✅ Tu horario semanal quedó guardado correctamente."
         return {
             "schedule": {
                 **schedule_state,
@@ -41,13 +50,10 @@ def persist_schedule(state: AgentState) -> dict:
             },
             "phase": "schedule_sync",
             "awaiting_user_input": False,
-            "messages": append_message(
-                state.get("messages", []),
-                "assistant",
-                "✅ Tu horario semanal quedó guardado correctamente.",
-            ),
+            "messages": append_message(state.get("messages", []), "assistant", success_msg),
         }
 
+    failure_msg = _build_failure_message(result)
     return {
         "schedule": {
             **schedule_state,
@@ -55,13 +61,29 @@ def persist_schedule(state: AgentState) -> dict:
         },
         "phase": "end",
         "awaiting_user_input": False,
-        "messages": append_message(
-            state.get("messages", []),
-            "assistant",
-            "No pude guardar el horario en la base de datos.\n"
-            f"Detalle técnico: {result.detail or result.error_code or 'desconocido'}",
-        ),
+        "messages": append_message(state.get("messages", []), "assistant", failure_msg),
     }
+
+
+def _build_failure_message(result: object) -> str:
+    error_code = getattr(result, "error_code", None)
+    invalid_blocks = getattr(result, "invalid_blocks", ())
+    if error_code == "no_valid_blocks":
+        if invalid_blocks:
+            lines = ["No pude guardar el horario porque ningún bloque tiene un formato válido:"]
+            lines.extend(f"- {desc}" for desc in invalid_blocks)
+            lines.append("Por favor, indícame de nuevo tu horario con el formato: día hora_inicio-hora_fin nombre.")
+            return "\n".join(lines)
+        return (
+            "No pude guardar el horario porque no hay bloques para persistir.\n"
+            "Por favor, indícame de nuevo tu horario con el formato: día hora_inicio-hora_fin nombre."
+        )
+    if invalid_blocks:
+        lines = ["No pude guardar el horario por un problema técnico."]
+        lines.append("Además, estos bloques tenían formato inválido:")
+        lines.extend(f"- {desc}" for desc in invalid_blocks)
+        return "\n".join(lines)
+    return "No pude guardar el horario en este momento. Por favor, intenta de nuevo más tarde."
 
 
 def _parse_schedule_end_date(raw_value: object) -> date | None:

@@ -1035,9 +1035,6 @@ def make_tools(state: AgentState) -> list:
             "work": "Laboral 💼",
             "extracurricular": "Extracurricular 🏃",
         }
-        repair_guard = _fixed_schedule_outlook_repair_guard(state)
-        if repair_guard:
-            return repair_guard
         blocks = _load_current_schedule_blocks(state)
         if not blocks:
             return "No tienes horario fijo registrado."
@@ -1528,6 +1525,35 @@ def _load_current_schedule_blocks(state: AgentState) -> list:
     return []
 
 
+_RECONCILIATION_THROTTLE_SECONDS = 60
+
+
+def _was_recently_reconciled(student_id: int, *, throttle_seconds: int = _RECONCILIATION_THROTTLE_SECONDS) -> bool:
+    """Retorna True si algún bloque fue reconciliado con Outlook hace menos de throttle_seconds."""
+    try:
+        from datetime import datetime, timezone as dt_timezone
+
+        from agents.support.dependencies import get_schedule_service
+
+        result = get_schedule_service().list_current_schedule_blocks(student_id=student_id)
+        if not result.found or not result.blocks:
+            return False
+        now = datetime.now(dt_timezone.utc)
+        for block in result.blocks:
+            raw = str(block.external_sync_metadata.get("reconciled_at") or "").strip()
+            if not raw:
+                continue
+            try:
+                reconciled_at = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                if (now - reconciled_at).total_seconds() < throttle_seconds:
+                    return True
+            except ValueError:
+                continue
+    except Exception:
+        pass
+    return False
+
+
 def _fixed_schedule_outlook_repair_guard(state: AgentState) -> str | None:
     """Reconciliación previa para no sobrescribir cambios manuales de Outlook."""
     student_id = _get_student_id(state)
@@ -1535,6 +1561,8 @@ def _fixed_schedule_outlook_repair_guard(state: AgentState) -> str | None:
         return None
     schedule_profile_id = getattr(state.schedule, "persisted_profile_id", None)
     if not schedule_profile_id:
+        return None
+    if _was_recently_reconciled(student_id):
         return None
     calendar = state.calendar
     calendar_id = getattr(calendar, "calendar_id", None)

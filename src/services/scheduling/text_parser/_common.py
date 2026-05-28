@@ -347,7 +347,13 @@ def parse_time_token(value: str) -> list[TimeOption]:
             normalized = normalize_time(f"{hour}:{minute:02d}")
             return [TimeOption(normalized, "literal", False)]
         normalized = normalize_time(f"{hour}:{minute:02d}{meridiem}")
-        return [TimeOption(normalized, "explicit", True)]
+        options = [TimeOption(normalized, "explicit", True)]
+        # "12am" is midnight (00:00) by AM/PM convention, but in class schedules
+        # users often mean noon. Offer 12:00 as a lower-priority alternative so
+        # the scorer can pick it when midnight would create an implausible overnight block.
+        if hour == 12 and meridiem == "am":
+            options.append(TimeOption("12:00", "noon_inferred", False))
+        return options
 
     normalized = normalize_time(f"{hour}:{minute:02d}")
     options = [TimeOption(normalized, "literal", False)]
