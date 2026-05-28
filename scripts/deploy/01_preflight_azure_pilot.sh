@@ -73,6 +73,21 @@ validate_transcription_deployment() {
   esac
 }
 
+validate_database_url_for_azure() {
+  local name="$1"
+  local value="${!name:-}"
+  local normalized="${value,,}"
+  [[ -n "$value" ]] || return 0
+
+  case "$normalized" in
+    *"localhost"*|*"127.0.0.1"*|*"::1"*)
+      fail "$name no puede apuntar a localhost para desplegar en Azure"
+      ;;
+  esac
+
+  info "$name=REMOTE_DATABASE_URL_OK"
+}
+
 require_file "$DEPLOY_ENV"
 require_file "$APP_ENV"
 
@@ -137,6 +152,8 @@ validate_azure_endpoint_base AZURE_OPENAI_ENDPOINT
 validate_chat_deployment AZURE_OPENAI_DEPLOYMENT_NAME
 validate_azure_endpoint_base AZURE_OPENAI_ENDPOINT_TRANSCRIBE
 validate_transcription_deployment AZURE_OPENAI_DEPLOYMENT_NAME_TRANSCRIBE
+validate_database_url_for_azure ACADEMIC_AGENT_DATABASE_URL
+validate_database_url_for_azure LANGGRAPH_CHECKPOINTER_DATABASE_URL
 
 case "${ACADEMIC_AGENT_REQUIRE_MICROSOFT_OAUTH,,}" in
   1|true|yes|on|required|obligatorio)

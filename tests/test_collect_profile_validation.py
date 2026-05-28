@@ -60,7 +60,10 @@ def test_collect_profile_rejects_name_with_special_characters() -> None:
 
     update = collect_profile(state)
 
-    assert "ese nombre no me qued" in update["messages"][0].content.lower()
+    prompt = update["messages"][0].content.lower()
+    assert "ese nombre no me qued" in prompt
+    assert "para empezar" not in prompt
+    assert "cómo te llamas" not in prompt
 
 
 def test_collect_profile_rejects_name_with_embedded_numbers() -> None:
@@ -107,9 +110,12 @@ def test_collect_profile_rejects_non_numeric_student_code() -> None:
 
     update = collect_profile(state)
 
+    prompt = update["messages"][0].content.lower()
     assert update["phase"] == "profile"
     assert update["awaiting_user_input"] is True
-    assert "código estudiantil" in update["messages"][0].content.lower()
+    assert "código estudiantil" in prompt
+    assert "8 dígitos" in prompt
+    assert "ahora necesito tu código estudiantil" not in prompt
 
 
 def test_collect_profile_rejects_duplicate_student_code_immediately() -> None:

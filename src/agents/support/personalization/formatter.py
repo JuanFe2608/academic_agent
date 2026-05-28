@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import re
 from typing import Any
 
 from services.personalization.questionnaire import (
@@ -17,6 +18,18 @@ from services.personalization.questionnaire import (
 
 _FILLED_STEP = "🟩"
 _EMPTY_STEP = "⬜"
+_INTERNAL_TERM_LABELS = {
+    "concept_connections": "dificultad para conectar ideas",
+    "difficulty_switching_topics": "dificultad para alternar materias o estrategias",
+    "distraction": "distracciones",
+    "exact_memory": "memoria de detalles exactos",
+    "explanation_gap": "dificultad para explicar con claridad",
+    "note_organization": "organización de apuntes",
+    "passive_review_dependence": "dependencia de releer",
+    "procrastination": "dificultad para iniciar",
+    "rapid_forgetting": "olvido rápido",
+    "start_and_focus_friction": "dificultad para iniciar y sostener el foco",
+}
 
 
 def build_question_prompt(
@@ -113,8 +126,10 @@ def build_personalization_summary(
     # La plantilla final solo muestra la guia practica, no cautelas separadas.
     _ = pedagogical_cautions
     top_ids = [_score_technique_id(scores[index]) for index in range(3)]
-    guidance = _practical_guidance(top_ids, pedagogical_guidance)
-    lines = ["Listo, ya identifiqué cómo puedes estudiar de forma más efectiva según tu perfil 📘"]
+    guidance = _practical_guidance(pedagogical_guidance)
+    lines = [
+        "Listo, ya identifiqué cómo puedes estudiar de forma más efectiva según tu perfil 📘"
+    ]
 
     lines.extend(
         [
@@ -210,60 +225,39 @@ def _technique_method_piece(technique_id: str) -> str:
     }.get(technique_id, _support_hint({"technique_id": technique_id}))
 
 
-def _practical_guidance(
-    technique_ids: list[str],
-    pedagogical_guidance: str | None,
-) -> str:
-    """Construye una guia accionable sin exponer etiquetas o nombres internos."""
+def _practical_guidance(pedagogical_guidance: str | None) -> str:
+    """Construye una guia accionable usando la sintesis RAG cuando existe."""
 
-    if not str(pedagogical_guidance or "").strip():
-        return ""
+    guidance = _clean_pedagogical_guidance(pedagogical_guidance)
+    if guidance:
+        return guidance
+    return ""
 
-    steps = [_practice_step(technique_id) for technique_id in technique_ids]
-    unique_steps = _unique([step for step in steps if step])
-    if not unique_steps:
+
+def _clean_pedagogical_guidance(text: str | None) -> str:
+    """Limpia una recomendacion RAG para mostrarla como texto de usuario."""
+
+    cleaned = " ".join(str(text or "").split())
+    if not cleaned:
         return ""
-    return "\n".join(
-        f"{index}. {step}"
-        for index, step in enumerate(unique_steps[:3], start=1)
+    cleaned = re.sub(
+        r"\b(?:technique|study_method|study_framework)\.[A-Za-z0-9_.:-]+\b",
+        "",
+        cleaned,
     )
+    for internal, label in _INTERNAL_TERM_LABELS.items():
+        cleaned = re.sub(rf"\b{re.escape(internal)}\b", label, cleaned)
+    cleaned = re.sub(
+        r"\b[A-Za-z]+_[A-Za-z0-9_]+\b",
+        _readable_internal_term,
+        cleaned,
+    )
+    cleaned = re.sub(r"\s+", " ", cleaned).strip(" ,;:")
+    return cleaned
 
 
-def _practice_step(technique_id: str) -> str:
-    return {
-        "active_recall": (
-            "Después de revisar un tema, cierra el material y respóndete preguntas "
-            "sin mirar. Luego compara tus respuestas y corrige solo lo que falló."
-        ),
-        "cornell": (
-            "Convierte tus apuntes en material de repaso: escribe preguntas al lado "
-            "de las ideas importantes y termina con un resumen breve en tus palabras."
-        ),
-        "feynman": (
-            "Elige un concepto pequeño y explícalo con palabras simples, como si se "
-            "lo contaras a otra persona. Si te trabas, marca esa parte y vuelve a revisarla."
-        ),
-        "interleaving": (
-            "Mezcla ejercicios o temas parecidos y, antes de resolver cada uno, decide "
-            "qué estrategia corresponde y por qué."
-        ),
-        "mapas_conceptuales": (
-            "Organiza el tema conectando ideas principales, detalles y ejemplos. Usa "
-            "las conexiones para detectar qué parte todavía está suelta."
-        ),
-        "mnemotecnia": (
-            "Para definiciones, listas o pasos, crea una pista fácil de recordar y "
-            "pruébate después sin mirar para confirmar que realmente la puedes recuperar."
-        ),
-        "pomodoro": (
-            "Empieza cada sesión con un objetivo pequeño, trabaja en un bloque corto "
-            "sin cambiar de tarea y cierra anotando qué quedó pendiente."
-        ),
-        "repeticion_espaciada": (
-            "Agenda repasos breves en distintos días. En cada repaso intenta recordar "
-            "primero y revisa el material solo después."
-        ),
-    }.get(technique_id, "")
+def _readable_internal_term(match: re.Match[str]) -> str:
+    return match.group(0).replace("_", " ")
 
 
 def _choice_option_lines(question: Any) -> list[str]:
@@ -285,17 +279,6 @@ def _join_hints(hints: list[str]) -> str:
     if len(filtered) == 2:
         return f"{filtered[0]} y {filtered[1]}"
     return f"{filtered[0]}, {filtered[1]} y {filtered[2]}"
-
-
-def _unique(values: list[str]) -> list[str]:
-    seen: set[str] = set()
-    result: list[str] = []
-    for value in values:
-        if value in seen:
-            continue
-        seen.add(value)
-        result.append(value)
-    return result
 
 
 def _value(item: Any, key: str, default: Any = None) -> Any:

@@ -136,18 +136,34 @@ def build_prompt_with_error(
     *,
     error_key: str | None = None,
 ) -> str:
-    """Agrega el mensaje de error al prompt del campo.
+    """Construye una corrección sin repetir el prompt completo del campo.
 
+    first_name se conserva por compatibilidad con llamadas existentes.
     error_key permite usar un mensaje especifico en lugar del mensaje generico del campo.
     """
 
-    message = VALIDATION_ERROR_MESSAGES.get(error_key or field, VALIDATION_ERROR_MESSAGES.get(field, ""))
+    del first_name
+    message = _validation_error_message(field, config, error_key)
     if error_key in {"duplicate_student_code", "duplicate_email"}:
         return message
-    parts = [message, build_field_prompt(field, config, first_name)]
+    parts = [message]
     if extra_note:
         parts.append(extra_note)
     return "\n".join(part for part in parts if part)
+
+
+def _validation_error_message(
+    field: str,
+    config: OnboardingConfig,
+    error_key: str | None,
+) -> str:
+    key = error_key or field
+    if key in {"student_code", "invalid_student_code"}:
+        return (
+            "Necesito tu código estudiantil solo en números de "
+            f"{config.student_code_length} dígitos 😊 Por ejemplo: 67000912"
+        )
+    return VALIDATION_ERROR_MESSAGES.get(key, VALIDATION_ERROR_MESSAGES.get(field, ""))
 
 
 def _non_personal_allowed_domains(domains: tuple[str, ...]) -> list[str]:

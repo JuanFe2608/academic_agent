@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from contextlib import contextmanager
 from typing import Any, Iterator
 
@@ -30,5 +31,18 @@ def postgres_connection(database_url: str) -> Iterator[Any]:
             "psycopg no esta disponible en el entorno actual."
         ) from exc
 
-    with psycopg.connect(database_url, row_factory=dict_row) as conn:
+    with psycopg.connect(
+        database_url,
+        row_factory=dict_row,
+        connect_timeout=_connect_timeout_seconds(),
+    ) as conn:
         yield conn
+
+
+def _connect_timeout_seconds() -> int:
+    raw_timeout = os.getenv("POSTGRES_CONNECT_TIMEOUT_SECONDS", "5").strip()
+    try:
+        timeout = int(raw_timeout)
+    except ValueError:
+        return 5
+    return max(timeout, 1)

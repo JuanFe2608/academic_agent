@@ -151,6 +151,14 @@ class _StudyRecommendationServiceStub:
 
     def answer_query(self, query):
         self.calls.append({"method": "answer_query", "query": query})
+        if query.intent == "recommend_technique":
+            return StudyRecommendationResult(
+                answer=self.student_answer,
+                recommended_techniques=list(query.top_techniques[:3]),
+                source_chunks=["technique.pomodoro::answer"],
+                confidence="media",
+                groundedness_notes=["sources:cited"],
+            )
         method_id = (
             "metodo_evaluacion_numerica_breve"
             if "evaluacion numerica" in query.query_text
@@ -291,9 +299,9 @@ def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
     recommendation_service = _StudyRecommendationServiceStub(
         ready=True,
         student_answer=(
-            'La técnica Feynman es ideal para trabajar el "explanation_gap". '
-            'El Método Cornell ayuda con "note_organization" y la mnemotecnia '
-            "sirve para recordar listas."
+            'Pomodoro debe ser la primera técnica porque el Radar marcó '
+            '"start_and_focus_friction". Feynman apoya el "explanation_gap" '
+            'y la repetición espaciada ayuda con "rapid_forgetting".'
         ),
     )
     set_personalization_service(personalization_service)
@@ -319,14 +327,21 @@ def test_persist_study_profile_enriches_radar_summary_when_rag_service_is_ready(
         assert "Para llevarlo a la práctica:" in final_message
         assert "fuentes internas" not in final_message
         assert "fragmento" not in final_message
-        assert "Empieza cada sesión con un objetivo pequeño" in final_message
-        assert "Feynman" not in final_message
-        assert "Cornell" not in final_message
-        assert "mnemotecnia" not in final_message
+        assert "Pomodoro debe ser la primera técnica" in final_message
+        assert "dificultad para iniciar y sostener el foco" in final_message
+        assert "dificultad para explicar con claridad" in final_message
+        assert "olvido rápido" in final_message
+        assert "Empieza cada sesión con un objetivo pequeño" not in final_message
+        assert "start_and_focus_friction" not in final_message
         assert "explanation_gap" not in final_message
-        assert "note_organization" not in final_message
-        assert recommendation_service.calls[0]["top_techniques"] == study_profile["top_techniques"]
-        assert "procrastination" in recommendation_service.calls[0]["student_signals"]
+        assert "rapid_forgetting" not in final_message
+        assert recommendation_service.calls[0]["method"] == "answer_query"
+        query = recommendation_service.calls[0]["query"]
+        assert query.top_techniques == study_profile["top_techniques"]
+        assert "procrastination" in query.student_signals
+        assert "Ranking del Radar" in query.query_text
+        assert "Pomodoro: 100.0%" in query.query_text
+        assert "Respuestas fuertes del estudiante" in query.query_text
     finally:
         set_personalization_service(None)
         set_study_recommendation_service(None)

@@ -17,6 +17,19 @@ from .context_package import (
     summarize_chunk_for_prompt,
 )
 
+_SIGNAL_DISPLAY_NAMES = {
+    "concept_connections": "dificultad para conectar ideas",
+    "difficulty_switching_topics": "dificultad para alternar materias o estrategias",
+    "distraction": "distracciones",
+    "exact_memory": "memoria de detalles exactos",
+    "explanation_gap": "dificultad para explicar con claridad",
+    "note_organization": "organización de apuntes",
+    "passive_review_dependence": "dependencia de releer",
+    "procrastination": "dificultad para iniciar",
+    "rapid_forgetting": "olvido rápido",
+    "start_and_focus_friction": "dificultad para iniciar y sostener el foco",
+}
+
 
 class GroundedAnswerGenerator(Protocol):
     """Boundary for turning retrieved evidence into a final user answer."""
@@ -93,7 +106,7 @@ def render_grounded_answer_prompt(
         ", ".join(format_entity_name(entity) for entity in understanding.detected_entities)
         or "sin entidad explicita"
     )
-    student_signals = ", ".join(understanding.detected_signals) or "sin senales explicitas"
+    student_signals = _display_signals(understanding.detected_signals)
     context_text = _fit_text("\n\n".join(context_blocks), max_chars=max_context_chars)
     relations_text = _fit_text("\n".join(relation_blocks), max_chars=1200) or "- Ninguna."
 
@@ -107,6 +120,7 @@ def render_grounded_answer_prompt(
         "- Trata los chunks como evidencia y contexto, no como respuesta directa.\n"
         "- Sintetiza y adapta, no copies chunks literalmente.\n"
         "- No menciones IDs de chunks ni nombres de archivos.\n"
+        "- No menciones etiquetas internas en snake_case; tradúcelas a lenguaje natural.\n"
         "- No inventes estudios ni fuentes citadas. Si puedes usar conocimiento general "
         "de pedagogia y tecnicas de aprendizaje.\n"
         "- Mantente en el dominio: gestion academica, metodos de estudio, planificacion.\n"
@@ -147,6 +161,7 @@ def render_no_sources_prompt(package: GroundedContextPackage) -> str:
         "- Responde en espanol claro y natural.\n"
         "- Usa tu conocimiento general de pedagogia y tecnicas de aprendizaje.\n"
         "- No inventes estudios ni fuentes citadas.\n"
+        "- No menciones etiquetas internas en snake_case; tradúcelas a lenguaje natural.\n"
         "- Mantente en el dominio: gestion academica, metodos de estudio, planificacion.\n"
         "- Respuesta breve: 2 a 5 frases + siguiente paso accionable si aplica.\n\n"
         "PREGUNTA DEL USUARIO:\n"
@@ -177,6 +192,15 @@ def _relation_blocks(package: GroundedContextPackage) -> list[str]:
             f"- {source} {relation.relation_type} {target}: {evidence}"
         )
     return blocks
+
+
+def _display_signals(signal_ids: list[str]) -> str:
+    labels = [
+        _SIGNAL_DISPLAY_NAMES.get(signal_id, signal_id.replace("_", " "))
+        for signal_id in signal_ids
+        if signal_id
+    ]
+    return ", ".join(labels) if labels else "sin senales explicitas"
 
 
 def _response_to_text(response: Any) -> str:
