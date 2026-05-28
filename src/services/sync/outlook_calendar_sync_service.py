@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field, replace
+from datetime import datetime
 from typing import Any
 
 from integrations.microsoft_graph.auth_client import (
@@ -363,6 +364,88 @@ class OutlookCalendarSyncService:
                 link.source_instance_key: link.external_event_id for link in active_links
             },
         )
+
+
+    def patch_single_study_session(
+        self,
+        *,
+        student_id: int,
+        source_instance_key: str,
+        subject: str,
+        new_starts_at: datetime,
+        new_ends_at: datetime,
+        timezone: str,
+    ) -> tuple[bool, str | None]:
+        """Parcha un único evento de sesión en Outlook Calendar sin tocar otras sesiones.
+
+        Retorna (True, None) si el patch tuvo éxito o si la sesión no estaba sincronizada.
+        Retorna (False, mensaje_error) si hubo un error real de autenticación o API.
+        """
+        try:
+            connection = self.state_repository.get_connection(student_id=student_id)
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError):
+            return True, None
+        if connection is None:
+            return True, None
+
+        token_result = self.auth_client.get_valid_access_token(student_id=student_id)
+        if not token_result.ok or token_result.token is None:
+            return False, "error de autenticación con Microsoft"
+
+        storage_calendar_id = _storage_calendar_id(connection)
+        try:
+            existing_links = self.state_repository.list_calendar_event_links(
+                student_id=student_id,
+                calendar_id=storage_calendar_id,
+            )
+        except (MicrosoftGraphStateRepositoryError, RepositoryConfigurationError):
+            return True, None
+
+        link = next(
+            (lnk for lnk in existing_links if lnk.source_instance_key == source_instance_key),
+            None,
+        )
+        if link is None:
+            return True, None
+
+        event = OutlookCalendarEventUpsert(
+            external_key=source_instance_key,
+            subject=str(subject or "Sesión de estudio"),
+            body_preview=(
+                f"Sesion de estudio movida manualmente.\n"
+                f"Instancia: {source_instance_key}"
+            ),
+            starts_at=new_starts_at,
+            ends_at=new_ends_at,
+            timezone=str(timezone or "America/Bogota"),
+            categories=("academic-agent", "study-plan"),
+            existing_external_event_id=link.external_event_id,
+            existing_change_key=link.external_change_key,
+        )
+        try:
+            results = self.client.upsert_events(
+                access_token=token_result.token.access_token,
+                calendar_id=connection.calendar_id,
+                events=[event],
+            )
+            if results:
+                self.state_repository.upsert_calendar_event_links(
+                    links=[
+                        OutlookCalendarEventLinkRecord(
+                            id=link.id,
+                            student_id=student_id,
+                            study_plan_event_instance_id=link.study_plan_event_instance_id,
+                            source_instance_key=source_instance_key,
+                            calendar_id=storage_calendar_id,
+                            external_event_id=results[0].external_event_id,
+                            external_change_key=results[0].external_change_key,
+                            sync_status="active",
+                        )
+                    ]
+                )
+        except MicrosoftGraphClientError:
+            return False, "error de conexión con Outlook Calendar"
+        return True, None
 
 
 def build_outlook_calendar_sync_service(

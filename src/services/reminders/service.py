@@ -35,6 +35,7 @@ _SUPPORTED_REMINDER_TYPES = {
     "daily_agenda",
     "activity_due",
     "activity_overdue",
+    "motivational",
 }
 _DEFAULT_QUIET_HOURS = {"start": "22:00", "end": "06:00"}
 _DEFAULT_POLICY_BLUEPRINTS: tuple[dict[str, object], ...] = (
@@ -97,6 +98,12 @@ _DEFAULT_ACTIVITY_POLICY_BLUEPRINTS: tuple[dict[str, object], ...] = (
         "lead_minutes": 15,
         "followup_minutes": None,
         "metadata_json": {"timing": "after_due", "origin": "default"},
+    },
+    {
+        "reminder_type": "motivational",
+        "lead_minutes": 0,
+        "followup_minutes": None,
+        "metadata_json": {"timing": "daily_morning", "origin": "default"},
     },
 )
 
@@ -387,7 +394,7 @@ def _build_activity_policy_specs(
     blueprints = _normalize_policy_blueprints(
         reminders_state.policy.get("activity_rules"),
         default_blueprints=_DEFAULT_ACTIVITY_POLICY_BLUEPRINTS,
-        allowed_types={"daily_agenda", "activity_due", "activity_overdue"},
+        allowed_types={"daily_agenda", "activity_due", "activity_overdue", "motivational"},
     )
 
     specs: list[ReminderPolicySpec] = []
@@ -541,6 +548,7 @@ def _build_activity_dispatches(
     due_policies = [policy for policy in policies if policy.reminder_type == "activity_due"]
     overdue_policies = [policy for policy in policies if policy.reminder_type == "activity_overdue"]
     agenda_policies = [policy for policy in policies if policy.reminder_type == "daily_agenda"]
+    motivational_policies = [policy for policy in policies if policy.reminder_type == "motivational"]
 
     dispatches: list[ReminderDispatchSeed] = []
     agenda_by_date: dict[date, list[dict[str, object]]] = {}
@@ -630,6 +638,33 @@ def _build_activity_dispatches(
                 )
             )
 
+        motiv_scheduled = _motivational_reminder_at(agenda_date, timezone=timezone)
+        motiv_source_key = f"motivational:{agenda_date.isoformat()}:{motiv_scheduled.isoformat()}"
+        for policy in motivational_policies:
+            dispatches.append(
+                ReminderDispatchSeed(
+                    student_id=policy.student_id,
+                    reminder_policy_id=policy.id,
+                    study_plan_event_instance_id=None,
+                    dispatch_type=f"motivational_{agenda_date.isoformat()}",
+                    channel=policy.channel,
+                    scheduled_for=motiv_scheduled,
+                    payload={
+                        "reminder_domain": "academic_activity",
+                        "reminder_source": motiv_source_key,
+                        "kind": "motivational",
+                        "title": "Motivacion diaria",
+                        "agenda_date": agenda_date.isoformat(),
+                        "timezone": timezone,
+                        "starts_at": motiv_scheduled.isoformat(),
+                        "channel": policy.channel,
+                        "reminder_type": policy.reminder_type,
+                        "lead_minutes": policy.lead_minutes,
+                        **_whatsapp_payload(whatsapp_recipient_id),
+                    },
+                )
+            )
+
     return dispatches
 
 
@@ -707,6 +742,11 @@ def _daily_agenda_at(agenda_date: date, *, timezone: str) -> datetime:
     return datetime.combine(agenda_date, _daily_agenda_time(), tzinfo=zone)
 
 
+def _motivational_reminder_at(agenda_date: date, *, timezone: str) -> datetime:
+    zone = ZoneInfo(timezone)
+    return datetime.combine(agenda_date, _motivational_reminder_time(), tzinfo=zone)
+
+
 def _activity_payload(activity: AcademicActivity, *, due_at: datetime) -> dict[str, object]:
     return {
         "activity_id": activity.activity_id,
@@ -759,6 +799,10 @@ def _default_activity_due_time() -> time:
 
 def _daily_agenda_time() -> time:
     return _env_time("ACADEMIC_AGENT_DAILY_AGENDA_TIME", time(6, 0))
+
+
+def _motivational_reminder_time() -> time:
+    return _env_time("ACADEMIC_AGENT_MOTIVATIONAL_REMINDER_TIME", time(8, 0))
 
 
 def _env_time(name: str, default: time) -> time:

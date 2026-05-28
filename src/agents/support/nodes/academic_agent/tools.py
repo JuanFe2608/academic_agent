@@ -15,7 +15,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import date, timedelta
+from datetime import date, datetime, time, timedelta
 from zoneinfo import ZoneInfoNotFoundError
 from typing import Any
 
@@ -611,10 +611,13 @@ def make_tools(state: AgentState) -> list:
 
     @tool
     def update_study_plan(reason: str) -> str:
-        """Genera o actualiza el plan semanal de sesiones de estudio y lo aplica directamente.
-        Úsala proactivamente: SIEMPRE después de add_academic_activity para reflejar
-        la nueva actividad en el calendario de estudio, cuando el estudiante pida
-        reorganizar su semana, o cuando cambie el horario fijo.
+        """Propone un plan semanal de sesiones de estudio. El resultado es una PROPUESTA —
+        las sesiones NO se guardan en Outlook hasta que el estudiante las confirme explícitamente.
+        Después de obtener la propuesta, SIEMPRE preséntala al estudiante y pregunta:
+        '¿Confirmas estas sesiones para guardarlas en tu Outlook? ¿O quieres ajustar algo?'
+        Solo llama sync_plan_to_calendar cuando el estudiante diga que sí confirma.
+        Úsala cuando el estudiante registre una actividad nueva, pida reorganizar su semana,
+        o cuando cambie el horario fijo.
         reason: motivo del cambio (ej: 'parcial de Filosofía el viernes')."""
         from agents.support.dependencies import get_study_replanning_service
 
@@ -707,14 +710,18 @@ def make_tools(state: AgentState) -> list:
         target_end_time: str | None = None,
         source_day: str | None = None,
         after_event_reference: str | None = None,
+        target_date: str | None = None,
     ) -> str:
-        """Mueve una sesión puntual del plan de estudio, validando disponibilidad antes de aplicar.
+        """Mueve una sesión del plan de estudio, validando disponibilidad antes de aplicar.
         session_reference: materia, título, id o número de la sesión a mover. Ej: "Física", "sesión 2".
         target_day: nuevo día deseado. Ej: "martes".
         target_start_time: nueva hora de inicio en HH:MM o con am/pm. Ej: "17:00".
         target_end_time: nueva hora de fin opcional; si se omite, conserva la duración actual.
         source_day: día actual de la sesión si el estudiante lo menciona. Ej: "martes".
         after_event_reference: bloque fijo después del cual ubicarla. Ej: "clase de Física".
+        target_date: fecha concreta de la instancia a mover (YYYY-MM-DD o texto como 'esta semana',
+        'el martes que viene'). Si se provee, el cambio aplica SOLO a esa semana y no modifica
+        la plantilla. Si se omite, el cambio aplica a todas las semanas.
         Úsala para frases como "mueve la sesión de Física del martes a las 5",
         "esa sesión no me sirve" o "ponla después de clase"."""
         plan_events = list(state.study_plan.plan_events or [])
@@ -810,6 +817,98 @@ def make_tools(state: AgentState) -> list:
                 + _format_alternatives(alternatives)
             ).strip()
 
+        # ── Instancia única (target_date presente) ────────────────────────────
+        if target_date:
+            timezone_name = str(state.get("timezone") or "America/Bogota")
+            resolved_date = _resolve_target_date_from_text(
+                target_date, str(target.dia or ""), timezone_name
+            )
+            if resolved_date is None:
+                return (
+                    f"No pude interpretar la fecha '{target_date}'. "
+                    "Usa formato YYYY-MM-DD o expresiones como 'esta semana', 'el martes que viene'."
+                )
+
+            # Calcular la fecha real del evento movido (puede ser diferente si cambia de día)
+            orig_wd = _day_str_to_weekday(str(target.dia or ""))
+            new_wd = _day_str_to_weekday(str(resolved_day or ""))
+            if orig_wd is not None and new_wd is not None and orig_wd != new_wd:
+                new_date = resolved_date + timedelta(days=new_wd - orig_wd)
+            else:
+                new_date = resolved_date
+
+            from agents.support.dependencies import get_study_plan_materialization_service
+            mat_svc = get_study_plan_materialization_service()
+            profile_id = state.study_plan.persisted_profile_id
+            student_id_raw = dict(state.get("student_profile", {})).get("persisted_student_id")
+            try:
+                student_id_int = int(student_id_raw)
+            except (TypeError, ValueError):
+                return "No pude identificar tu perfil de estudiante para mover la sesión."
+
+            if not profile_id:
+                return "El plan de estudio no tiene un perfil persistido; no puedo mover instancias individuales."
+
+            instance = mat_svc.find_instance_for_session_and_date(
+                student_id=student_id_int,
+                study_plan_profile_id=int(profile_id),
+                source_event_id=str(target.id),
+                target_date=resolved_date,
+            )
+            if instance is None:
+                return (
+                    f"No encontré una instancia de **{target.titulo}** "
+                    f"para la semana del {resolved_date.isoformat()}. "
+                    "Es posible que ya haya pasado o que aún no esté materializada."
+                )
+
+            start_min = _time_to_minutes(resolved_start)
+            new_starts_at = datetime.combine(
+                new_date, time(hour=start_min // 60, minute=start_min % 60)
+            )
+            end_min = _time_to_minutes(resolved_end)
+            new_ends_at = datetime.combine(
+                new_date, time(hour=end_min // 60, minute=end_min % 60)
+            )
+
+            updated = mat_svc.update_instance_schedule_manually(
+                source_instance_key=str(instance["source_instance_key"]),
+                student_id=student_id_int,
+                new_starts_at=new_starts_at,
+                new_ends_at=new_ends_at,
+            )
+            if not updated:
+                return (
+                    f"No pude actualizar la instancia de **{target.titulo}** "
+                    f"del {resolved_date.isoformat()}."
+                )
+
+            # Parchar en Outlook si el plan está sincronizado (no bloqueante)
+            if profile_id:
+                try:
+                    from agents.support.dependencies import get_outlook_calendar_sync_service
+                    get_outlook_calendar_sync_service().patch_single_study_session(
+                        student_id=student_id_int,
+                        source_instance_key=str(instance["source_instance_key"]),
+                        subject=str(target.titulo or "Sesión de estudio"),
+                        new_starts_at=new_starts_at,
+                        new_ends_at=new_ends_at,
+                        timezone=timezone_name,
+                    )
+                except Exception:
+                    pass
+
+            return json.dumps(
+                {
+                    "result": (
+                        f"✅ Moví **{target.titulo}** al {resolved_day} "
+                        f"{resolved_start}–{resolved_end} solo para la semana del "
+                        f"{resolved_date.isoformat()}. Las demás semanas no cambian."
+                    )
+                }
+            )
+
+        # ── Plantilla semanal (target_date ausente) ───────────────────────────
         moved = target.model_copy(
             update={
                 "dia": resolved_day,
@@ -851,7 +950,8 @@ def make_tools(state: AgentState) -> list:
             {
                 "result": (
                     f"✅ Moví **{target.titulo}** de {target.dia} "
-                    f"{target.inicio}–{target.fin} a {moved.dia} {moved.inicio}–{moved.fin}."
+                    f"{target.inicio}–{target.fin} a {moved.dia} {moved.inicio}–{moved.fin}. "
+                    "El cambio aplica a todas las semanas."
                 ),
                 "_state_update": {"study_plan": updated_plan.model_dump(mode="python")},
             }
@@ -1361,11 +1461,10 @@ def make_tools(state: AgentState) -> list:
         restore_manual_outlook_changes: bool = False,
         keep_manual_outlook_changes: bool = False,
     ) -> str:
-        """Sincroniza las SESIONES DEL PLAN DE ESTUDIO (bloques generados por el planificador)
-        con Outlook Calendar. SOLO usar cuando el estudiante pida sincronizar su PLAN DE SESIONES
-        de estudio con Outlook. NO usar para clases, materias ni bloques del horario fijo (work,
-        academic, extracurricular): esos se sincronizan automáticamente al usar add_schedule_block
-        o update_schedule_block.
+        """Guarda en Outlook Calendar las sesiones de estudio propuestas por update_study_plan.
+        SOLO úsala después de que el estudiante confirme explícitamente las sesiones propuestas.
+        NO usar para clases, materias ni bloques del horario fijo (work, academic, extracurricular):
+        esos se sincronizan automáticamente al usar add_schedule_block o update_schedule_block.
         restore_manual_outlook_changes: True solo si el estudiante eligió restaurar el plan del asistente
         tras detectar cambios manuales en Outlook.
         keep_manual_outlook_changes: True solo si el estudiante eligió conservar cambios manuales de Outlook."""
@@ -1386,10 +1485,7 @@ def make_tools(state: AgentState) -> list:
                     timezone=str(state.timezone or "America/Bogota"),
                 )
                 if not materialized.materialized:
-                    return (
-                        "No pude dejar listas las sesiones fechadas para Outlook: "
-                        f"{materialized.detail or materialized.error_code or 'error desconocido'}"
-                    )
+                    return "No pude preparar las sesiones para Outlook. Intenta de nuevo más tarde."
                 manual_guard = _study_calendar_outlook_manual_change_guard(
                     state,
                     restore_manual_outlook_changes=restore_manual_outlook_changes,
@@ -1413,9 +1509,9 @@ def make_tools(state: AgentState) -> list:
                     f"✅ Sincronización completada: {result.upserted_count} sesión(es) "
                     f"creadas/actualizadas, {result.deleted_count} eliminadas en Outlook."
                 )
-            return f"No se pudo sincronizar: {result.detail or result.error_code or 'error desconocido'}"
-        except Exception as exc:
-            return f"Error al sincronizar con Outlook: {exc}"
+            return "No se pudo sincronizar con Outlook Calendar. Intenta de nuevo más tarde."
+        except Exception:
+            return "No se pudo sincronizar con Outlook Calendar. Intenta de nuevo más tarde."
 
     @tool
     def sync_tasks_to_todo(
@@ -1428,8 +1524,7 @@ def make_tools(state: AgentState) -> list:
         Si To Do tiene cambios manuales de título o fecha, pregunta antes de importarlos.
         Usa import_manual_todo_changes=True si el estudiante quiere conservar lo editado en To Do.
         Usa restore_assistant_tasks=True si el estudiante quiere restaurar To Do con los datos del asistente.
-        Úsala proactivamente después de registrar o modificar actividades,
-        o cuando el estudiante pida ver sus tareas en Microsoft To Do."""
+        Úsala solo cuando el estudiante pida explícitamente ver o sincronizar sus tareas en Microsoft To Do."""
         from agents.support.dependencies import get_microsoft_todo_sync_service
         from services.planning.academic_activity_service import (
             coerce_academic_activities,
@@ -1478,9 +1573,110 @@ def make_tools(state: AgentState) -> list:
                     _cycle_updates["academic_activities"] = merged
                     return json.dumps({"result": msg, "_state_update": {"academic_activities": merged}})
                 return msg
-            return f"No se pudo sincronizar: {result.detail or result.error_code or 'error desconocido'}"
+            return "No se pudo sincronizar con Microsoft To Do. Intenta de nuevo más tarde."
+        except Exception:
+            return "No se pudo sincronizar con Microsoft To Do. Intenta de nuevo más tarde."
+
+    @tool
+    def apply_outlook_reconciliation(
+        accept: bool,
+        reconciliation_id: str | None = None,
+    ) -> str:
+        """Aplica o rechaza un cambio detectado en Outlook Calendar.
+        Úsala cuando el estudiante responda sí/no a una notificación de cambio detectado.
+        accept: True si confirma el cambio, False si lo rechaza.
+        reconciliation_id: ID del cambio pendiente (opcional; si se omite, aplica al más reciente)."""
+        from agents.support.dependencies import get_reconciliation_repository
+
+        if not student_id:
+            return "No pude identificar tu perfil para procesar el cambio."
+
+        repo = get_reconciliation_repository()
+        try:
+            pending = repo.list_pending_for_student(str(student_id))
         except Exception as exc:
-            return f"Error al sincronizar con To Do: {exc}"
+            return f"No pude consultar los cambios pendientes: {exc}"
+
+        unresolved = [p for p in pending if p.get("resolved_at") is None]
+        if not unresolved:
+            return "No hay cambios de Outlook pendientes de confirmar."
+
+        if reconciliation_id:
+            target = next((p for p in unresolved if str(p.get("id") or "") == reconciliation_id), None)
+            if target is None:
+                return f"No encontré el cambio pendiente con ID '{reconciliation_id}'."
+        else:
+            target = unresolved[0]
+
+        rec_id = str(target["id"])
+        drift_kind = str(target.get("drift_kind") or "")
+        instance_id = str(target.get("instance_id") or "")
+        session_title = str(target.get("session_title") or "la sesión").strip() or "la sesión"
+
+        if not accept:
+            try:
+                repo.resolve(rec_id, "rejected")
+            except Exception:
+                pass
+
+            if drift_kind == "moved":
+                try:
+                    orig_start = _parse_reconciliation_datetime(target.get("original_start"))
+                    orig_end = _parse_reconciliation_datetime(target.get("original_end"))
+                    if orig_start and orig_end and student_id:
+                        from agents.support.dependencies import get_outlook_calendar_sync_service
+                        get_outlook_calendar_sync_service().patch_single_study_session(
+                            student_id=int(student_id),
+                            source_instance_key=instance_id,
+                            subject=session_title,
+                            new_starts_at=orig_start,
+                            new_ends_at=orig_end,
+                            timezone=timezone_name,
+                        )
+                except Exception:
+                    pass
+
+            return (
+                f"De acuerdo. Mantendré tu plan original para *{session_title}* "
+                "sin aplicar el cambio de Outlook."
+            )
+
+        # accept=True
+        if drift_kind == "moved":
+            new_start = _parse_reconciliation_datetime(target.get("new_start"))
+            new_end = _parse_reconciliation_datetime(target.get("new_end"))
+            if not new_start or not new_end:
+                return f"No tengo las nuevas fechas para *{session_title}*. No pude aplicar el cambio."
+            try:
+                from agents.support.dependencies import get_study_plan_materialization_service
+                updated = get_study_plan_materialization_service().update_instance_schedule_manually(
+                    source_instance_key=instance_id,
+                    student_id=int(student_id),
+                    new_starts_at=new_start,
+                    new_ends_at=new_end,
+                )
+                repo.resolve(rec_id, "accepted")
+                if updated:
+                    return f"✅ Actualicé *{session_title}* en tu plan con la nueva hora de Outlook."
+                return f"No pude actualizar *{session_title}* en el plan (puede que ya no exista la instancia)."
+            except Exception as exc:
+                return f"Error al aplicar el cambio en el plan: {exc}"
+
+        if drift_kind == "deleted":
+            try:
+                from agents.support.dependencies import get_study_plan_materialization_service
+                cancelled = get_study_plan_materialization_service().cancel_instance(
+                    source_instance_key=instance_id,
+                    student_id=int(student_id),
+                )
+                repo.resolve(rec_id, "accepted")
+                if cancelled:
+                    return f"✅ Eliminé *{session_title}* de tu plan de estudio."
+                return f"La sesión *{session_title}* ya no estaba activa en el plan."
+            except Exception as exc:
+                return f"Error al eliminar la sesión del plan: {exc}"
+
+        return f"No pude procesar el cambio para *{session_title}*."
 
     return [
         get_current_datetime,
@@ -1502,6 +1698,7 @@ def make_tools(state: AgentState) -> list:
         add_one_time_event,
         sync_plan_to_calendar,
         sync_tasks_to_todo,
+        apply_outlook_reconciliation,
     ]
 
 
@@ -2771,6 +2968,72 @@ def _round_up_to_step(value: int, step: int) -> int:
     return value if remainder == 0 else value + (step - remainder)
 
 
+def _day_str_to_weekday(day_str: str) -> int | None:
+    """Convierte nombre de día (español title-case o inglés) a weekday number (lunes=0)."""
+    _MAP = {
+        "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2,
+        "jueves": 3, "viernes": 4, "sabado": 5, "sábado": 5, "domingo": 6,
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6,
+    }
+    return _MAP.get(str(day_str or "").strip().lower())
+
+
+def _resolve_target_date_from_text(text: str, session_day: str, timezone_name: str) -> date | None:
+    """Resuelve texto de fecha (ISO, día, 'esta semana', etc.) a una fecha concreta.
+
+    session_day: día del evento en español title-case o inglés (ej. 'Martes', 'tuesday').
+    Retorna None si no se puede resolver.
+    """
+    from zoneinfo import ZoneInfo
+
+    text_norm = str(text or "").strip()
+    if not text_norm:
+        return None
+
+    # 1. ISO date YYYY-MM-DD
+    try:
+        return date.fromisoformat(text_norm.replace(" ", ""))
+    except ValueError:
+        pass
+
+    # 2. Today en timezone del estudiante
+    try:
+        zone = ZoneInfo(str(timezone_name or "America/Bogota"))
+    except Exception:
+        zone = ZoneInfo("America/Bogota")
+    today = datetime.now(zone).date()
+
+    key = text_norm.lower()
+
+    # 3. Detectar semana siguiente
+    next_week = any(kw in key for kw in ("próxima", "proxima", "que viene", "siguiente", "next week"))
+
+    # 4. Detectar día mencionado en el texto, fallback al día de la sesión
+    _ALIASES: dict[str, int] = {
+        "lunes": 0, "martes": 1, "miercoles": 2, "miércoles": 2,
+        "jueves": 3, "viernes": 4, "sabado": 5, "sábado": 5, "domingo": 6,
+        "monday": 0, "tuesday": 1, "wednesday": 2, "thursday": 3,
+        "friday": 4, "saturday": 5, "sunday": 6,
+    }
+    detected_wd: int | None = None
+    for alias, wd in _ALIASES.items():
+        if alias in key:
+            detected_wd = wd
+            break
+    if detected_wd is None:
+        detected_wd = _day_str_to_weekday(session_day)
+    if detected_wd is None:
+        return None
+
+    # 5. Calcular la fecha correspondiente dentro de la semana actual (o siguiente)
+    current_monday = today - timedelta(days=today.weekday())
+    candidate = current_monday + timedelta(days=detected_wd)
+    if next_week:
+        candidate += timedelta(days=7)
+    return candidate
+
+
 def _minutes_to_hhmm(value: int) -> str:
     hour = value // 60
     minute = value % 60
@@ -2973,6 +3236,20 @@ def _get_student_id(state: AgentState) -> int | None:
         return profile.persisted_student_id
     d = profile.model_dump() if hasattr(profile, "model_dump") else {}
     return d.get("persisted_student_id")
+
+
+def _parse_reconciliation_datetime(value: object) -> datetime | None:
+    if value is None:
+        return None
+    if isinstance(value, datetime):
+        return value
+    try:
+        raw = str(value).strip()
+        if not raw:
+            return None
+        return datetime.fromisoformat(raw.replace("Z", "+00:00"))
+    except Exception:
+        return None
 
 
 __all__ = ["extract_tool_state_updates", "make_tools"]

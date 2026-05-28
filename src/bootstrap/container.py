@@ -88,6 +88,14 @@ from services.sync.outlook_one_time_event_service import (
     OutlookOneTimeEventService,
     build_outlook_one_time_event_service,
 )
+from repositories.planning.reconciliation_repository import (
+    ReconciliationRepository,
+    build_reconciliation_repository,
+)
+from services.planning.study_session_reconciliation_service import (
+    StudySessionReconciliationService,
+    build_study_session_reconciliation_service,
+)
 
 from .settings import BootstrapSettings, database_url_from_env, load_bootstrap_settings
 
@@ -340,6 +348,41 @@ class AppContainer:
         service: OutlookOneTimeEventService | None,
     ) -> None:
         self._set_override("outlook_one_time_event_service", service)
+
+    def get_reconciliation_repository(self) -> ReconciliationRepository:
+        return self._get_or_build(
+            "reconciliation_repository",
+            self._build_reconciliation_repository,
+        )
+
+    def set_reconciliation_repository(
+        self,
+        repository: ReconciliationRepository | None,
+    ) -> None:
+        self._set_override("reconciliation_repository", repository)
+
+    def get_study_session_reconciliation_service(self) -> StudySessionReconciliationService:
+        return self._get_or_build(
+            "study_session_reconciliation_service",
+            self._build_study_session_reconciliation_service,
+        )
+
+    def set_study_session_reconciliation_service(
+        self,
+        service: StudySessionReconciliationService | None,
+    ) -> None:
+        self._set_override("study_session_reconciliation_service", service)
+
+    def _build_reconciliation_repository(self) -> ReconciliationRepository:
+        return build_reconciliation_repository(database_url_from_env())
+
+    def _build_study_session_reconciliation_service(self) -> StudySessionReconciliationService:
+        materialization_service = self.get_study_plan_materialization_service()
+        return build_study_session_reconciliation_service(
+            instances_repository=getattr(materialization_service, "repository", None),
+            state_repository=self.get_microsoft_graph_state_repository(),
+            auth_client=self.get_microsoft_oauth_client(),
+        )
 
     def _build_study_plan_enrichment_service(self) -> StudyPlanEnrichmentService:
         return build_study_plan_enrichment_service(

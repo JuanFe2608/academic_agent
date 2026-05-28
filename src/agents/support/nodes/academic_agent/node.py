@@ -175,19 +175,29 @@ def academic_agent(state: AgentState, config: RunnableConfig | None = None) -> d
                 _append_operational_note(return_dict, str(todo_update["operational_note"]))
             if "academic_activities" in todo_update:
                 pre_todo_snapshot = list(return_dict.get("academic_activities") or [])
-                return_dict["academic_activities"] = todo_update["academic_activities"]
+                # Merge por activity_id: actualiza solo los campos de los registros
+                # devueltos por el sync (p.ej. todo_task_id) sin descartar actividades
+                # que el servicio no incluyó en synced_activities (lista parcial).
+                todo_by_id: dict[str, dict] = {}
+                for raw in todo_update["academic_activities"]:
+                    act_id = raw.get("activity_id") if isinstance(raw, dict) else getattr(raw, "activity_id", None)
+                    if act_id:
+                        todo_by_id[str(act_id)] = raw if isinstance(raw, dict) else raw.model_dump()
+                merged_activities = []
+                for raw in pre_todo_snapshot:
+                    act_id = raw.get("activity_id") if isinstance(raw, dict) else getattr(raw, "activity_id", None)
+                    merged_activities.append(
+                        todo_by_id.get(str(act_id), raw) if act_id else raw
+                    )
+                return_dict["academic_activities"] = merged_activities
                 _persist_todo_task_id_updates(state, return_dict, pre_todo_snapshot)
         reminder_update = _sync_activity_reminders_after_tool_update(state, return_dict, whatsapp_recipient_id=whatsapp_recipient_id)
         if reminder_update:
             return_dict["reminders"] = reminder_update
 
-    if "study_plan" in tool_updates or "subjects" in tool_updates:
-        study_sync_update = _materialize_and_sync_study_plan_after_tool_update(state, return_dict)
-        if study_sync_update:
-            operational_note = study_sync_update.pop("operational_note", None)
-            return_dict.update(study_sync_update)
-            if operational_note:
-                _append_operational_note(return_dict, str(operational_note))
+    # La materialización y sincronización del plan con Outlook Calendar se hace ÚNICAMENTE
+    # cuando el estudiante confirma explícitamente las sesiones propuestas (via sync_plan_to_calendar).
+    # No auto-sincronizar aquí evita que el plan se guarde en Outlook sin confirmación del estudiante.
 
     return return_dict
 
@@ -378,6 +388,26 @@ def _is_empty_message_content(content: object) -> bool:
                     return False
         return True
     return False
+
+
+def _sanitize_microsoft_sync_error(detail: str | None) -> str:
+    """Convierte un error técnico de Microsoft en un mensaje genérico para el usuario.
+
+    Oculta AADSTS codes, Correlation IDs y trazas de stack que no son relevantes
+    para el estudiante y pueden generar confusión o alarma innecesaria.
+    """
+    import re
+
+    if not detail:
+        return "error de conexión con Microsoft"
+    if re.search(r"AADSTS\d+", detail):
+        return "error de autenticación con Microsoft"
+    if re.search(r"(CorrelationId|TraceId|Timestamp|trace_id|correlation_id)", detail, re.IGNORECASE):
+        return "error de conexión con Microsoft"
+    # Truncar mensajes muy largos para no exponer detalles técnicos
+    if len(detail) > 120:
+        return "error de conexión con Microsoft"
+    return detail
 
 
 def _append_operational_note(update: dict, note: str) -> None:
@@ -784,11 +814,12 @@ def _sync_academic_activities_to_todo_after_tool_update(
         return update_payload
 
     if not getattr(result, "synced", False):
-        detail = getattr(result, "detail", None) or getattr(result, "error_code", None) or "error desconocido"
+        raw_detail = getattr(result, "detail", None) or getattr(result, "error_code", None)
+        safe_detail = _sanitize_microsoft_sync_error(raw_detail)
         return {
             "operational_note": (
                 "Nota operativa: guardé la actividad localmente, "
-                f"pero no pude sincronizar Microsoft To Do ({detail})."
+                f"pero no pude sincronizar Microsoft To Do ({safe_detail})."
             )
         }
     if not getattr(result, "synced_activities", None):
@@ -862,10 +893,11 @@ def _materialize_and_sync_study_plan_after_tool_update(
                 materialized_horizon_days=materialization.horizon_days,
                 materialized_through_date=materialization.materialized_through_date,
             )
+            raw_mat_detail = materialization.detail or materialization.error_code
+            safe_mat_detail = _sanitize_microsoft_sync_error(raw_mat_detail)
             merged["operational_note"] = (
                 "Nota operativa: guardé el plan localmente, "
-                "pero no pude preparar las sesiones fechadas para Outlook "
-                f"({materialization.detail or materialization.error_code or 'error desconocido'})."
+                f"pero no pude preparar las sesiones fechadas para Outlook ({safe_mat_detail})."
             )
             return merged
 
@@ -883,10 +915,11 @@ def _materialize_and_sync_study_plan_after_tool_update(
                 "synced_event_map": dict(sync.synced_event_map),
             }
         else:
+            raw_sync_detail = sync.detail or sync.error_code
+            safe_sync_detail = _sanitize_microsoft_sync_error(raw_sync_detail)
             merged["operational_note"] = (
                 "Nota operativa: guardé el plan localmente, "
-                "pero no pude sincronizar las sesiones en Outlook Calendar "
-                f"({sync.detail or sync.error_code or 'error desconocido'})."
+                f"pero no pude sincronizar las sesiones en Outlook Calendar ({safe_sync_detail})."
             )
         return merged
     except Exception:

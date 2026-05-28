@@ -530,15 +530,37 @@ def render_whatsapp_reminder_message(dispatch: LeasedReminderDispatch) -> str:
     if kind == "daily_agenda" or reminder_type == "daily_agenda":
         return _render_daily_agenda_message(dispatch)
 
+    if kind == "motivational" or reminder_type == "motivational":
+        _MOTIVATIONAL_PHRASES = (
+            "Cada hora de estudio de hoy es una inversión que cobras en el examen.",
+            "El progreso no siempre se ve, pero siempre se acumula. Sigue adelante.",
+            "Una tarea a la vez. Tú puedes con esto.",
+            "Los hábitos de hoy construyen los resultados de mañana. Empieza.",
+            "Cuando sientas que no puedes más, recuerda por qué empezaste. Vale la pena.",
+            "Cada sesión de estudio que completas es un paso más cerca de tu meta.",
+        )
+        student_name = str(dispatch.payload.get("student_name") or "Estudiante").strip() or "Estudiante"
+        phrase = _MOTIVATIONAL_PHRASES[int(dispatch.id) % len(_MOTIVATIONAL_PHRASES)]
+        return f"Hola, {student_name}. {phrase}"
+
     if kind == "activity_due" or reminder_type == "activity_due":
-        lead_text = _lead_text(lead_minutes)
+        activity_type = str(dispatch.payload.get("activity_type") or "").strip()
+        subject_name = str(dispatch.payload.get("subject_name") or "").strip()
+        type_label = _activity_type_label(activity_type)
+        due_at_raw = dispatch.payload.get("due_at") or dispatch.payload.get("starts_at")
+        timezone_name = str(dispatch.payload.get("timezone") or "America/Bogota")
+        due_label = _format_due_date_spanish(due_at_raw, timezone_name=timezone_name)
+        remaining_text = _remaining_time_text(lead_minutes)
+        if subject_name and subject_name.lower() not in title.lower():
+            activity_desc = f"{type_label} de {subject_name}"
+        elif title:
+            activity_desc = title
+        else:
+            activity_desc = type_label
         return "\n".join(
             [
-                "Recordatorio de actividad academica",
-                f"Actividad: {title}",
-                f"Vence: {starts_at}",
-                f"Faltan {lead_text}.",
-                "Prioriza cerrar esta entrega antes de abrir nuevas tareas.",
+                f"Tienes *{activity_desc}* el {due_label}.",
+                f"Te quedan {remaining_text}. ¡Prepárate!",
             ]
         )
 
@@ -760,6 +782,58 @@ def _lead_text(minutes: int) -> str:
         hours = minutes // 60
         return "1 hora" if hours == 1 else f"{hours} horas"
     return f"{minutes} minutos"
+
+
+_ACTIVITY_TYPE_LABELS: dict[str, str] = {
+    "parcial": "Parcial",
+    "quiz": "Quiz",
+    "tarea": "Tarea",
+    "taller": "Taller",
+    "entrega": "Entrega",
+    "exposicion": "Exposicion",
+    "exposición": "Exposicion",
+    "proyecto": "Proyecto",
+    "estudio_pendiente": "Estudio pendiente",
+}
+_WEEKDAYS_ES = ("lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo")
+_MONTHS_ES = (
+    "", "enero", "febrero", "marzo", "abril", "mayo", "junio",
+    "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+)
+
+
+def _activity_type_label(activity_type: str) -> str:
+    key = str(activity_type or "").strip().lower()
+    return _ACTIVITY_TYPE_LABELS.get(key, key.capitalize()) or "Actividad"
+
+
+def _format_due_date_spanish(value: object, *, timezone_name: str) -> str:
+    parsed = _parse_datetime(value)
+    if parsed is None:
+        return str(value or "")
+    try:
+        zone = ZoneInfo(timezone_name)
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=zone)
+        else:
+            parsed = parsed.astimezone(zone)
+    except Exception:
+        pass
+    weekday = _WEEKDAYS_ES[parsed.weekday()]
+    month = _MONTHS_ES[parsed.month]
+    return f"{weekday} {parsed.day} de {month} a las {parsed.strftime('%H:%M')}"
+
+
+def _remaining_time_text(lead_minutes: int) -> str:
+    if lead_minutes <= 0:
+        return "poco tiempo"
+    if lead_minutes < 60:
+        return f"{lead_minutes} minuto{'s' if lead_minutes != 1 else ''}"
+    if lead_minutes < 24 * 60:
+        hours = lead_minutes // 60
+        return f"{hours} hora{'s' if hours != 1 else ''}"
+    days = lead_minutes // (24 * 60)
+    return f"{days} día{'s' if days != 1 else ''}"
 
 
 def _is_retryable_whatsapp_error(exc: WhatsAppClientError) -> bool:

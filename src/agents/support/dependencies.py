@@ -304,6 +304,32 @@ def set_outlook_one_time_event_service(
     get_app_container().set_outlook_one_time_event_service(service)
 
 
+def get_reconciliation_repository() -> ReconciliationRepository:
+    """Retorna el repositorio de reconciliaciones pendientes de Outlook."""
+
+    return get_app_container().get_reconciliation_repository()
+
+
+def set_reconciliation_repository(repository: ReconciliationRepository | None) -> None:
+    """Permite inyectar el repositorio de reconciliaciones durante pruebas."""
+
+    get_app_container().set_reconciliation_repository(repository)
+
+
+def get_study_session_reconciliation_service() -> StudySessionReconciliationService:
+    """Retorna el servicio de detección de drift de sesiones en Outlook."""
+
+    return get_app_container().get_study_session_reconciliation_service()
+
+
+def set_study_session_reconciliation_service(
+    service: StudySessionReconciliationService | None,
+) -> None:
+    """Permite inyectar el servicio de reconciliación durante pruebas."""
+
+    get_app_container().set_study_session_reconciliation_service(service)
+
+
 __all__ = [
     "get_academic_activity_persistence_service",
     "get_microsoft_graph_state_repository",
@@ -318,12 +344,14 @@ __all__ = [
     "get_outlook_study_calendar_reconciliation_service",
     "get_outlook_one_time_event_service",
     "get_personalization_service",
+    "get_reconciliation_repository",
     "get_reminders_service",
     "get_schedule_service",
     "get_study_plan_materialization_service",
     "get_study_planning_persistence_service",
     "get_study_replanning_service",
     "get_study_recommendation_service",
+    "get_study_session_reconciliation_service",
     "get_tracking_service",
     "set_academic_activity_persistence_service",
     "set_microsoft_graph_state_repository",
@@ -338,6 +366,7 @@ __all__ = [
     "set_outlook_study_calendar_reconciliation_service",
     "set_outlook_one_time_event_service",
     "set_personalization_service",
+    "set_reconciliation_repository",
     "set_reminders_service",
     "set_schedule_service",
     "set_study_plan_materialization_service",
@@ -346,5 +375,6 @@ __all__ = [
     "get_study_plan_enrichment_service",
     "set_study_plan_enrichment_service",
     "set_study_recommendation_service",
+    "set_study_session_reconciliation_service",
     "set_tracking_service",
 ]

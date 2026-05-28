@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import json as _json
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import date, datetime
@@ -65,6 +66,32 @@ class StudyPlanInstancesRepository(Protocol):
         active_from: datetime,
         instances: list[MaterializedStudyPlanInstance],
     ) -> SyncStudyPlanInstancesResult: ...
+
+    def find_instances_by_event_and_date_range(
+        self,
+        *,
+        student_id: int,
+        study_plan_profile_id: int,
+        source_event_id: str,
+        planned_date_from: date,
+        planned_date_to: date,
+    ) -> list[dict[str, Any]]: ...
+
+    def update_instance_schedule(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+        new_starts_at: datetime,
+        new_ends_at: datetime,
+    ) -> bool: ...
+
+    def cancel_instance(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+    ) -> bool: ...
 
 
 class InMemoryStudyPlanInstancesRepository:
@@ -145,20 +172,21 @@ class InMemoryStudyPlanInstancesRepository:
                 continue
 
             protected = existing["status"] in _PROTECTED_INSTANCE_STATUSES
-            existing.update(
-                {
-                    "student_id": student_id,
-                    "study_plan_profile_id": study_plan_profile_id,
-                    "study_plan_event_id": instance.study_plan_event_id,
-                    "planned_date": instance.planned_date,
-                    "starts_at": instance.starts_at,
-                    "ends_at": instance.ends_at,
-                    "timezone": instance.timezone,
-                    "source": "materialized_plan",
-                    "instance_payload": dict(instance.instance_payload),
-                    "updated_at": datetime.now(tz=instance.starts_at.tzinfo),
-                }
-            )
+            manually_moved = (existing.get("instance_payload") or {}).get("manually_moved") is True
+            base_update: dict[str, Any] = {
+                "student_id": student_id,
+                "study_plan_profile_id": study_plan_profile_id,
+                "study_plan_event_id": instance.study_plan_event_id,
+                "planned_date": instance.planned_date,
+                "timezone": instance.timezone,
+                "source": "materialized_plan",
+                "updated_at": datetime.now(tz=instance.starts_at.tzinfo),
+            }
+            if not manually_moved:
+                base_update["starts_at"] = instance.starts_at
+                base_update["ends_at"] = instance.ends_at
+                base_update["instance_payload"] = dict(instance.instance_payload)
+            existing.update(base_update)
             if not protected:
                 existing["status"] = "scheduled"
                 existing["completion_pct"] = None
@@ -168,6 +196,74 @@ class InMemoryStudyPlanInstancesRepository:
             materialized_instance_count=len(instances),
             superseded_instance_count=superseded,
         )
+
+    def find_instances_by_event_and_date_range(
+        self,
+        *,
+        student_id: int,
+        study_plan_profile_id: int,
+        source_event_id: str,
+        planned_date_from: date,
+        planned_date_to: date,
+    ) -> list[dict[str, Any]]:
+        result: list[dict[str, Any]] = []
+        for payload in self._instances_by_key.values():
+            if payload.get("student_id") != student_id:
+                continue
+            if payload.get("study_plan_profile_id") != study_plan_profile_id:
+                continue
+            if payload.get("status") in ("superseded", "deleted"):
+                continue
+            inst_payload = payload.get("instance_payload") or {}
+            if str(inst_payload.get("source_event_id") or "") != str(source_event_id):
+                continue
+            pd = payload.get("planned_date")
+            if isinstance(pd, str):
+                try:
+                    pd = date.fromisoformat(pd)
+                except ValueError:
+                    continue
+            if pd is None or not (planned_date_from <= pd <= planned_date_to):
+                continue
+            result.append(dict(payload))
+        return result
+
+    def update_instance_schedule(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+        new_starts_at: datetime,
+        new_ends_at: datetime,
+    ) -> bool:
+        existing = self._instances_by_key.get(source_instance_key)
+        if existing is None or existing.get("student_id") != student_id:
+            return False
+        if existing.get("status") in ("superseded", "deleted"):
+            return False
+        existing["starts_at"] = new_starts_at
+        existing["ends_at"] = new_ends_at
+        existing["instance_payload"] = {
+            **(existing.get("instance_payload") or {}),
+            "manually_moved": True,
+        }
+        existing["updated_at"] = datetime.now(tz=new_starts_at.tzinfo)
+        return True
+
+    def cancel_instance(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+    ) -> bool:
+        existing = self._instances_by_key.get(source_instance_key)
+        if existing is None or existing.get("student_id") != student_id:
+            return False
+        if existing.get("status") in ("superseded", "deleted"):
+            return False
+        existing["status"] = "deleted"
+        existing["updated_at"] = datetime.now()
+        return True
 
 
 class PostgresStudyPlanInstancesRepository:
@@ -268,11 +364,23 @@ class PostgresStudyPlanInstancesRepository:
                         study_plan_profile_id = EXCLUDED.study_plan_profile_id,
                         study_plan_event_id = EXCLUDED.study_plan_event_id,
                         planned_date = EXCLUDED.planned_date,
-                        starts_at = EXCLUDED.starts_at,
-                        ends_at = EXCLUDED.ends_at,
+                        starts_at = CASE
+                            WHEN (study_plan_event_instances.instance_payload->>'manually_moved')::boolean IS TRUE
+                            THEN study_plan_event_instances.starts_at
+                            ELSE EXCLUDED.starts_at
+                        END,
+                        ends_at = CASE
+                            WHEN (study_plan_event_instances.instance_payload->>'manually_moved')::boolean IS TRUE
+                            THEN study_plan_event_instances.ends_at
+                            ELSE EXCLUDED.ends_at
+                        END,
                         timezone = EXCLUDED.timezone,
                         source = EXCLUDED.source,
-                        instance_payload = EXCLUDED.instance_payload,
+                        instance_payload = CASE
+                            WHEN (study_plan_event_instances.instance_payload->>'manually_moved')::boolean IS TRUE
+                            THEN study_plan_event_instances.instance_payload
+                            ELSE EXCLUDED.instance_payload
+                        END,
                         status = CASE
                             WHEN study_plan_event_instances.status = ANY(%s)
                                 THEN study_plan_event_instances.status
@@ -312,6 +420,93 @@ class PostgresStudyPlanInstancesRepository:
             materialized_instance_count=len(instances),
             superseded_instance_count=superseded_count,
         )
+
+    def find_instances_by_event_and_date_range(
+        self,
+        *,
+        student_id: int,
+        study_plan_profile_id: int,
+        source_event_id: str,
+        planned_date_from: date,
+        planned_date_to: date,
+    ) -> list[dict[str, Any]]:
+        with self._connect() as conn:
+            rows = conn.execute(
+                """
+                SELECT source_instance_key, planned_date, starts_at, ends_at, instance_payload
+                FROM study_plan_event_instances
+                WHERE student_id = %s
+                  AND study_plan_profile_id = %s
+                  AND instance_payload->>'source_event_id' = %s
+                  AND planned_date BETWEEN %s AND %s
+                  AND status NOT IN ('superseded', 'deleted')
+                ORDER BY planned_date
+                """,
+                (student_id, study_plan_profile_id, source_event_id, planned_date_from, planned_date_to),
+            ).fetchall()
+        result: list[dict[str, Any]] = []
+        for row in rows:
+            raw_payload = row[4] if row[4] is not None else {}
+            if isinstance(raw_payload, str):
+                try:
+                    raw_payload = _json.loads(raw_payload)
+                except Exception:
+                    raw_payload = {}
+            result.append({
+                "source_instance_key": str(row[0] or ""),
+                "planned_date": row[1],
+                "starts_at": row[2],
+                "ends_at": row[3],
+                "instance_payload": raw_payload,
+            })
+        return result
+
+    def update_instance_schedule(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+        new_starts_at: datetime,
+        new_ends_at: datetime,
+    ) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                UPDATE study_plan_event_instances
+                SET starts_at = %s,
+                    ends_at = %s,
+                    instance_payload = instance_payload || '{"manually_moved": true}'::jsonb,
+                    updated_at = NOW()
+                WHERE source_instance_key = %s
+                  AND student_id = %s
+                  AND status NOT IN ('superseded', 'deleted')
+                RETURNING source_instance_key
+                """,
+                (new_starts_at, new_ends_at, source_instance_key, student_id),
+            ).fetchone()
+            conn.commit()
+        return row is not None
+
+    def cancel_instance(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+    ) -> bool:
+        with self._connect() as conn:
+            row = conn.execute(
+                """
+                UPDATE study_plan_event_instances
+                SET status = 'deleted', updated_at = NOW()
+                WHERE source_instance_key = %s
+                  AND student_id = %s
+                  AND status NOT IN ('superseded', 'deleted')
+                RETURNING source_instance_key
+                """,
+                (source_instance_key, student_id),
+            ).fetchone()
+            conn.commit()
+        return row is not None
 
     @contextmanager
     def _connect(self) -> Iterator[Any]:

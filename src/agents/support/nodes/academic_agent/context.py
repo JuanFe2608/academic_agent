@@ -77,7 +77,9 @@ _STATIC_INSTRUCTIONS = (
     "4. Mantener su plan semanal actualizado\n"
     "\n"
     "CÓMO ACTUAR:\n"
-    "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity, luego update_study_plan\n"
+    "- Cuando el estudiante mencione un examen, tarea o entrega → usa add_academic_activity; "
+    "luego llama update_study_plan para PROPONER sesiones, presenta la propuesta y pregunta "
+    "si la confirma antes de llamar sync_plan_to_calendar\n"
     "- Cuando pida reorganizar su semana o actualizar el plan → usa update_study_plan directamente\n"
     "- Cuando pregunte cómo estudiar algo o diga 'quiero estudiar X' → trátalo como guía temática, "
     "no solo como recomendación de método: identifica la materia/tema, responde primero con "
@@ -111,8 +113,12 @@ _STATIC_INSTRUCTIONS = (
     "2. Pregunta UNA SOLA VEZ: '¿Quieres marcarla como prioritaria? ⭐' (sí = is_priority=True)\n"
     "   NO preguntes prioridad alta/media/baja, ni urgencia — eso se calcula solo.\n"
     "3. Llama add_academic_activity con los datos y is_priority según la respuesta\n"
-    "4. Llama update_study_plan con el motivo para incorporar la actividad al plan de sesiones\n"
-    "5. Sincroniza con To Do: llama sync_tasks_to_todo de forma proactiva\n"
+    "4. Llama update_study_plan — devuelve una PROPUESTA de sesiones, NO las guarda en Outlook todavía.\n"
+    "   Preséntala al estudiante: '📅 Te propongo estas sesiones de estudio, ¿las confirmas o quieres ajustar algo?'\n"
+    "5. Espera respuesta del estudiante:\n"
+    "   → Confirma → llama sync_plan_to_calendar\n"
+    "   → Quiere ajustar → usa move_study_session para el cambio puntual, luego pregunta de nuevo si confirma\n"
+    "   → Rechaza → no llames sync_plan_to_calendar\n"
     "6. Si el estudiante dice que ya completó algo → usa mark_activity_done\n"
     "\n"
     "CALENDARIO vs MICROSOFT TO DO:\n"
@@ -134,7 +140,9 @@ _STATIC_INSTRUCTIONS = (
     "(ej: 'mueve la sesión de Física del martes a las 5', 'esa sesión no me sirve', "
     "'ponla después de clase') → usa move_study_session. No regeneres todo el plan si solo quieren mover una sesión.\n"
     "- move_study_session debe validar disponibilidad antes de aplicar; si no cabe, presenta alternativas.\n"
-    "- update_study_plan genera y aplica el plan en un solo paso — NO pidas confirmación al estudiante.\n"
+    "- update_study_plan PROPONE el plan pero NO lo guarda en Outlook. Después de mostrarlo,\n"
+    "  SIEMPRE pregunta: '¿Confirmas estas sesiones para guardarlas en tu Outlook? ¿O quieres ajustar algo?'\n"
+    "  Solo llama sync_plan_to_calendar cuando el estudiante confirme explícitamente.\n"
     "- Las materias y su orden de prioridad se derivan automáticamente del horario fijo registrado.\n"
     "- NUNCA razones por tu cuenta si hay espacio disponible en el horario — SIEMPRE llama update_study_plan\n"
     "  y deja que el servicio calcule. Tú no decides si caben bloques nuevos.\n"
@@ -304,6 +312,8 @@ def build_dynamic_context(state: AgentState) -> str:
         "  Continúa ese flujo — no lo interpretes como un intent nuevo."
     ) if pending_question else ""
 
+    pending_reconciliation_section = _format_pending_reconciliations(state)
+
     return (
         "---\n"
         "PERFIL DEL ESTUDIANTE:\n"
@@ -345,6 +355,7 @@ def build_dynamic_context(state: AgentState) -> str:
         f"- Zona horaria: {timezone_name}\n"
         "- Si el estudiante pregunta qué día es hoy, responde usando estos datos, no tu conocimiento interno.\n"
         "- Para expresiones relativas como hoy, mañana, esta semana o próximos días, usa esta fecha local."
+        f"{pending_reconciliation_section}"
         f"{pending_section}"
     )
 
@@ -475,6 +486,45 @@ def format_study_plan(study_plan) -> str:
     if extra > 0:
         lines.append(f"  ... y {extra} materia(s) más")
     return "\n".join(lines)
+
+
+def _format_pending_reconciliations(state: AgentState) -> str:
+    try:
+        from agents.support.dependencies import get_reconciliation_repository
+
+        profile = state.student_profile
+        student_id_raw = getattr(profile, "persisted_student_id", None)
+        if not student_id_raw:
+            return ""
+        pending = get_reconciliation_repository().list_pending_for_student(str(student_id_raw))
+        unresolved = [p for p in pending if p.get("resolved_at") is None]
+        if not unresolved:
+            return ""
+        lines = ["\n\n📋 CAMBIOS PENDIENTES DE CONFIRMAR EN OUTLOOK:"]
+        for p in unresolved[:5]:
+            title = str(p.get("session_title") or "Sesión")
+            drift_kind = str(p.get("drift_kind") or "")
+            orig_start = p.get("original_start")
+            date_str = _format_dt_iso(orig_start)
+            if drift_kind == "moved":
+                lines.append(f"- Sesión de {title} del {date_str}: movida — pendiente confirmación del estudiante")
+            else:
+                lines.append(f"- Sesión de {title} del {date_str}: eliminada — pendiente confirmación del estudiante")
+        return "\n".join(lines)
+    except Exception:
+        return ""
+
+
+def _format_dt_iso(value: object) -> str:
+    if value is None:
+        return "fecha desconocida"
+    try:
+        from datetime import datetime as _dt
+        if isinstance(value, _dt):
+            return value.strftime("%Y-%m-%d %H:%M")
+        return str(value)[:16]
+    except Exception:
+        return str(value or "")
 
 
 __all__ = [

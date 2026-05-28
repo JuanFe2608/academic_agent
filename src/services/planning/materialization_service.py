@@ -5,6 +5,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from datetime import date, datetime, time, timedelta
+from typing import Any
 from zoneinfo import ZoneInfo
 
 from bootstrap.errors import RepositoryConfigurationError
@@ -223,6 +224,62 @@ class StudyPlanMaterializationService:
             horizon_days=self.horizon_days,
             materialized_through_date=horizon_end.isoformat(),
         )
+
+
+    def find_instance_for_session_and_date(
+        self,
+        *,
+        student_id: int,
+        study_plan_profile_id: int,
+        source_event_id: str,
+        target_date: date,
+    ) -> dict[str, Any] | None:
+        """Busca la instancia materializada para un evento en una fecha ±1 día."""
+        try:
+            results = self.repository.find_instances_by_event_and_date_range(
+                student_id=student_id,
+                study_plan_profile_id=study_plan_profile_id,
+                source_event_id=source_event_id,
+                planned_date_from=target_date - timedelta(days=1),
+                planned_date_to=target_date + timedelta(days=1),
+            )
+            return results[0] if results else None
+        except (StudyPlanInstancesRepositoryError, RepositoryConfigurationError):
+            return None
+
+    def update_instance_schedule_manually(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+        new_starts_at: datetime,
+        new_ends_at: datetime,
+    ) -> bool:
+        """Actualiza horario de una instancia y la marca como movida manualmente."""
+        try:
+            return self.repository.update_instance_schedule(
+                source_instance_key=source_instance_key,
+                student_id=student_id,
+                new_starts_at=new_starts_at,
+                new_ends_at=new_ends_at,
+            )
+        except (StudyPlanInstancesRepositoryError, RepositoryConfigurationError):
+            return False
+
+    def cancel_instance(
+        self,
+        *,
+        source_instance_key: str,
+        student_id: int,
+    ) -> bool:
+        """Marca una instancia como eliminada (aceptar borrado del estudiante en Outlook)."""
+        try:
+            return self.repository.cancel_instance(
+                source_instance_key=source_instance_key,
+                student_id=student_id,
+            )
+        except (StudyPlanInstancesRepositoryError, RepositoryConfigurationError):
+            return False
 
 
 def build_study_plan_materialization_service() -> StudyPlanMaterializationService:

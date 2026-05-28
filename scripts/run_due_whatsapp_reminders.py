@@ -1,4 +1,8 @@
-"""Worker programado para despachar solo reminders WhatsApp vencidos."""
+"""Worker programado para despachar solo reminders WhatsApp vencidos.
+
+Cron sugerido (cada 5 minutos):
+  */5 * * * * cd /ruta/proyecto && PYTHONPATH=src python scripts/run_due_whatsapp_reminders.py >> logs/reminders.log 2>&1
+"""
 
 from __future__ import annotations
 
