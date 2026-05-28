@@ -814,7 +814,28 @@ def _sync_academic_activities_to_todo_after_tool_update(
         return update_payload
 
     if not getattr(result, "synced", False):
-        raw_detail = getattr(result, "detail", None) or getattr(result, "error_code", None)
+        error_code = str(getattr(result, "error_code", "") or "")
+        raw_detail = getattr(result, "detail", None) or error_code
+        import re as _re
+        _AUTH_RECONNECT_CODES = frozenset({
+            "missing_refresh_token",
+            "microsoft_token_not_found",
+            "invalid_grant",
+            "interaction_required",
+        })
+        is_auth_failure = (
+            error_code in _AUTH_RECONNECT_CODES
+            or bool(_re.search(r"AADSTS\d+", str(raw_detail or "")))
+        )
+        if is_auth_failure:
+            return {
+                "operational_note": (
+                    "Nota operativa: guardé la actividad localmente, pero no pude sincronizar "
+                    "Microsoft To Do porque la autenticación con Microsoft expiró. "
+                    "Informa al estudiante que su conexión Microsoft venció y ofrécele "
+                    "reconectarla usando el tool reconnect_microsoft_account."
+                )
+            }
         safe_detail = _sanitize_microsoft_sync_error(raw_detail)
         return {
             "operational_note": (

@@ -1678,6 +1678,60 @@ def make_tools(state: AgentState) -> list:
 
         return f"No pude procesar el cambio para *{session_title}*."
 
+    @tool
+    def reconnect_microsoft_account() -> str:
+        """Genera un enlace para volver a conectar la cuenta Microsoft del estudiante.
+        Úsala cuando la sincronización con Outlook Calendar o Microsoft To Do falle por
+        autenticación expirada, o cuando el estudiante pida reconectar su cuenta Microsoft.
+        Tras compartir el enlace, indica al estudiante que lo abra en su navegador,
+        complete el inicio de sesión y escriba 'listo' cuando termine."""
+        from datetime import timezone as dt_tz
+
+        from agents.support.dependencies import get_microsoft_oauth_flow_service
+
+        if not student_id:
+            return "No pude identificar tu perfil para generar el enlace de reconexión."
+
+        flow_service = get_microsoft_oauth_flow_service()
+        institutional_email = getattr(state.student_profile, "institutional_email", None) or None
+
+        try:
+            result = flow_service.start_authorization(
+                student_id=int(student_id),
+                institutional_email=institutional_email,
+                force=True,
+            )
+        except Exception:
+            return (
+                "No pude generar el enlace de reconexión. "
+                "Intenta de nuevo en unos minutos."
+            )
+
+        if not result.ok or not result.authorization_url:
+            return (
+                "No pude generar el enlace de reconexión Microsoft. "
+                "Verifica la configuración del asistente o intenta más tarde."
+            )
+
+        expires_info = ""
+        if result.expires_at:
+            from datetime import datetime
+            minutes_left = int(
+                (result.expires_at - datetime.now(dt_tz.utc)).total_seconds() / 60
+            )
+            if minutes_left > 0:
+                expires_info = f" (válido {minutes_left} min)"
+
+        return json.dumps({
+            "result": (
+                f"🔗 Enlace de reconexión Microsoft listo{expires_info}.\n\n"
+                "Abre este enlace en tu navegador, inicia sesión con tu cuenta Microsoft "
+                "y autoriza el acceso al asistente:\n\n"
+                f"{result.authorization_url}\n\n"
+                "Cuando termines, escríbeme *'listo'* o *'ya autoricé'* para continuar."
+            )
+        })
+
     return [
         get_current_datetime,
         search_study_methods,
@@ -1699,6 +1753,7 @@ def make_tools(state: AgentState) -> list:
         sync_plan_to_calendar,
         sync_tasks_to_todo,
         apply_outlook_reconciliation,
+        reconnect_microsoft_account,
     ]
 
 

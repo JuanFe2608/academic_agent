@@ -17,6 +17,13 @@ from repositories.microsoft_graph.state_repository import (
 )
 from project_env import load_project_env
 
+_PERMANENT_TOKEN_FAILURE_CODES = frozenset({
+    "invalid_grant",
+    "interaction_required",
+    "unauthorized_client",
+    "consent_required",
+})
+
 DEFAULT_MICROSOFT_SCOPES = (
     "offline_access",
     "openid",
@@ -484,6 +491,11 @@ class MicrosoftOAuthClient:
                 ),
             )
         except MicrosoftOAuthTransportError as exc:
+            if exc.error_code in _PERMANENT_TOKEN_FAILURE_CODES:
+                # Refresh token is permanently invalid — clear auth credentials so
+                # subsequent calls return missing_refresh_token immediately (no HTTP
+                # retries against Microsoft) while preserving calendar_id / todo IDs.
+                self._clear_stored_auth_credentials(student_id=student_id, stored=stored)
             return MicrosoftTokenOperationResult(
                 ok=False,
                 error_code=exc.error_code,
@@ -561,6 +573,40 @@ class MicrosoftOAuthClient:
             ),
         )
         return MicrosoftTokenOperationResult(ok=True, token=token)
+
+
+    def _clear_stored_auth_credentials(
+        self,
+        *,
+        student_id: int,
+        stored: MicrosoftTokenRecord,
+    ) -> None:
+        """Clears auth tokens while preserving calendar/todo IDs for after re-auth."""
+
+        cleared = MicrosoftTokenRecord(
+            student_id=stored.student_id,
+            access_token="",
+            refresh_token=None,
+            expires_at=datetime(2000, 1, 1, tzinfo=timezone.utc),
+            scopes=stored.scopes,
+            token_type=stored.token_type,
+            tenant_id=stored.tenant_id,
+            microsoft_user_id=stored.microsoft_user_id,
+            user_principal_name=stored.user_principal_name,
+            email=stored.email,
+            display_name=stored.display_name,
+            calendar_id=stored.calendar_id,
+            todo_task_list_id=stored.todo_task_list_id,
+            auth_metadata={
+                **stored.auth_metadata,
+                "invalidated_at": datetime.now(timezone.utc).isoformat(),
+                "invalidation_reason": "permanent_refresh_failure",
+            },
+        )
+        try:
+            self.token_store.save_token(token=cleared)
+        except Exception:
+            pass
 
 
 def build_microsoft_oauth_client_from_env(

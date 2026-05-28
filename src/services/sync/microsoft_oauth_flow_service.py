@@ -81,11 +81,16 @@ class MicrosoftOAuthFlowService:
         *,
         student_id: int,
         institutional_email: str | None = None,
+        force: bool = False,
     ) -> MicrosoftOAuthFlowStartResult:
-        """Genera un state no deterministico, lo persiste y devuelve la URL."""
+        """Genera un state no deterministico, lo persiste y devuelve la URL.
+
+        force=True omite la verificación de conexión existente — útil para reconectar
+        una cuenta Microsoft cuya autenticación ha expirado.
+        """
 
         student_id = int(student_id)
-        if self.has_connection(student_id=student_id):
+        if not force and self.has_connection(student_id=student_id):
             return MicrosoftOAuthFlowStartResult(ok=True, already_authorized=True)
 
         state_token = _generate_state_token(student_id)
