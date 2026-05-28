@@ -160,11 +160,11 @@ def test_reminders_service_schedules_academic_activity_dispatches(monkeypatch) -
     )
 
     assert result.synced is True
-    assert result.policy_count == 5
+    assert result.policy_count == 6
     assert result.schedulable_instance_count == 1
-    assert result.created_dispatch_count == 5
+    assert result.created_dispatch_count == 6
     assert result.canceled_dispatch_count == 0
-    assert len(reminders_repository._dispatches_by_id) == 5
+    assert len(reminders_repository._dispatches_by_id) == 6
     dispatch_types = {
         row["dispatch_type"] for row in reminders_repository._dispatches_by_id.values()
     }
@@ -205,9 +205,9 @@ def test_reminders_service_cancels_activity_dispatches_when_completed(monkeypatc
         timezone="America/Bogota",
     )
 
-    assert first.created_dispatch_count == 5
+    assert first.created_dispatch_count == 6
     assert second.created_dispatch_count == 0
-    assert second.canceled_dispatch_count == 5
+    assert second.canceled_dispatch_count == 6
     assert {
         row["status"] for row in reminders_repository._dispatches_by_id.values()
     } == {"canceled"}
@@ -461,8 +461,9 @@ def test_whatsapp_renderer_handles_activity_due_and_overdue_messages() -> None:
     due_message = render_whatsapp_reminder_message(due_dispatch)
     overdue_message = render_whatsapp_reminder_message(overdue_dispatch)
 
-    assert "Recordatorio de actividad academica" in due_message
-    assert "Faltan 3 horas." in due_message
+    assert "Tienes" in due_message
+    assert "Parcial 1" in due_message
+    assert "Te quedan" in due_message
     assert "Seguimiento de actividad vencida" in overdue_message
     assert "¿La completaste?" in overdue_message
     assert "complete Parcial 1" in overdue_message
